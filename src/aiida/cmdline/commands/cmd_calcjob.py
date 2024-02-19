@@ -347,3 +347,47 @@ def get_remote_and_path(calcjob, path=None):
         f'nor does its associated process class `{calcjob.process_class.__class__.__name__}`\n'
         'Please specify a path explicitly.'
     )
+
+
+@verdi_calcjob.command('inputdump')
+@arguments.CALCULATION('calcjob', type=CalculationParamType(sub_classes=('aiida.node:process.calculation.calcjob',)))
+@click.option(
+    '--path',
+    '-p',
+    type=click.Path(),
+    default=None,
+    show_default=True,
+    help='The directory to save the dumped input files.',
+)
+def calcjob_inputdump(calcjob, path):
+    from pathlib import Path
+
+    if path is None:
+        path = '.' / Path(f'cj-{calcjob.pk}')
+
+    try:
+        calcjob.base.repository.copy_tree(Path(path).resolve())
+    except:
+        raise
+
+
+@verdi_calcjob.command('outputdump')
+@arguments.CALCULATION('calcjob', type=CalculationParamType(sub_classes=('aiida.node:process.calculation.calcjob',)))
+@click.option(
+    '--path',
+    '-p',
+    type=click.Path(),
+    default=None,
+    show_default=True,
+    help='The directory to save the dumped output files.',
+)
+def calcjob_outputdump(calcjob, path):
+    from pathlib import Path
+
+    if path is None:
+        path = '.' / Path(f'cj-{calcjob}')
+
+    try:
+        calcjob.outputs.retrieved.copy_tree(path.resolve())
+    except:
+        raise
