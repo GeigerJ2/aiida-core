@@ -1,18 +1,33 @@
+import io
 import pathlib
-import re
+from pathlib import Path
+from pprint import pprint
 from typing import Union
 
+import yaml
+
+from aiida.common.folders import Folder
 from aiida.common.links import LinkType
-from aiida.orm import CalcFunctionNode, CalcJobNode, WorkChainNode, WorkFunctionNode
+from aiida.orm import (ArrayData, CalcFunctionNode, CalcJobNode, WorkChainNode,
+                       WorkFunctionNode)
+from aiida.orm.nodes.data import FolderData
+from aiida.orm.utils.serialize import AiiDADumper, represent_node
+from aiida.tools.calculations.dumping import calcjob_dump
 
 
-def recursive_dump(process_node: Union[WorkChainNode, CalcJobNode], filepath: pathlib.Path) -> None:
-
-    from pathlib import Path
+def recursive_dump(
+    process_node: Union[WorkChainNode, CalcJobNode],
+    filepath: pathlib.Path,
+    node_inputs: bool = True,
+    dump_attributes: bool = False,
+    dump_extras: bool = False,
+    use_prepare_for_submission: bool = False,
+) -> None:
     called_links = process_node.base.links.get_outgoing(link_type=(LinkType.CALL_CALC, LinkType.CALL_WORK)).all()
 
     # Don't increment index for ProcessNodes that don't have file IO (Calc/Work-FunctionNodes), such as
     # `create_kpoints_from_distance`
+
     called_links = [
         called_link
         for called_link in called_links
@@ -28,44 +43,27 @@ def recursive_dump(process_node: Union[WorkChainNode, CalcJobNode], filepath: pa
         else:
             label = f'{index:02d}-{node.process_label}'
 
-        final_path = filepath / label
-        final_path_abs = final_path.resolve()
+        node_path = filepath.resolve() / label
+        node_path.mkdir(exist_ok=True, parents=True)
+
+        # Dump node extras/attributes irrespective of type
+        if dump_attributes is True:
+            node_attributes = process_node.base.attributes.all
+            with open(node_path / '.aiida_node_attributes.yaml', 'w') as handle:
+                yaml.dump(node_attributes, handle, sort_keys=False)
+
+        if dump_extras is True:
+            node_extras = process_node.base.extras.all
+            with open(node_path / '.aiida_node_extras.yaml', 'w') as handle:
+                yaml.dump(node_extras, handle, sort_keys=False)
 
         if isinstance(node, WorkChainNode):
-            recursive_dump(node, final_path_abs)
+            recursive_dump(node, node_path, node_inputs, dump_attributes, dump_extras)
+
         elif isinstance(node, CalcJobNode):
-            node.base.repository.copy_tree(final_path_abs / Path("input"))
-            node.outputs.retrieved.copy_tree(final_path_abs / Path("output"))
-
-
-# def workchain_filedump(ctx, workchain, path, mode):
-#     """Dump input/output files of calcjobs run by the given workchain."""
-
-#     echo.echo_warning(
-#         'Caution: No provenance. The retrieved input/output files are not guaranteed to be complete '
-#         'for a full restart of the given workchain. Instead, this utility is intended for easy inspection '
-#         'of the files that were involved in its execution. For restarting workchains, see the `get_builder_restart` '
-#         'method instead.'
-#     )
-
-#     path_node_list = _recursive_get_node_path(workchain)
-#     paths = [_[0] for _ in path_node_list]
-#     paths = _number_path_elements(path_list=paths, parent_path=path)
-#     nodes = [_[1] for _ in path_node_list]
-
-#     if not Path(path).is_dir():
-#         # ctx.invoke(_workchain_maketree, workchain=workchain, path=path)
-#         _workchain_maketree(numbered_paths=paths)
-
-#     mode_functions = {
-#         'input': [calcjob_inputdump],
-#         'output': [calcjob_outputdump],
-#         'all': [calcjob_inputdump, calcjob_outputdump],
-#     }
-
-#     if mode not in mode_functions:
-#         raise KeyError(f'Provided mode not available, must be one of: {"/".join(mode_functions.keys())}.')
-
-#     for calcjob_node_path, calcjob_node in zip(paths, nodes):
-#         for func in mode_functions[mode]:
-#             ctx.invoke(func, calcjob=calcjob_node, path=calcjob_node_path)
+            calcjob_dump(
+                calcjob_node=node,
+                output_path=node_path,
+                node_inputs=node_inputs,
+                use_prepare_for_submission=use_prepare_for_submission,
+            )

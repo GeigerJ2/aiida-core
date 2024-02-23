@@ -8,25 +8,13 @@
 ###########################################################################
 """`verdi workchain` commands."""
 
-import pathlib
-import re
-from pathlib import Path
-from typing import List, Optional, Tuple
 
 import click
 
-from aiida import orm
-from aiida.cmdline.commands.cmd_calcjob import calcjob_inputdump, calcjob_outputdump
 from aiida.cmdline.commands.cmd_verdi import verdi
 from aiida.cmdline.params import arguments
 from aiida.cmdline.params.types import WorkflowParamType
 from aiida.cmdline.utils import echo
-from aiida.common import LinkType
-from aiida.engine.processes.calcjobs.calcjob import CalcJob
-from aiida.engine.processes.workchains.workchain import WorkChainNode
-from aiida.orm import Bool, ProcessNode
-from aiida.orm.nodes.process.calculation.calcjob import CalcJobNode
-from aiida.sphinxext import workchain
 from aiida.tools.workflows.dumping import recursive_dump
 
 # TODO I have several other cli functions that are useful for
@@ -65,16 +53,40 @@ def verdi_workchain():
     help='The parent directory to save the data of the workchain.',
 )
 @click.option(
-    '--user-prepare-for-submission',
-    '-m',
-    type=Bool,
+    '--node-inputs',
+    '-n',
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help='',
+)
+@click.option(
+    '--dump-attributes',
+    '-a',
+    is_flag=True,
     default=False,
     show_default=True,
-    help='Use the prepare ',
+    help='',
+)
+@click.option(
+    '--dump-extras',
+    '-e',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help='',
+)
+@click.option(
+    '--use-prepare-for-submission',
+    '-u',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help='',
 )
 # @click.pass_context
-def workchain_dump(workchain, path) -> None:
-
+# TODO: Write metadata file for workchain/calcjob or both
+def workchain_dump(workchain, path, node_inputs, dump_attributes, dump_extras, use_prepare_for_submission) -> None:
     import pathlib
 
     # Set reasonable default path when path argument is omitted
@@ -87,4 +99,11 @@ def workchain_dump(workchain, path) -> None:
     except FileExistsError:
         echo.echo_critical(f'Invalid value for "OUTPUT_DIRECTORY": Path "{output_directory}" exists.')
 
-    recursive_dump(process_node=workchain, filepath=output_directory)
+    recursive_dump(
+        process_node=workchain,
+        filepath=output_directory,
+        node_inputs=node_inputs,
+        dump_attributes=dump_attributes,
+        dump_extras=dump_extras,
+        use_prepare_for_submission=use_prepare_for_submission
+    )
