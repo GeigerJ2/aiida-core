@@ -18,7 +18,7 @@ from aiida.cmdline.params import arguments
 from aiida.cmdline.params.types import WorkflowParamType
 from aiida.cmdline.utils import echo
 from aiida.orm.nodes import process
-from aiida.tools.dumping.dumping import ProcessNodeDumper, _recursive_dump
+from aiida.tools.dumping.processes import ProcessNodeYamlDumper, recursive_dump
 
 # TODO I have several other cli functions that are useful for
 # my own work, but somehow it's not easy to merge them
@@ -111,11 +111,12 @@ def workchain_dump(
     except FileExistsError:
         echo.echo_critical(f'Invalid value for "OUTPUT_PATH": Path "{output_path}" exists.')
 
-    # Write node_metadata
-    processnode_dumper = ProcessNodeDumper(include_attributes=include_attributes, include_extras=include_extras)
-    processnode_dumper.dump_yaml(node=workchain, output_path=output_path)
+    # Write parent node_metadata
+    processnode_dumper = ProcessNodeYamlDumper(include_attributes=include_attributes, include_extras=include_extras)
+    processnode_dumper.dump_yaml(process_node=workchain, output_path=output_path)
 
-    _recursive_dump(
+    # Actual recursive function call
+    recursive_dump(
         process_node=workchain,
         output_path=output_path,
         no_node_inputs=no_node_inputs,

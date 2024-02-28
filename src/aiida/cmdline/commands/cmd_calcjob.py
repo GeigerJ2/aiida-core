@@ -16,7 +16,7 @@ from aiida.cmdline.commands.cmd_verdi import verdi
 from aiida.cmdline.params import arguments, options
 from aiida.cmdline.params.types import CalculationParamType
 from aiida.cmdline.utils import decorators, echo
-from aiida.tools.dumping.dumping import ProcessNodeDumper, _calcjob_dump
+from aiida.tools.dumping.processes import ProcessNodeYamlDumper, _calcjob_dump
 
 
 @verdi.group('calcjob')
@@ -402,7 +402,7 @@ def calcjob_dump(
 ) -> None:
     """Dump files involved in the execution of a calcjob.
 
-    Note: This is for inspection only and does not guarantee tha a direct resubmission of the simulations is possible.
+    Note: This is for inspection only and does not guarantee that a direct resubmission of the simulations is possible.
     """
 
     # Set reasonable default path when path argument is omitted
@@ -417,8 +417,8 @@ def calcjob_dump(
         echo.echo_critical(f'Invalid value for "OUTPUT_PATH": Path "{output_path}" exists.')
 
     # Write node_metadata
-    processnode_dumper = ProcessNodeDumper(include_attributes=include_attributes, include_extras=include_extras)
-    processnode_dumper.dump_yaml(node=calcjob, output_path=output_path)
+    processnode_dumper = ProcessNodeYamlDumper(include_attributes=include_attributes, include_extras=include_extras)
+    processnode_dumper.dump_yaml(process_node=calcjob, output_path=output_path)
 
     _calcjob_dump(
         calcjob_node=calcjob,

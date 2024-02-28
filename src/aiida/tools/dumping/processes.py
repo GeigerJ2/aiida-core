@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Type, Union
+from typing import Union
 
 import yaml
 
@@ -10,16 +10,15 @@ from aiida.engine.daemon.execmanager import upload_calculation
 from aiida.engine.utils import instantiate_process
 from aiida.manage import get_manager
 from aiida.orm import CalcFunctionNode, CalcJobNode, WorkChainNode, WorkFunctionNode
-from aiida.orm.nodes.data import FolderData
-from aiida.orm.nodes.data.singlefile import SinglefileData
+from aiida.orm.nodes.data import FolderData, SinglefileData
 from aiida.orm.nodes.process import ProcessNode
 from aiida.transports.plugins.local import LocalTransport
 
 
-class ProcessNodeDumper:
-    """Utility class to dump selected ProcessNode properties, attributes and extras."""
+class ProcessNodeYamlDumper:
+    """Utility class to dump selected `ProcessNode` properties and, optionally, attributes and extras to yaml."""
 
-    _metadata_properties = [
+    METADATA_PROPERTIES = [
         'label',
         'description',
         'pk',
@@ -36,48 +35,74 @@ class ProcessNodeDumper:
         self.include_extras = include_extras
 
     def dump_yaml(
-        self, node: Type[ProcessNode], output_path: Path, output_filename: str = 'aiida_node_metadata.yaml'
+        self, process_node: ProcessNode, output_path: Path, output_filename: str = 'aiida_node_metadata.yaml'
     ) -> None:
+
+        """
+        Dump the selected `ProcessNode` properties, attributes, and extras to a yaml file.
+
+        :param process_node: The ProcessNode to dump.
+        :param output_path: The path to the directory where the yaml file will be saved.
+        :param output_filename: The name of the output yaml file. Defaults to 'aiida_node_metadata.yaml'.
+        :return: None
+        """
+
         node_dict = {}
         metadata_dict = {}
 
         # Add actual node `@property`s to dictionary
-        for metadata_property in self._metadata_properties:
-            metadata_dict[metadata_property] = getattr(node, metadata_property)
+        for metadata_property in self.METADATA_PROPERTIES:
+            metadata_dict[metadata_property] = getattr(process_node, metadata_property)
 
         node_dict['Node metadata'] = metadata_dict
 
         # Add node attributes
         if self.include_attributes is True:
-            node_attributes = node.base.attributes.all
+            node_attributes = process_node.base.attributes.all
             node_dict['Node attributes'] = node_attributes
 
         # Add node extras
         if self.include_extras is True:
-            node_extras = node.base.extras.all
+            node_extras = process_node.base.extras.all
             if node_extras:
                 node_dict['Node extras'] = node_extras
 
         # Dump to file
         output_file = output_path / output_filename
+
         if not output_file.exists():
             with open(output_file, 'w') as handle:
                 yaml.dump(node_dict, handle, sort_keys=False)
         else:
-            echo.echo_critical('yaml file already exists.')
+            echo.echo_critical(f'yaml file at path "{output_path}" already exists.')
 
 
-def _recursive_dump(
+def recursive_dump(
     process_node: Union[WorkChainNode, CalcJobNode],
     output_path: Path,
     no_node_inputs: bool = False,
     use_prepare_for_submission: bool = False,
-    node_dumper: ProcessNodeDumper = None,
+    node_dumper: ProcessNodeYamlDumper = None,
 ) -> None:
+    """
+    Dumps all data involved in a `WorkChainNode`, including its outgoing links.
+
+    Note that if an outgoing link is again a `WorkChainNode`, the function recursively calls itself, while files are
+    only actually created when a `CalcJobNode` is reached.
+
+    :param process_node: The parent process node to be dumped. It can be either a `WorkChainNode` or a `CalcJobNode`.
+    :param output_path: The main output path where the directory tree will be created.
+    :param no_node_inputs: If True, do not include file or folder inputs in the dump. Defaults to False.
+    :param use_prepare_for_submission: If True, use the `prepare_for_submission` method to get the inputs of the
+        CalcJobNode. Defaults to False.
+    :param node_dumper: The ProcessNodeYamlDumper instance to use for dumping node metadata. If not provided, a new
+        instance will be created. Defaults to None.
+    :return: None
+    """
     called_links = process_node.base.links.get_outgoing(link_type=(LinkType.CALL_CALC, LinkType.CALL_WORK)).all()
 
-    # Don't increment index for ProcessNodes that don't have file IO (Calc/Work-FunctionNodes), such as
-    # `create_kpoints_from_distance`
+    # Don't increment index for `ProcessNodes`` that don't have file IO (`CalcFunctionNodes`/`WorkFunctionNodes`), such
+    # as `create_kpoints_from_distance`
     called_links = [
         called_link
         for called_link in called_links
@@ -88,34 +113,35 @@ def _recursive_dump(
         node = link_triple.node
         link_label = link_triple.link_label
 
+        # Generate directories with naming scheme akin to `verdi process status`
         if link_label != 'CALL' and not link_label.startswith('iteration_'):
             label = f'{index:02d}-{link_label}-{node.process_label}'
         else:
             label = f'{index:02d}-{node.process_label}'
 
-        output_path_new = output_path.resolve() / label
-        output_path_new.mkdir(exist_ok=True, parents=True)
+        output_path_child = output_path.resolve() / label
+        output_path_child.mkdir(exist_ok=True, parents=True)
 
         # Dump node metadata as yaml
         if node_dumper is None:
-            node_dumper = ProcessNodeDumper()
-        node_dumper.dump_yaml(node=node, output_path=output_path_new)
+            node_dumper = ProcessNodeYamlDumper()
+        node_dumper.dump_yaml(process_node=node, output_path=output_path_child)
 
-        # Recursive function call for WorkChainNode
+        # Recursive function call for `WorkChainNode``
         if isinstance(node, WorkChainNode):
-            _recursive_dump(
+            recursive_dump(
                 process_node=node,
-                output_path=output_path_new,
+                output_path=output_path_child,
                 no_node_inputs=no_node_inputs,
                 use_prepare_for_submission=use_prepare_for_submission,
                 node_dumper=node_dumper,
             )
 
-        # Dump for CalcJobNode
+        # Dump for `CalcJobNode`
         elif isinstance(node, CalcJobNode):
             _calcjob_dump(
                 calcjob_node=node,
-                output_path=output_path_new,
+                output_path=output_path_child,
                 no_node_inputs=no_node_inputs,
                 use_prepare_for_submission=use_prepare_for_submission,
             )
@@ -129,9 +155,43 @@ def _calcjob_dump(
     # node_dumper: ProcessNodeDumper = None
     # -> Actually run in `cmd_calcjob` and outside in loop in `cmd_workchain`. Necessary to actually pass here?
 ):
+    """
+    Dump the contents of a CalcJobNode to a specified output path.
+
+    :param calcjob_node: The CalcJobNode to be dumped.
+    :param output_path: The path where the dumped contents will be stored.
+    :param no_node_inputs: If True, do not dump the inputs of the CalcJobNode.
+    :param use_prepare_for_submission: If True, use the `prepare_for_submission` method to prepare the calculation for
+        submission. If False, use the retrieved outputs and raw inputs.
+    :return: None
+    """
+
     output_path_abs = output_path.resolve()
 
-    if use_prepare_for_submission is True:
+    if use_prepare_for_submission is False:
+        # Outputs obtained via retrieved and should not be present when using `prepare_for_submission` as it puts the
+        # calculation in a state to be submitted ?!
+        calcjob_node.outputs.retrieved.copy_tree(output_path_abs / Path('raw_outputs'))
+        calcjob_node.base.repository.copy_tree(output_path_abs / Path('raw_inputs'))
+
+        # Dump `SinglefileData` and `FolderData` inputs of the `CalcJobNode`
+        if no_node_inputs is False:
+            input_node_triples = calcjob_node.base.links.get_incoming(link_type=LinkType.INPUT_CALC)
+            dump_types = (SinglefileData, FolderData)
+
+            for input_node_triple in input_node_triples:
+                # Select only repositories that hold objects and are of types
+                if len(input_node_triple.node.base.repository.list_objects()) > 0 and isinstance(
+                    input_node_triple.node, dump_types
+                ):
+                    input_node_path = output_path / Path('node_inputs') / Path(input_node_triple.link_label)
+                    # Could also create nested path from name mangling?
+                    # output_path / Path('node_inputs') / Path(*input_node_triple.link_label.split('__'))
+
+                    input_node_path.mkdir(parents=True, exist_ok=True)
+                    input_node_triple.node.base.repository.copy_tree(input_node_path.resolve())
+
+    else:
         echo.echo_warning('`use_prepare_for_submission` not fully implemented yet. Files likely missing.')
         try:
             builder_restart = calcjob_node.get_builder_restart()
@@ -151,28 +211,6 @@ def _calcjob_dump(
             echo.echo_error(
                 'ValueError when trying to get a restart-builder. Do you have the relevant aiida-plugin installed?'
             )
-
-    else:
-        calcjob_node.outputs.retrieved.copy_tree(output_path_abs / Path('raw_outputs'))
-        # Outputs obtained via retrieved and should not be present when using `prepare_for_submission` as it puts the
-        # calculation in a state to be submitted
-        calcjob_node.base.repository.copy_tree(output_path_abs / Path('raw_inputs'))
-
-        if no_node_inputs is False:
-            input_node_triples = calcjob_node.base.links.get_incoming(link_type=LinkType.INPUT_CALC)
-            dump_types = (SinglefileData, FolderData)
-
-            for input_node_triple in input_node_triples:
-                # Select only repositories that hold objects and are of reasonable types
-                if len(input_node_triple.node.base.repository.list_objects()) > 0 and isinstance(
-                    input_node_triple.node, dump_types
-                ):
-                    # Could also create nested path from name mangling
-                    # output_path / Path('node_inputs') / Path(*input_node_triple.link_label.split('__'))
-                    input_node_path = output_path / Path('node_inputs') / Path(input_node_triple.link_label)
-
-                    input_node_path.mkdir(parents=True, exist_ok=True)
-                    input_node_triple.node.base.repository.copy_tree(input_node_path.resolve())
 
 
 # def processnode_metadata_dump(
