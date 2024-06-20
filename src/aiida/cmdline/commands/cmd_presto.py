@@ -17,8 +17,8 @@ import typing as t
 import click
 
 from aiida.cmdline.commands.cmd_verdi import verdi
-from aiida.cmdline.params import options
 from aiida.cmdline.utils import echo
+from aiida.cmdline.params import options
 from aiida.manage.configuration import get_config_option
 
 DEFAULT_PROFILE_NAME_PREFIX: str = 'presto'
@@ -42,36 +42,30 @@ def get_default_presto_profile_name():
     return f'{DEFAULT_PROFILE_NAME_PREFIX}-{last_index + 1}'
 
 
-def detect_postgres_config(
+def _postgres_from_profile_name(
     profile_name: str,
-    postgres_hostname: str,
-    postgres_port: int,
-    postgres_username: str,
-    postgres_password: str,
     non_interactive: bool,
+    database_hostname: str = 'localhost',
+    database_port: int = 5432,
 ) -> dict[str, t.Any]:
-    """."""
+    """Generate a default PostgreSQL user and db based on the profile name.
+
+    Only the database hostname and port can be specified, while the remaining config options are derived from the
+    profile name.
+
+    """
+
     import secrets
 
     from aiida.manage.configuration.settings import AIIDA_CONFIG_FOLDER
     from aiida.manage.external.postgres import Postgres
-
-    dbinfo = {
-        'host': postgres_hostname,
-        'port': postgres_port,
-        'user': postgres_username,
-        'password': postgres_password,
-    }
-    postgres = Postgres(interactive=not non_interactive, quiet=False, dbinfo=dbinfo)
-
-    if not postgres.is_connected:
-        echo.echo_critical(f'Failed to connect to the PostgreSQL server using parameters: {dbinfo}')
 
     database_name = f'aiida-{profile_name}'
     database_username = f'aiida-{profile_name}'
     database_password = secrets.token_hex(15)
 
     try:
+        postgres = Postgres(interactive=not non_interactive, quiet=False)
         database_username, database_name = postgres.create_dbuser_db_safe(
             dbname=database_name, dbuser=database_username, dbpass=database_password
         )
@@ -79,8 +73,8 @@ def detect_postgres_config(
         echo.echo_critical(f'Unable to automatically create the PostgreSQL user and database: {exception}')
 
     return {
-        'database_hostname': postgres_hostname,
-        'database_port': postgres_port,
+        'database_hostname': database_hostname,
+        'database_port': database_port,
         'database_name': database_name,
         'database_username': database_username,
         'database_password': database_password,
@@ -93,8 +87,7 @@ def detect_postgres_config(
     '--profile-name',
     default=lambda: get_default_presto_profile_name(),
     show_default=True,
-    help=f'Name of the profile. By default, a unique name starting with `{DEFAULT_PROFILE_NAME_PREFIX}` is '
-    'automatically generated.',
+    help=f'Name of the profile. By default, a unique name starting with `{DEFAULT_PROFILE_NAME_PREFIX}` is automatically generated.',
 )
 @click.option(
     '--email',
@@ -105,37 +98,11 @@ def detect_postgres_config(
 @click.option(
     '--use-postgres',
     is_flag=True,
-    help='When toggled on, the profile uses a PostgreSQL database instead of an SQLite one. The connection details to '
-    'the PostgreSQL server can be configured with the relevant options. The command attempts to automatically create a '
-    'user and database to use for the profile, but this can fail depending on the configuration of the server.',
-)
-@click.option('--postgres-hostname', type=str, default='localhost', help='The hostname of the PostgreSQL server.')
-@click.option('--postgres-port', type=int, default=5432, help='The port of the PostgreSQL server.')
-@click.option(
-    '--postgres-username',
-    type=str,
-    default='postgres',
-    help='The username of the PostgreSQL user that is authorized to create new databases.',
-)
-@click.option(
-    '--postgres-password',
-    type=str,
-    required=False,
-    help='The password of the PostgreSQL user that is authorized to create new databases.',
+    help=('When toggled on, the profile uses a PostgreSQL database instead of an SQLite one. The command attempts to automatically create a user and database to use for the profile, but this can fail depending on the configuration of the server. If it fails or you want to specify custom options, use ``verdi profile setup core.psql_dos`` instead.',)
 )
 @options.NON_INTERACTIVE(help='Never prompt, such as for sudo password.')
 @click.pass_context
-def verdi_presto(
-    ctx,
-    profile_name,
-    email,
-    use_postgres,
-    postgres_hostname,
-    postgres_port,
-    postgres_username,
-    postgres_password,
-    non_interactive,
-):
+def verdi_presto(ctx, profile_name, email, use_postgres, non_interactive):
     """Set up a new profile in a jiffy.
 
     This command aims to make setting up a new profile as easy as possible. It does not require any services, such as
@@ -157,26 +124,19 @@ def verdi_presto(
     profile is created without a broker, in which case some functionality will be unavailable, most notably running the
     daemon and submitting processes to said daemon.
 
-    When the `--use-postgres` flag is toggled, the command tries to connect to the PostgreSQL server with connection
-    paramaters taken from the `--postgres-hostname`, `--postgres-port`, `--postgres-username` and `--postgres-password`
-    options. It uses these credentials to try and automatically create a user and database. If successful, the newly
-    created profile uses the new PostgreSQL database instead of SQLite.
+    When the `--use-postgres` flag is toggled, the command tries to automatically create a PostgreSQL user and database.
+    If successful, the newly created profile uses this PostgreSQL database instead of SQLite.
     """
+
     from aiida.brokers.rabbitmq.defaults import detect_rabbitmq_config
     from aiida.common import exceptions
     from aiida.manage.configuration import create_profile, load_profile
     from aiida.orm import Computer
 
-    postgres_config_kwargs = {
-        'profile_name': profile_name,
-        'postgres_hostname': postgres_hostname,
-        'postgres_port': postgres_port,
-        'postgres_username': postgres_username,
-        'postgres_password': postgres_password,
-        'non_interactive': non_interactive,
-    }
-    storage_config: dict[str, t.Any] = detect_postgres_config(**postgres_config_kwargs) if use_postgres else {}
-    storage_backend = 'core.psql_dos' if storage_config else 'core.sqlite_dos'
+    storage_config: dict[str, t.Any] = (
+        _postgres_from_profile_name(profile_name=profile_name, non_interactive=non_interactive) if use_postgres else {}
+    )
+    storage_backend = 'core.psql_dos' if use_postgres else 'core.sqlite_dos'
 
     if use_postgres:
         echo.echo_report(
