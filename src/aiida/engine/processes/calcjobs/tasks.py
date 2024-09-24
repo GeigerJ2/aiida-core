@@ -499,6 +499,7 @@ class Waiting(plumpy.process_states.Waiting):
         node.set_process_status(process_status)
 
         try:
+            # ? Possibly implement here to keep connection open
             if self._command == UPLOAD_COMMAND:
                 skip_submit = await self._launch_task(task_upload_job, self.process, transport_queue)
                 if skip_submit:

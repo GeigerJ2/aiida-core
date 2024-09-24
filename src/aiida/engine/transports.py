@@ -14,6 +14,8 @@ import contextvars
 import logging
 import traceback
 from typing import TYPE_CHECKING, Awaitable, Dict, Hashable, Iterator, Optional
+from aiida.common import timezone
+from datetime import datetime
 
 from aiida.orm import AuthInfo
 
@@ -47,6 +49,8 @@ class TransportQueue:
         """:param loop: An asyncio event, will use `asyncio.get_event_loop()` if not supplied"""
         self._loop = loop if loop is not None else asyncio.get_event_loop()
         self._transport_requests: Dict[Hashable, TransportRequest] = {}
+        # self._last_transport_request: Dict[Hashable, str] = {}
+        # self._was_last_request_special: bool = False
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -99,7 +103,86 @@ class TransportQueue:
             # passed around to many places, including outside aiida-core (e.g. paramiko). Anyone keeping a reference
             # to this handle would otherwise keep the Process context (and thus the process itself) in memory.
             # See https://github.com/aiidateam/aiida-core/issues/4698
-            open_callback_handle = self._loop.call_later(safe_open_interval, do_open, context=contextvars.Context())
+
+            # Pseudocode
+            # get_metadata from authinfo
+            # see if there is a last_close, if not None, compute seconds from then to now
+            # if < safe_interval, wait for difference
+            # if larger, call call_later, open call_later but with 0
+            metadata = authinfo.get_metadata()
+            last_close_time = metadata.get('last_close_time')
+
+            log_file_path = '/home/geiger_j/aiida_projects/thor-dev/transport-log.txt'
+
+            debug_info = '\nDEBUG START\n'
+
+            # if last_close_time is None:
+            #     # Submit immediately -> This is not ever being triggered
+            #     open_callback_handle = self._loop.call_later(1, do_open, context=contextvars.Context())
+
+            #     debug_info += (
+            #         f"LAST_CLOSE_TIME_NONE: submit immediately\n"
+            #         f"LAST_CLOSE_TIME: {last_close_time}\n"
+            #         f"LAST_REQUEST_SPECIAL: {self._was_last_request_special}\n"
+            #     )
+
+            last_close_time = datetime.strptime(last_close_time, '%Y-%m-%dT%H:%M:%S.%f%z')
+            timedelta_seconds = (timezone.localtime(timezone.now()) - last_close_time).total_seconds()
+
+
+            if timedelta_seconds > safe_open_interval:
+
+                debug_info += (
+                    f"TIMEDELTA > SAFE_OPEN_INTERVAL: submit immediately\n"
+                    f"LAST_CLOSE_TIME: {last_close_time}\n"
+                    # f"LAST_REQUEST_SPECIAL: {self._was_last_request_special}\n"
+                )
+
+                open_callback_handle = self._loop.call_later(0, do_open, context=contextvars.Context())
+                # self._was_last_request_special = True
+
+            else:
+
+                # If the last one was a special request, wait the safe_open_interval
+                debug_info += (
+                    f"TIMEDELTA < SAFE_OPEN_INTERVAL and last request special: submit after safe_open_interval\n"
+                    f"LAST_CLOSE_TIME: {last_close_time}\n"
+                    # f"LAST_REQUEST_SPECIAL: {self._was_last_request_special}\n"
+                )
+
+                open_callback_handle = self._loop.call_later(safe_open_interval, do_open, context=contextvars.Context())
+
+                # if self._was_last_request_special:
+
+                #     # If the last one was a special request, wait the safe_open_interval
+                #     debug_info += (
+                #         f"TIMEDELTA < SAFE_OPEN_INTERVAL and last request special: submit after safe_open_interval\n"
+                #         f"LAST_CLOSE_TIME: {last_close_time}\n"
+                #         f"LAST_REQUEST_SPECIAL: {self._was_last_request_special}\n"
+                #     )
+
+                #     open_callback_handle = self._loop.call_later(safe_open_interval, do_open, context=contextvars.Context())
+                #     self._was_last_request_special = False
+
+                # else:
+
+                #     # This is also a special request
+                #     # Or, should it be? Could also remove the if/else, and just wait the safe_open_interval, as is the default
+                #     debug_info += (
+                #         f"TIMEDELTA < SAFE_OPEN_INTERVAL and last request not special: submit after timedelta\n"
+                #         f"LAST_CLOSE_TIME: {last_close_time}\n"
+                #         f"LAST_REQUEST_SPECIAL: {self._was_last_request_special}\n"
+                #         f"TIMEDELTA: {timedelta_seconds}\n"
+                #     )
+
+                #     open_callback_handle = self._loop.call_later(timedelta_seconds, do_open, context=contextvars.Context())
+                #     self._was_last_request_special = True
+                    # open_callback_handle = self._loop.call_later(5, do_open, context=contextvars.Context())
+
+            # open_callback_handle = self._loop.call_later(safe_open_interval, do_open, context=contextvars.Context())
+
+            with open(log_file_path, 'a') as log_file:
+                log_file.write(debug_info)
 
         try:
             transport_request.count += 1
@@ -120,7 +203,22 @@ class TransportQueue:
                 if transport_request.future.done():
                     _LOGGER.debug('Transport request closing transport for %s', authinfo)
                     transport_request.future.result().close()
+
+                    # Get old metadata from authinfo, and set variable last_close_time to datetime now in isoformat
+                    # Need to convert to str, otherwise not json-serializable when setting authinfo metadata
+                    # if self._was_last_request_special is True:
+                    last_close_time = timezone.localtime(timezone.now()).strftime('%Y-%m-%dT%H:%M:%S.%f%z')
+                    authinfo.set_metadata({'last_close_time': last_close_time})
+                    # else:
+                    #     # asyncio.sleep(5)
+                    #     transport_request.count += 1
+                    #     self._was_last_request_special = True
+                    #     yield transport_request.future
+
                 elif open_callback_handle is not None:
                     open_callback_handle.cancel()
 
                 self._transport_requests.pop(authinfo.pk, None)
+
+# Should wait first time 0, then always ~30
+# Try out with manual waiting times in between
