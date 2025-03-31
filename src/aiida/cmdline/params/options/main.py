@@ -113,6 +113,7 @@ __all__ = (
     'SILENT',
     'SORT',
     'SYMLINK_CALCS',
+    'SYMLINK_BETWEEN_GROUPS',
     'TIMEOUT',
     'TRAJECTORY_INDEX',
     'TRANSPORT',
@@ -870,6 +871,13 @@ FLAT = OverridableOption(
 
 SYMLINK_CALCS = OverridableOption(
     '--symlink-calcs/--no-symlink-calcs',
+    default=False,
+    show_default=True,
+    help='Symlink data if the same node is contained in multiple groups.',
+)
+
+SYMLINK_BETWEEN_GROUPS = OverridableOption(
+    '--symlink-between-groups/--no-symlink-between-groups',
     default=False,
     show_default=True,
     help='Symlink data if the same node is contained in multiple groups.',

@@ -34,9 +34,9 @@ from aiida.tools.mirror.utils import (
     NodeMirrorKeyMapper,
     generate_group_default_mirror_path,
     generate_process_default_mirror_path,
-    load_given_group,
 )
 from typing import Any
+from aiida.common.exceptions import NotExistent
 
 logger = AIIDA_LOGGER.getChild("tools.mirror.group")
 
@@ -55,14 +55,14 @@ class GroupMirror(BaseCollectionMirror):
 
     def __init__(
         self,
-        group: orm.Group,
+        group: orm.Group | None,
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
         # NOTE: This should be part of the logger...
         last_mirror_time: datetime | None = None,
         mirror_logger: MirrorLogger | None = None,
         node_collector_config: NodeCollectorConfig | None = None,
-        group_mirror_config: GroupMirrorConfig | None = None,
+        config: GroupMirrorConfig | None = None,
         process_mirror_config: ProcessMirrorConfig | None = None,
     ):
         """Initialize the GroupMirror class."""
@@ -79,13 +79,36 @@ class GroupMirror(BaseCollectionMirror):
             node_collector_config=node_collector_config,
         )
 
-        self.group = load_given_group(group)
+        self.group = GroupMirror.load_given_group(group)
 
-        self.group_mirror_config = group_mirror_config or GroupMirrorConfig()
+        self.config = config or GroupMirrorConfig()
         self.process_mirror_config = process_mirror_config or ProcessMirrorConfig()
         # FIXME: This is duplicated/overwritten here because, due to the recursive nature of the Process mirroring
         # FIXME: I need to pass the option to both, the GroupMirror and the ProcessMirror
-        self.process_mirror_config.symlink_calcs = self.group_mirror_config.symlink_calcs
+        self.process_mirror_config.symlink_calcs = self.config.symlink_calcs
+
+    def load_given_group(group: orm.Group | str | None) -> orm.Group:
+        """Validate the given group identifier.
+
+        :param group: The group identifier to validate.
+        :return: Insance of ``orm.Group``.
+        :raises NotExistent: If no ``orm.Group`` can be loaded for a given label.
+        """
+
+        if isinstance(group, str):
+            try:
+                return orm.load_group(group)
+            # `load_group` raises the corresponding errors
+            except NotExistent:
+                raise
+            except:
+                raise
+
+        elif isinstance(group, orm.Group):
+            return group
+
+        else:
+            return orm.Group(label='no-group')
 
     # staticmethod so I can use it before instantiation of the GroupDumper, as that will need the subpath already
     @staticmethod
@@ -132,8 +155,8 @@ class GroupMirror(BaseCollectionMirror):
             "calculations" if current_store_type == "workflows" else "workflows"
         )
 
-        current_store = getattr(self.mirror_logger.log, current_store_type)
-        other_store = getattr(self.mirror_logger.log, other_store_type)
+        current_store = getattr(self.mirror_logger.stores, current_store_type)
+        other_store = getattr(self.mirror_logger.stores, other_store_type)
         self.current_store = current_store
         self.other_store = other_store
 
@@ -204,11 +227,11 @@ class GroupMirror(BaseCollectionMirror):
             mirror_mode=self.mirror_mode,
             mirror_paths=process_paths,
             last_mirror_time=self.last_mirror_time,
-            process_mirror_config=self.process_mirror_config,
+            config=self.process_mirror_config,
             mirror_logger=self.mirror_logger,
         )
 
-        if not self.group_mirror_config.symlink_calcs:
+        if not self.config.symlink_calcs:
             # Case: symlink_duplicates is disabled
             process_mirror_inst.do_mirror(top_level_caller=False)
 
@@ -247,7 +270,7 @@ class GroupMirror(BaseCollectionMirror):
         for process_type in ("calculations", "workflows"):
             processes = getattr(self.node_container, process_type)
             if len(processes) > 0:
-                msg = f"Mirroring {len(processes)} {process_type}s..."
+                msg = f"Mirroring {len(processes)} {process_type}..."
                 logger.report(msg)
                 self._mirror_processes(processes=processes)
             else:
@@ -266,6 +289,9 @@ class GroupMirror(BaseCollectionMirror):
         self._mirror_process_collections()
 
         self.post_mirror()
+    
+    # for process_type in ('calculations', 'workflows'):
+
 
     # @cached_property
     # def processes_to_delete(self) -> NodeContainer:

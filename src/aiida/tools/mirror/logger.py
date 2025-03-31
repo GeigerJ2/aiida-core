@@ -14,10 +14,12 @@ from datetime import datetime
 from pathlib import Path
 
 from aiida.common.exceptions import NotExistent
-from aiida.tools.mirror.utils import MirrorPaths
+from aiida.tools.mirror.utils import MirrorPaths, NodeMirrorKeyMapper
 
 # TODO: Possibly mirror hierarchy of mirrored directory inside json file
 # TODO: Currently, json file has only top-level "groups", "workflows", and "calculations"
+# TODO: `add_entry` and `add_entries` shouldn't _require_ passing a store, but could be automatically evaluated from the
+# type of the first node in the passed entry/entries
 # NOTE: Could use MirrorLogger also as container for orm.Nodes, that should be mirrored
 # NOTE: Should MirrorLogger be not provided (None), or should it rather just be empty with no entries
 # NOTE: Is on `save_log` again the whole history being written to disk? Ideally, this would be incremental
@@ -30,7 +32,7 @@ class MirrorLog:
     # TODO: Possibly add `node_type` or something similar here
 
     path: Path
-    time: datetime
+    time: datetime = field(default_factory=lambda: datetime.now())
     links: list[Path] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -136,11 +138,15 @@ class MirrorLogger:
     def add_entry(self, store: MirrorLogStore, uuid: str, entry: MirrorLog) -> None:
         store.add_entry(uuid, entry)
 
+    def add_entries(self, store: MirrorLogStore, uuids: list[str], entries: list[MirrorLog]) -> None:
+        for uuid, entry in zip(uuids, entries):
+            store.add_entry(uuid, entry)
+
     def del_entry(self, store: MirrorLogStore, uuid: str) -> bool:
         return store.del_entry(uuid)
 
     @property
-    def log(self) -> MirrorLogStoreCollection:
+    def stores(self) -> MirrorLogStoreCollection:
         """Retrieve the current state of the log as a dataclass."""
         return MirrorLogStoreCollection(
             calculations=self.calculations,
@@ -212,8 +218,8 @@ class MirrorLogger:
         """Find the store that contains the given UUID."""
         # Iterate over the fields of the MirrorLogStoreCollection dataclass for generality
         # TODO: Add error handling for wrong UUID
-        for field_ in fields(self.log):
-            store = getattr(self.log, field_.name)
+        for field_ in fields(self.stores):
+            store = getattr(self.stores, field_.name)
             if uuid in store.entries:
                 return store
 
@@ -257,3 +263,6 @@ class MirrorLogger:
             'groups': serialize_logs(self.groups),
             'data': serialize_logs(self.data),
         }
+
+    def get_store_by_orm(self, orm_type)-> MirrorLogStore:
+        return getattr(self, NodeMirrorKeyMapper.get_key_from_class(orm_type))

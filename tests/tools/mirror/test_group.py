@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from aiida import orm
-from aiida.tools.dumping import GroupMirror
+from aiida.tools.mirror import GroupMirror
 
 from .utils import compare_tree
 
@@ -28,48 +28,9 @@ from .utils import compare_tree
 
 
 # @pytest.mark.usefixtures('aiida_profile_clean')
-@pytest.fixture()
-def setup_no_process_group() -> orm.Group:
-    no_process_group, _ = orm.Group.collection.get_or_create(label='no-process')
-    if no_process_group.is_empty:
-        int_node = orm.Int(1).store()
-        no_process_group.add_nodes([int_node])
-    return no_process_group
-
-
-# @pytest.mark.usefixtures('aiida_profile_clean')
-@pytest.fixture()
-def setup_add_group(generate_calculation_node_add) -> orm.Group:
-    add_group, _ = orm.Group.collection.get_or_create(label='add')
-    if add_group.is_empty:
-        add_node = generate_calculation_node_add()
-        add_group.add_nodes([add_node])
-    return add_group
-
-
-# @pytest.mark.usefixtures('aiida_profile_clean')
-@pytest.fixture()
-def setup_multiply_add_group(generate_workchain_multiply_add) -> orm.Group:
-    multiply_add_group, _ = orm.Group.collection.get_or_create(label='multiply-add')
-    if multiply_add_group.is_empty:
-        multiply_add_node = generate_workchain_multiply_add()
-        multiply_add_group.add_nodes([multiply_add_node])
-    return multiply_add_group
-
-
-# @pytest.mark.usefixtures('aiida_profile_clean')
-@pytest.fixture()
-def duplicate_group():
-    def _duplicate_group(source_group: orm.Group, dest_group_label: str):
-        dupl_group, created = orm.Group.collection.get_or_create(label=dest_group_label)
-        dupl_group.add_nodes(list(source_group.nodes))
-        return dupl_group
-
-    return _duplicate_group
-
 
 # @pytest.mark.usefixtures('aiida_profile_clean_class')
-class TestCollectionDumper:
+class TestGroupMirror:
     # @pytest.mark.usefixtures('aiida_profile_clean')
     # def test_should_dump_processes(self, setup_no_process_group, setup_add_group):
     #     """"""
@@ -213,6 +174,8 @@ class TestCollectionDumper:
 
         compare_tree(expected=expected_tree_no_dedup, base_path=tmp_path, relative_path=Path(multiply_add_group_label))
 
+
+    # def test_
         # pytest.set_trace()
 
     # def test_dump_workflows(self):

@@ -733,7 +733,7 @@ def group_mirror(
         # last_mirror_time=None,
         # mirror_logger=None,
         node_collector_config=node_collector_config,
-        group_mirror_config=group_mirror_config,
+        config=group_mirror_config,
         process_mirror_config=process_mirror_config,
     )
 
