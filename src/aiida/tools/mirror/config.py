@@ -80,4 +80,4 @@ class ProfileMirrorConfig(BaseCollectionMirrorConfig):  # NodeCollectorConfig
     organize_by_groups: bool = True
     only_groups: bool = False
     update_groups: bool = True
-    symlink_between_groops: bool = False
+    symlink_between_groups: bool = False

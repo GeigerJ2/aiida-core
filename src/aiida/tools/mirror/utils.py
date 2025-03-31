@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from aiida import load_profile, orm
-from aiida.common.exceptions import NotExistent
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration import Profile
 from aiida.tools.mirror.config import MirrorMode
@@ -34,7 +33,6 @@ __all__ = (
 )
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.utils')
-
 
 class NodeMirrorKeyMapper:
     calculation_key: str = 'calculations'
@@ -55,23 +53,38 @@ class NodeMirrorKeyMapper:
                 raise NotImplementedError(msg)
 
     @classmethod
-    def get_key_from_class(cls, node_type: type) -> str:
-        if issubclass(node_type, orm.CalculationNode):
+    def get_key_from_class(cls, orm_class: type) -> str:
+        if issubclass(orm_class, orm.CalculationNode):
             return cls.calculation_key
-        elif issubclass(node_type, orm.WorkflowNode):
+        elif issubclass(orm_class, orm.WorkflowNode):
             return cls.workflow_key
-        elif issubclass(node_type, orm.Data):
+        elif issubclass(orm_class, orm.Data):
             return cls.data_key
         else:
-            msg = f'Mirroring not implemented yet for node type: {node_type}'
+            msg = f'Mirroring not implemented yet for node type: {orm_class}'
             raise NotImplementedError(msg)
 
+    @classmethod
+    def get_class_from_key(cls, key: str) -> type:
+        if key == cls.calculation_key:
+            return orm.CalculationNode
+        elif key == cls.workflow_key:
+            return orm.WorkflowNode
+        elif key == cls.data_key:
+            return orm.Data
+        else:
+            msg = f'No node type mapping exists for key: {key}'
+            raise ValueError(msg)
 
 # NOTE: Could also add logger and safeguard file path here
 @dataclass
 class MirrorPaths:
     parent: Path = Path.cwd
     child: Path = Path('aiida-mirror')
+
+    @classmethod
+    def from_path(cls, path: Path):
+        return cls(parent=path.parent, child=path.name)
 
     @property
     def absolute(self) -> Path:
@@ -154,7 +167,7 @@ def prepare_mirror_path(
     # Handle existing non-empty directory
     if path_to_validate.is_dir() and any(path_to_validate.iterdir()) and mirror_mode == MirrorMode.OVERWRITE:
         safe_delete_dir(
-            path_to_validate=path_to_validate,
+            path=path_to_validate,
             safeguard_file=safeguard_file,
         )
 
@@ -171,33 +184,33 @@ def prepare_mirror_path(
 
 
 def safe_delete_dir(
-    path_to_validate: Path,
+    path: Path,
     safeguard_file: str,
 ) -> None:
     """Also deletes the top-level directory itself."""
 
-    if not path_to_validate.exists():
+    if not path.exists():
         return
 
-    is_empty = not any(path_to_validate.iterdir())
+    is_empty = not any(path.iterdir())
     if is_empty:
-        path_to_validate.rmdir()
+        path.rmdir()
         return
 
-    safeguard_exists = (path_to_validate / safeguard_file).is_file()
+    safeguard_exists = (path / safeguard_file).is_file()
 
     if safeguard_exists:
         try:
-            _delete_dir_recursive(path_to_validate)
+            _delete_dir_recursive(path)
             # shutil.rmtree(path_to_validate)
         except OSError:
             # `shutil.rmtree` fails for symbolic links with
             # OSError: Cannot call rmtree on a symbolic link
-            _delete_dir_recursive(path_to_validate)
+            _delete_dir_recursive(path)
 
     else:
         msg = (
-            f'Path `{path_to_validate.name}` exists without safeguard file `{safeguard_file}`. '
+            f'Path `{path.name}` exists without safeguard file `{safeguard_file}`. '
             f'Not removing because path might be a directory not created by AiiDA.'
         )
         raise FileNotFoundError(msg)
@@ -246,27 +259,6 @@ def do_filter_nodes(nodes: list[str], last_dump_time: datetime | None = None) ->
     qb = orm.QueryBuilder().append(orm.Node, filters={'uuid': {'in': nodes}})
     nodes_orm: list[orm.Node] = cast(list[orm.Node], qb.all(flat=True))
     return [node.uuid for node in nodes_orm if node.mtime > last_dump_time]
-
-
-def load_given_group(group: orm.Group | str) -> orm.Group:
-    """Validate the given group identifier.
-
-    :param group: The group identifier to validate.
-    :return: Insance of ``orm.Group``.
-    :raises NotExistent: If no ``orm.Group`` can be loaded for a given label.
-    """
-
-    if isinstance(group, str):
-        try:
-            return orm.load_group(group)
-        # `load_group` raises the corresponding errors
-        except NotExistent:
-            raise
-        except:
-            raise
-
-    elif isinstance(group, orm.Group):
-        return group
 
 
 def generate_process_default_mirror_path(
@@ -384,10 +376,12 @@ def delete_missing_node_dir(mirror_logger: 'MirrorLogger', to_delete_uuid: str) 
     if path_to_delete is not None:
         try:
             safe_delete_dir(
-                path_to_validate=path_to_delete,
+                path=path_to_delete,
                 safeguard_file='.aiida_node_metadata.yaml',
                 verbose=False,
             )
             current_store.del_entry(uuid=to_delete_uuid)
         except:
             raise
+
+

@@ -47,15 +47,15 @@ class BaseMirror:
         :param mirror_logger: Optional existing logger instance to use
         :return: The appropriate MirrorLogger instance
         """
-        
+
         # If in OVERWRITE mode, create a new instance
-        if self.mirror_mode.OVERWRITE:
+        if self.mirror_mode == MirrorMode.OVERWRITE:
             return MirrorLogger(mirror_paths=self.mirror_paths)
 
         # Use provided mirror_logger if one is passed in
         if mirror_logger is not None:
             return mirror_logger
-        
+
         # Try to load from file, fall back to new instance on failure
         try:
             return MirrorLogger.from_file(mirror_paths=self.mirror_paths)

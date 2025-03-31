@@ -46,7 +46,7 @@ class ProcessMirror(BaseMirror):
         mirror_paths: MirrorPaths | None = None,
         last_mirror_time: datetime | None = None,
         mirror_logger: MirrorLogger | None = None,
-        process_mirror_config: ProcessMirrorConfig | None = None,
+        config: ProcessMirrorConfig | None = None,
     ) -> None:
         """Initialize the ProcessMirror."""
 
@@ -63,15 +63,15 @@ class ProcessMirror(BaseMirror):
             mirror_logger=mirror_logger,
         )
 
-        self.process_mirror_config = process_mirror_config or ProcessMirrorConfig()
+        self.config = config or ProcessMirrorConfig()
 
         # Unpack arguments for easier access
-        self.include_inputs = self.process_mirror_config.include_inputs
-        self.include_outputs = self.process_mirror_config.include_outputs
-        self.include_attributes = self.process_mirror_config.include_attributes
-        self.include_extras = self.process_mirror_config.include_extras
-        self.flat = self.process_mirror_config.flat
-        self.mirror_unsealed = self.process_mirror_config.mirror_unsealed
+        # self.include_inputs = self.config.include_inputs
+        # self.include_outputs = self.config.include_outputs
+        # self.include_attributes = self.config.include_attributes
+        # self.include_extras = self.config.include_extras
+        # self.config.flat = self.config.flat
+        # self.config.mirror_unsealed = self.config.mirror_unsealed
 
     def _generate_readme(self) -> None:
         """Generate README.md file in main mirroring directory.
@@ -194,7 +194,7 @@ class ProcessMirror(BaseMirror):
 
         process_node = self.process_node
 
-        if not process_node.is_sealed and not self.mirror_unsealed:
+        if not process_node.is_sealed and not self.config.mirror_unsealed:
             raise ExportValidationError(
                 f"Process `{process_node.pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True."
             )
@@ -240,10 +240,12 @@ class ProcessMirror(BaseMirror):
         if not output_path:
             output_path = self.mirror_paths.absolute
 
+        output_path.mkdir(parents=True, exist_ok=True)
+
         self._write_node_yaml(process_node=workflow_node, output_path=output_path)
 
         if self.mirror_logger is not None:
-            workflow_store = self.mirror_logger.log.workflows
+            workflow_store = self.mirror_logger.stores.workflows
 
             self.mirror_logger.add_entry(
                 store=workflow_store,
@@ -279,10 +281,10 @@ class ProcessMirror(BaseMirror):
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
 
-                calculation_store = self.mirror_logger.log.calculations
+                calculation_store = self.mirror_logger.stores.calculations
 
                 if (
-                    not self.process_mirror_config.symlink_calcs
+                    not self.config.symlink_calcs
                     or child_node.uuid not in calculation_store.entries.keys()
                 ):
                     self._mirror_calculation(
@@ -341,7 +343,7 @@ class ProcessMirror(BaseMirror):
             )
 
         # Mirror the node_inputs
-        if self.include_inputs:
+        if self.config.include_inputs:
             input_links = calculation_node.base.links.get_incoming(
                 link_type=LinkType.INPUT_CALC
             )
@@ -355,7 +357,7 @@ class ProcessMirror(BaseMirror):
             )
 
         # Mirror the node_outputs apart from `retrieved`
-        if self.include_outputs:
+        if self.config.include_outputs:
             output_links = list(
                 calculation_node.base.links.get_outgoing(link_type=LinkType.CREATE)
             )
@@ -372,7 +374,7 @@ class ProcessMirror(BaseMirror):
 
         # TODO: Add store entry here
         if self.mirror_logger is not None:
-            calculation_store = self.mirror_logger.log.calculations
+            calculation_store = self.mirror_logger.stores.calculations
 
             if calculation_node.uuid not in calculation_store.entries:
                 self.mirror_logger.add_entry(
@@ -395,7 +397,7 @@ class ProcessMirror(BaseMirror):
         for link_triple in link_triples:
             link_label = link_triple.link_label
 
-            if not self.flat:
+            if not self.config.flat:
                 linked_node_path = parent_path / Path(*link_label.split("__"))
             else:
                 # Don't use link_label at all -> But, relative path inside FolderData is retained
@@ -428,7 +430,7 @@ class ProcessMirror(BaseMirror):
             "node_inputs",
             "node_outputs",
         ]
-        if self.flat and io_mirror_paths is None:
+        if self.config.flat and io_mirror_paths is None:
             logger.info(
                 "Flat set to True and no `io_mirror_paths`. Mirroring in a flat directory, files might be overwritten."
             )
@@ -438,14 +440,14 @@ class ProcessMirror(BaseMirror):
                 **dict(zip(aiida_entities_to_mirror, empty_calculation_io_mirror_paths))
             )
 
-        if not self.flat and io_mirror_paths is None:
+        if not self.config.flat and io_mirror_paths is None:
             logger.info(
                 "Flat set to False but no `io_mirror_paths` provided. "
                 + f"Will use the defaults {default_calculation_io_mirror_paths}."
             )
             io_mirror_paths = default_calculation_io_mirror_paths
 
-        elif self.flat:
+        elif self.config.flat:
             logger.info(
                 "Flat set to True but `io_mirror_paths` provided. These will be used, but `inputs` not nested."
             )
@@ -509,11 +511,11 @@ class ProcessMirror(BaseMirror):
             }
             node_dict["Computer data"] = computer_dict
         # Add node attributes
-        if self.include_attributes:
+        if self.config.include_attributes:
             node_attributes = process_node.base.attributes.all
             node_dict["Node attributes"] = node_attributes
 
-        if self.include_extras:
+        if self.config.include_extras:
             if node_extras := process_node.base.extras.all:
                 node_dict["Node extras"] = node_extras
 

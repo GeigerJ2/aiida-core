@@ -628,7 +628,7 @@ def process_mirror(
         last_mirror_time=None,  # ? Is this needed for a single process?
         # last_mirror_time=last_mirror_time,
         mirror_mode=mirror_mode,
-        process_mirror_config=process_mirror_config,
+        config=process_mirror_config,
     )
 
     try:
