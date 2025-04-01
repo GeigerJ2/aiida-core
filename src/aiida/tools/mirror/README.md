@@ -978,11 +978,109 @@ Evaluate for yourself if that is a price you are willing to pay for the achieved
 We intend to provide fully self-contained output directories with the feature, which is why the `--symlink-calcs` option
 is turned off by default.
 
+<!--
+ctx,
+path,
+# dry_run,
+overwrite,
+filter_by_last_mirror_time,
+mirror_processes,
+mirror_data,
+groups,
+organize_by_groups,
+symlink_calcs,
+# symlink_between_groups,
+delete_missing,
+update_groups,
+only_groups,
+only_top_level_calcs,
+only_top_level_workflows,
+include_inputs,
+include_outputs,
+include_attributes,
+include_extras,
+flat,
+mirror_unsealed
+-->
+
 #### Customizing `verdi profile mirrror`
 
 
 
 ## Python API
 
+The mirror functionality is implemented through the three classes `ProcessMirror`, `GroupMirror`, and `ProfileMirror`,
+and is therefore also available directly accessible via a Python API.
+Upon instantiation of each class, the relevant entity that is supposed to be mirrored (a `orm.ProcessNode`, `orm.Group`)
+has to be provided (apart from the `ProfileMirror` where the default profile is selected if no `Profile` is given).
+Minimal examples for each case are shown in the following:
 
-##
+**Process**
+
+```python
+from aiida import orm, load_profile
+from aiida.tools.mirror.process import ProcessMirror
+
+load_profile()
+
+process_node = orm.load_node(4)  # ArithmeticAddCalculation node
+
+process_mirror = ProcessMirror(process_node=process_node)
+process_mirror.do_mirror()
+```
+
+**Group**
+
+```python
+from aiida import orm, load_profile
+from aiida.tools.mirror.group import GroupMirror
+
+load_profile()
+
+group = orm.load_group('add-group')  # Group defined for this demonstration
+
+group_mirror = GroupMirror(group=group)
+group_mirror.do_mirror()
+```
+
+**Profile**
+
+```python
+from aiida import load_profile
+from aiida.tools.mirror.profile import ProfileMirror
+
+load_profile()
+
+profile_mirror = ProfileMirror()
+profile_mirror.do_mirror()
+```
+
+If no options are given, a default mirror output directory is created in the CWD, and the mirror behavior is set to incremental.
+
+### Configuration
+
+#### Configuration classes 
+
+Each mirror class has a `config` attribute which holds the corresponding `ProcessMirrorConfig`, `GroupMirrorConfig`, and
+`ProfileMirrorConfig` dataclasses, defined in the `src/aiida/tools/mirror/config.py` file.
+If no instances of the config classes are provided, the default values are being used.
+In addition, the `GroupMirror` class also takes the `process_mirror_config` configuration object, while the
+`ProfileMirror` class takes the `process_mirror_config` and `group_mirror_config` arguments.
+
+#### Mode, paths, and logger
+
+In addition, for each Mirror class the `mirror_mode` can be set (available options are `INCREMENTAL` (the default), and
+`OVERWRITE`, implemented via the `MirrorMode` enum), the `mirror_paths` (via the `MirrorPaths` container that holds the mirror parent and child
+directories, among others, and which can be constructed from a single path via the `MirrorPaths.from_path` classmethod).
+Finally, every Mirror class holds a global instance of the `MirrorLogger` (via the `mirror_logger`) attribute, which
+keeps track of the mirrored nodes and their output paths.
+After the mirroring operation, it is serialized to the `.aiida_mirror_log.json` file.
+When the mirroring is done multiple times for a group or profile, while new simulation data is obtained, the 
+During incremental mirroring, the `.aiida_mirror_log.json` file is read upon initialization, thus providing information
+which nodes had already been mirrored.
+
+## Code design
+
+### More on the logger
+
+### Composition and inheritance
