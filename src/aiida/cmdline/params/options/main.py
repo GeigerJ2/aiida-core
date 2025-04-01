@@ -113,7 +113,7 @@ __all__ = (
     'SILENT',
     'SORT',
     'SYMLINK_CALCS',
-    'SYMLINK_BETWEEN_GROUPS',
+    # 'SYMLINK_BETWEEN_GROUPS',
     'TIMEOUT',
     'TRAJECTORY_INDEX',
     'TRANSPORT',
@@ -779,7 +779,7 @@ PATH = OverridableOption(
     '--path',
     type=click.Path(path_type=pathlib.Path),
     show_default=False,
-    help='Base path for operations that write to disk.',
+    help='Base path for mirror operations that write to disk.',
 )
 
 OVERWRITE = OverridableOption(
@@ -805,7 +805,7 @@ MIRROR_DATA = OverridableOption(
     is_flag=True,
     default=False,
     show_default=True,
-    help='Dump data nodes.',
+    help='Mirror data nodes.',
 )
 
 MIRROR_PROCESSES = OverridableOption(
@@ -813,7 +813,7 @@ MIRROR_PROCESSES = OverridableOption(
     is_flag=True,
     default=True,
     show_default=True,
-    help='Dump process data.',
+    help='Mirror process data.',
 )
 
 ORGANIZE_BY_GROUPS = OverridableOption(
@@ -858,30 +858,23 @@ FLAT = OverridableOption(
     '--flat',
     is_flag=True,
     default=False,
-    help='Dump files in a flat directory for every step of a workflow.',
+    help='Mirror files in a flat directory for every step of a workflow.',
 )
-
-# INCREMENTAL = OverridableOption(
-#     '--incremental/--no-incremental',
-#     is_flag=True,
-#     default=True,
-#     show_default=True,
-#     help="Incremental mirroring of data to disk. Doesn't require using overwrite to clean previous directories.",
-# )
 
 SYMLINK_CALCS = OverridableOption(
     '--symlink-calcs/--no-symlink-calcs',
     default=False,
     show_default=True,
-    help='Symlink data if the same node is contained in multiple groups.',
+    help='Symlink workflow sub-calculations to their own dedicated directories.',
+#   (must be used in conjunction with no-only-top-level-calcs)
 )
 
-SYMLINK_BETWEEN_GROUPS = OverridableOption(
-    '--symlink-between-groups/--no-symlink-between-groups',
-    default=False,
-    show_default=True,
-    help='Symlink data if the same node is contained in multiple groups.',
-)
+# SYMLINK_BETWEEN_GROUPS = OverridableOption(
+#     '--symlink-between-groups/--no-symlink-between-groups',
+#     default=False,
+#     show_default=True,
+#     help='Symlink data if the same node is contained in multiple groups.',
+# )
 
 DELETE_MISSING = OverridableOption(
     '--delete-missing/--no-delete-missing',
@@ -894,21 +887,21 @@ ONLY_GROUPS = OverridableOption(
     '--only-groups/--no-only-groups',
     default=False,
     show_default=True,
-    help='Dump only data of nodes which are already organized in groups.',
+    help='Mirror only data of nodes which are already organized in groups.',
 )
 
 ONLY_TOP_LEVEL_CALCS = OverridableOption(
     '--only-top-level-calcs/--no-only-top-level-calcs',
     default=True,
     show_default=True,
-    help='Dump calculations in their own dedicated directories, not just as part of the mirrored workflow.',
+    help='Mirror calculations in their own dedicated directories, not just as part of the mirrored workflow.',
 )
 
 ONLY_TOP_LEVEL_WORKFLOWS = OverridableOption(
     '--only-top-level-workflows/--no-only-top-level-workflows',
     default=True,
     show_default=True,
-    help='If a top-level process calls sub-processes, create a designated directory only for the top-level process.',
+    help='If a top-level workflow calls sub-workflows, create a designated directory only for the top-level workflow.',
 )
 
 UPDATE_GROUPS = OverridableOption(

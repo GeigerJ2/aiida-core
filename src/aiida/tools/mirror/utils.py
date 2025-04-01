@@ -10,7 +10,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from aiida.common import timezone
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -27,12 +28,18 @@ __all__ = (
     'MirrorPaths',
     'NodeMirrorKeyMapper',
     'do_filter_nodes',
-    'get_group_subpath',
     'prepare_mirror_path',
     'safe_delete_dir',
 )
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.utils')
+
+
+# TODO: Properly implement this throughout
+@dataclass
+class MirrorTimes:
+    last: datetime | None = None
+    current: datetime | None = field(default_factory=timezone.now)
 
 class NodeMirrorKeyMapper:
     calculation_key: str = 'calculations'
@@ -94,7 +101,13 @@ class MirrorPaths:
     @property
     def safeguard_path(self) -> Path:
         """Returns the path to a safeguard file."""
-        return self.absolute / '.aiida_safeguard'
+        return self.absolute / '.aiida_mirror_safeguard'
+
+    @property
+    def logger_path(self) -> Path:
+        from aiida.tools.mirror.logger import MirrorLogger
+        """Returns the path of the logger JSON."""
+        return self.absolute / MirrorLogger.MIRROR_LOG_FILE
 
     # NOTE: Should this return a new instance?
     def extend_paths(self, subdir: str) -> 'MirrorPaths':

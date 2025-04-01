@@ -61,9 +61,11 @@ class MirrorNodeCollector:
         config: NodeCollectorConfig | None = None,
         last_mirror_time: datetime | None = None,
     ):
-        self.last_mirror_time = last_mirror_time
         self.mirror_logger = mirror_logger
         self.config = config or NodeCollectorConfig()
+        self.last_mirror_time = last_mirror_time
+
+        # import ipdb; ipdb.set_trace()
 
     def collect_to_mirror(self, group: orm.Group | None = None, filters: dict | None = None) -> MirrorNodeContainer:
         msg = 'Collecting nodes from the database. For the first mirror, this can take a while.'
@@ -73,14 +75,14 @@ class MirrorNodeCollector:
 
         if self.config.include_processes:
             # Get workflow nodes
-            workflows = self._get_nodes(
-                'workflows', group=group, top_level_only=self.config.only_top_level_workflows, filters=filters
+            workflows = self.get_nodes(
+                orm.WorkflowNode, group=group, top_level_only=self.config.only_top_level_workflows, filters=filters
             )
             container.workflows = workflows
 
             # Get calculation nodes
-            calculations = self._get_nodes(
-                'calculations', group=group, top_level_only=self.config.only_top_level_calcs, filters=filters
+            calculations = self.get_nodes(
+                orm.CalculationNode, group=group, top_level_only=self.config.only_top_level_calcs, filters=filters
             )
 
             # If not using top-level-only filter, add descendant calculations from workflows
@@ -160,35 +162,61 @@ class MirrorNodeCollector:
 
         # ipdb.set_trace()
 
-    def _resolve_filters(self, orm_key: str) -> Dict[str, Any]:
+    def _resolve_filters(self, orm_class: orm.CalculationNode | orm.WorkflowNode | orm.Data) -> Dict[str, Any]:
         filters = {}
+        orm_key = NodeMirrorKeyMapper.get_key_from_class(orm_class=orm_class)
+
+        # This might be too annoying to log always, and raising here would require manually setting
+        # `filter-by-last-mirror-time` to False for the first mirror
+        if self.config.filter_by_last_mirror_time and not self.last_mirror_time:
+            msg = 'Cannot filter by last mirror time if no last mirror time available. Will not filter nodes by time.'
+            logger.debug(msg)
 
         # Filter by modification time if requested
-        if self.config.filter_by_last_mirror_time and self.last_mirror_time:
+        elif self.config.filter_by_last_mirror_time and self.last_mirror_time:
             filters['mtime'] = {'>=': self.last_mirror_time.astimezone()}
 
         # Filter out already logged nodes if mirror_logger is available
-        if self.mirror_logger and hasattr(self.mirror_logger, orm_key):
-            node_store = getattr(self.mirror_logger, orm_key)
-            if node_store and len(node_store) > 0:
-                filters['uuid'] = {'!in': list(node_store.entries.keys())}
+        # NOTE: Move this outside and make it depend on the passing of the store???
+        # if self.mirror_logger and hasattr(self.mirror_logger, orm_key):
+        store = getattr(self.mirror_logger, orm_key)
+        if len(store) > 0:
+            filters['uuid'] = {'!in': list(store.entries.keys())}
 
         return filters
 
-    def _get_nodes(
-        self, orm_key: str, group: 'orm.Group' = None, top_level_only: bool = False, filters: dict | None = None
+    def get_nodes(
+        self, orm_type: orm.Node, group: 'orm.Group' = None, top_level_only: bool = False, filters: dict | None = None
     ) -> list['orm.Node']:
-        orm_type = NodeMirrorKeyMapper.get_class_from_key(orm_key)
-
         # Basic filters for the query
-        if filters is None:
-            filters = self._resolve_filters(orm_key)
+        if not filters:
+            filters = self._resolve_filters(orm_type)
 
         # Build query based on scope
         if self.config.group_scope == NodeMirrorGroupScope.IN_GROUP:
             if group is None:
                 raise ValueError('Group must be provided when scope is IN_GROUP')
             nodes = self._query_group_nodes(orm_type, group, filters)
+
+            # Extend "group" nodes to descendants
+            if not self.config.only_top_level_calcs:
+                descendant_nodes = []
+                for node in nodes:
+                    if isinstance(node, orm.WorkflowNode):
+                        descendant_nodes.extend(
+                            [n for n in node.called_descendants if isinstance(n, orm.CalculationNode)]
+                        )
+                # import ipdb; ipdb.set_trace()
+                nodes += descendant_nodes
+
+            # Extend "group" nodes to descendants
+            if not self.config.only_top_level_workflows:
+                descendant_nodes = []
+                for node in nodes:
+                    if isinstance(node, orm.ProcessNode):
+                        descendant_nodes.extend([n for n in node.called_descendants if isinstance(n, orm.WorkflowNode)])
+                # import ipdb; ipdb.set_trace()
+                nodes += descendant_nodes
 
         elif self.config.group_scope == NodeMirrorGroupScope.ANY:
             nodes = self._query_all_nodes(orm_type, filters)

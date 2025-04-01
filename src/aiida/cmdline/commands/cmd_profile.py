@@ -275,17 +275,17 @@ def profile_delete(force, delete_data, profiles):
 @options.PATH()
 # @options.DRY_RUN()
 @options.OVERWRITE()
+@options.GROUPS()
 @options.FILTER_BY_LAST_MIRROR_TIME()
 @options.MIRROR_PROCESSES()
 @options.MIRROR_DATA()
-@options.GROUPS()
-@options.ORGANIZE_BY_GROUPS()
-@options.SYMLINK_CALCS()
-@options.SYMLINK_BETWEEN_GROUPS()
-@options.DELETE_MISSING()
-@options.ONLY_GROUPS()
 @options.ONLY_TOP_LEVEL_CALCS()
 @options.ONLY_TOP_LEVEL_WORKFLOWS()
+@options.DELETE_MISSING()
+@options.SYMLINK_CALCS()
+# @options.SYMLINK_BETWEEN_GROUPS()
+@options.ORGANIZE_BY_GROUPS()
+@options.ONLY_GROUPS()
 @options.UPDATE_GROUPS()
 @options.INCLUDE_INPUTS()
 @options.INCLUDE_OUTPUTS()
@@ -305,7 +305,7 @@ def profile_mirror(
     groups,
     organize_by_groups,
     symlink_calcs,
-    symlink_between_groups,
+    # symlink_between_groups,
     delete_missing,
     update_groups,
     only_groups,
@@ -323,6 +323,7 @@ def profile_mirror(
     from aiida.tools.mirror import ProfileMirror
     from aiida.tools.mirror.config import MirrorMode, ProcessMirrorConfig, ProfileMirrorConfig, NodeCollectorConfig
     from aiida.tools.mirror.utils import resolve_click_path_for_mirror
+    from aiida.tools.archive.exceptions import ExportValidationError
 
     profile = ctx.obj['profile']
 
@@ -333,7 +334,7 @@ def profile_mirror(
     mirror_paths = resolve_click_path_for_mirror(path=path, entity=profile)
     output_path_absolute = mirror_paths.absolute
 
-    msg = f'Mirroring data of profile `{profile.name}` at path: `{output_path_absolute.name}`.'
+    msg = f'Mirroring data of profile `{profile.name}` at path `{output_path_absolute.name}`.'
     echo.echo_report(msg)
 
     # The logging of this behavior is taken care of in `prepare_dump_path`
@@ -370,10 +371,10 @@ def profile_mirror(
         organize_by_groups=organize_by_groups,
         only_groups=only_groups,
         update_groups=update_groups,
-        symlink_between_groups=symlink_between_groups
+        # symlink_between_groups=symlink_between_groups
     )
 
-    profile_mirror = ProfileMirror(
+    profile_mirror_inst = ProfileMirror(
         profile=profile,
         mirror_mode=mirror_mode,
         mirror_paths=mirror_paths,
@@ -393,11 +394,14 @@ def profile_mirror(
     #     echo.echo_report(dry_run_message)
     #     return
 
-    profile_mirror.do_mirror(top_level_caller=True)
-
-    # with safeguard_file_path.open('a') as fhandle:
-    #     msg = f'Last profile mirror time: {current_dump_time.isoformat()}\n'
-    #     fhandle.write(msg)
-
-    # # Write the logging json file to disk
-    # dump_logger.save_log()
+    try:
+        _ = profile_mirror_inst.do_mirror(top_level_caller=True)
+        # _ = group_mirror_inst._generate_readme()
+        msg = f'Raw files for profile `{profile.name}` mirrored into folder `{mirror_paths.child}`.'
+        echo.echo_success(msg)
+    except ExportValidationError as e:
+        echo.echo_critical(f'{e!s}')
+    except Exception as e:
+        import traceback
+        msg = f'Unexpected error while mirroring {profile.name}:\n ({e!s}).\n'
+        echo.echo_critical(msg + traceback.format_exc())

@@ -283,6 +283,7 @@ class ProcessMirror(BaseMirror):
 
                 calculation_store = self.mirror_logger.stores.calculations
 
+                # import ipdb; ipdb.set_trace()
                 if (
                     not self.config.symlink_calcs
                     or child_node.uuid not in calculation_store.entries.keys()
@@ -373,12 +374,12 @@ class ProcessMirror(BaseMirror):
             )
 
         # TODO: Add store entry here
+        # import ipdb; ipdb.set_trace()
         if self.mirror_logger is not None:
             calculation_store = self.mirror_logger.stores.calculations
 
             if calculation_node.uuid not in calculation_store.entries:
-                self.mirror_logger.add_entry(
-                    store=calculation_store,
+                calculation_store.add_entry(
                     uuid=calculation_node.uuid,
                     entry=MirrorLog(path=output_path, time=datetime.now().astimezone()),
                 )
