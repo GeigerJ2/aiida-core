@@ -306,6 +306,7 @@ class ProfileMirror(BaseCollectionMirror):
 
 
 # def update_groups(self) -> list[dict[str, Path]]:
+    # TODO: Check if mtime of group _after_ last_mirror_time, and if so, run mirroring for new nodes
 #     mirror_logger = self.mirror_logger
 
 #     # Order is the same as in the mirroring log file -> Not using a profile QB here

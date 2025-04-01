@@ -307,6 +307,67 @@ This can, of course, be changed by passing the `--path` argument.
 In this directory, depending on the type of process, directories for each `ProcessNode` are placed in `calculations` or
 `workflows` subdirectories.
 
+### Mirroring the entire profile
+
+Mirroring the data of the entire profile proceeds as follows:
+
+```
+❯ verdi profile mirror
+Report: Mirroring data of profile `readme` at path: `profile-readme-mirror`.
+Report: Incremental mirroring selected. Will update directory.
+Report: Mirroring processes not in any group for profile `readme`...
+Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: No (new) calculations to mirror in group `no-group`.
+Report: No (new) workflows to mirror in group `no-group`.
+Report: Mirroring processes in group `add-group` for profile `readme`...
+Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Mirroring 1 calculations...
+Report: No (new) workflows to mirror in group `add-group`.
+Report: Mirroring processes in group `multiply-add-group` for profile `readme`...
+Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: No (new) calculations to mirror in group `multiply-add-group`.
+Report: Mirroring 1 workflows...
+Success: Raw files for profile `readme` mirrored into folder `profile-readme-mirror`.
+```
+
+and gives the directory tree:
+
+```
+❯ tree profile-readme-mirror/
+profile-readme-mirror
+├── groups
+│  ├── add-group
+│  │  └── calculations
+│  │     └── ArithmeticAddCalculation-4
+│  │        ├── inputs
+│  │        │  ├── _aiidasubmit.sh
+│  │        │  └── aiida.in
+│  │        ├── node_inputs
+│  │        └── outputs
+│  │           ├── _scheduler-stderr.txt
+│  │           ├── _scheduler-stdout.txt
+│  │           └── aiida.out
+│  └── multiply-add-group
+│     └── workflows
+│        └── MultiplyAddWorkChain-11
+│           ├── 01-multiply-12
+│           │  ├── inputs
+│           │  │  └── source_file
+│           │  └── node_inputs
+│           └── 02-ArithmeticAddCalculation-14
+│              ├── inputs
+│              │  ├── _aiidasubmit.sh
+│              │  └── aiida.in
+│              ├── node_inputs
+│              └── outputs
+│                 ├── _scheduler-stderr.txt
+│                 ├── _scheduler-stdout.txt
+│                 └── aiida.out
+└── no-group
+```
+
+Thus, the `verdi profile mirror` command respects your internal AiiDA data organization in groups.
+
 ### JSON mirror log file
 
 If we have a closer look and show also the hidden files:
@@ -367,11 +428,12 @@ More info about the JSON log file will be outlined further below.
 
 ### Safety when overwriting
 
-Lastly, an `.aiida_mirror_safeguard` file is contained in every directory created by the mirror feature for each ORM entitity.
+You can also see that an `.aiida_mirror_safeguard` file is contained in every directory created by the mirror feature for each ORM entitity.
 This file serves as a (surprise...) safeguard file, as, in `overwrite` mode, the `mirror` command option performs a dangerous recursive deletion operation of a previous output directory.
 If, for whatever reason, the directory that is supposed to be cleaned by the mirror feature in `overwrite` mode is _not_
 the correct one, the command will abort if it does not find the `.aiida_mirror_safeguard` file, thus ensuring the
-command doesn't accidentally delete your family photo album. So don't fiddle with that file!!
+command doesn't accidentally delete your family photo album.
+So don't touch that file!!
 
 ### Efficient incremental mirroring
 
@@ -391,11 +453,10 @@ it should finish almost instantaneously, as there are no new simulations to mirr
 
 The evaluation of new nodes that should be mirrored is based on the entries in the `.aiida_mirror_log.json` file and the
 last time the `mirror` command was run. This information is used to construct a `QueryBuilder` instance that
-extracts the relevant nodes from the database. As this step is the very first one
-done in the code, and the query is executed using SQL, incremental mirroring for a small number of simulations should be
-quick, even for a large database. The first time a large database is mirrored, however, depending on the number of
-nodes, might take a considerable amount of time, due to the many individual I/O operations to write the relevant files
-for each process.
+extracts the relevant nodes from the database.
+As this step is the very first one done in the code, and the query is executed using SQL, incremental mirroring for a small number of simulations should be
+quick, even for a large database.
+The first time a large database is mirrored, however, depending on the number of nodes, might take a considerable amount of time, due to the many individual I/O operations to write the relevant files for each process.
 
 #### Customizing `verdi [group|profile] mirrror`
 
@@ -439,18 +500,17 @@ Let's consider how they change the behavior one by one.
 
 ##### `only-top-level-calcs`/`only-top-level-workflows`
 
-One thing you might have already noticed is that, even though the `MultiplyAddWorkchain` calls both, a `multiply`
-`calcfunction`, as well as an `ArithmeticAdd` CalcJob, there is no `calculations` subdirectory in the `add-group-mirror`
-output directory, and, instead, only one `MultiplyAddWorkChain` subdirectory under workflows.
-This is because, by default, only workflows and calculations that don't have a `CALLER` are put into their own, separate
-directories.
-During mirroring these "top-level" processes are then traversed recursively, and the files written. Thus, no extra
+One thing you might have already noticed is that even though the `MultiplyAddWorkchain` calls both, a `multiply`
+`calcfunction`, as well as an `ArithmeticAdd` `CalcJob`, there is no `calculations` subdirectory in the `add-group-mirror`
+output directory, and, instead, only one `MultiplyAddWorkChain` subdirectory under the `workflows` directory.
+This is because, by default, only top-level workflows and calculations (meaning they don't have a `CALLER`) are put into their own, separate directories.
+During mirroring, these top-level processes are then traversed recursively, and the files written. Thus, no extra
 top-level output directory for the `ArithmeticAddCalculation` called by the `MultiplyAddWorkChain` is required, as it is
-mirrored into a dedicated subdirectory.
-If you would obtain _all_ calculations and workflows of your group/profile in the dedicated `calculations` and
+mirrored into a subdirectory of the `MultiplyAddWorkChain` output folder.
+If you want to obtain _all_ calculations and workflows of your group/profile in the dedicated `calculations` and
 `workflows` directories, you can use the `--no-only-top-level-calcs` and/or `--no-only-top-level-workflows` flags.
 In that case, the report from running the command indicates that, in addition to the 1 workflow we've seen before, also
-2 calculations are being mirrored:
+2 calculations are being mirrored for the `multiply-add-group`:
 
 ```
 ❯ verdi group mirror multiply-add-group -o --no-only-top-level-calcs
@@ -734,6 +794,8 @@ SelfConsistentHubbardWorkChain<590> Finished [0] [2:run_results]
 
 </details>
 
+<!-- region -->
+
 <details>
 <summary>Mirror of a `SelfconsistentHubbardWorkchain`</summary>
 
@@ -786,40 +848,88 @@ group-hubbard-mirror/workflows/SelfConsistentHubbardWorkChain-590
 
 </details>
 
+<!-- endregion -->
 
 Running the command with the flags `--no-only-top-level-workflows` and
 `--no-only-top-level-calcs` makes access to the relevant sub-calculations and workflows easier:
 
+<details><summary>Top-level `ls` on processes of the SelfConsistentHubbardWorkChain</summary>
 ![alt text](figs/image-1.png)
+</details>
+
 
 ##### `--symlink-calcs`
 
-If the calculations
-
-### Mirroring the entire profile
-
-Finally, if we mirror the data of the entire profile, we get the following report messages:
+Using the flag `--no-only-top-level-calcs`, calculations are being mirrored in their own, dedicated directories, under
+`calculations`. This is in addition to subdirectories that were created for these `CalculationNode`s in the mirror
+directories of the `WorkflowNode`s from which they were called (if so).
+This can lead to data duplication, which is why the `--symlink-calcs` flag can be used to symlink the mirror directories of
+the calculations to the subdirectories of the parent workflows:
 
 ```
-❯ verdi profile mirror
-Report: Mirroring data of profile `readme` at path: `profile-readme-mirror`.
-Report: Incremental mirroring selected. Will update directory.
+❯ verdi group mirror multiply-add-group -o --no-only-top-level-calcs --symlink-calcs
+Report: Mirroring data of group `multiply-add-group` at path `multiply-add-group-mirror`.
+Report: Overwriting selected. Will clean directory first.
+Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Mirroring 2 calculations...
+Report: Mirroring 1 workflows...
+Success: Raw files for group `multiply-add-group` <2> mirrored into folder `multiply-add-group-mirror`.
+```
+
+giving the following directory:
+
+```
+❯ tree multiply-add-group-mirror/
+multiply-add-group-mirror
+├── calculations
+│  ├── ArithmeticAddCalculation-14
+│  │  ├── inputs
+│  │  │  ├── _aiidasubmit.sh
+│  │  │  └── aiida.in
+│  │  ├── node_inputs
+│  │  └── outputs
+│  │     ├── _scheduler-stderr.txt
+│  │     ├── _scheduler-stdout.txt
+│  │     └── aiida.out
+│  └── multiply-12
+│     ├── inputs
+│     │  └── source_file
+│     └── node_inputs
+└── workflows
+   └── MultiplyAddWorkChain-11
+      ├── 01-multiply-12 -> /home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/multiply-add-group-mirror/calculations/multiply-12
+      └── 02-ArithmeticAddCalculation-14 -> /home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/multiply-add-group-mirror/calculations/ArithmeticAddCalculation-14
+```
+</details>
+
+Here, the sub-calculations of the `MultiplyAddWorkChain` are symlinked to the relevant directories in the `calculations`
+directory.
+The symlinking also works between different groups, if, for example, calculations are contained in multiple groups (this
+is because to evaluate the possibility for symlinking, the global `MirrorLogger` that keeps track of mirrored entities
+and the corresponding paths is checked).
+
+For instance, for the current demonstration profile:
+
+```
+❯ verdi profile mirror --no-only-top-level-calcs --symlink-calcs -o
+Report: Mirroring data of profile `readme` at path `profile-readme-mirror`.
+Report: Overwriting selected. Will clean directory first.
+Report: Mirroring processes in group `add-group` for profile `readme`...
+Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Mirroring 2 calculations...
+Report: No (new) workflows to mirror in group `add-group`.
+Report: Mirroring processes in group `multiply-add-group` for profile `readme`...
+Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Mirroring 2 calculations...
+Report: Mirroring 1 workflows...
 Report: Mirroring processes not in any group for profile `readme`...
 Report: Collecting nodes from the database. For the first mirror, this can take a while.
 Report: No (new) calculations to mirror in group `no-group`.
 Report: No (new) workflows to mirror in group `no-group`.
-Report: Mirroring processes in group `add-group` for profile `readme`...
-Report: Collecting nodes from the database. For the first mirror, this can take a while.
-Report: Mirroring 1 calculations...
-Report: No (new) workflows to mirror in group `add-group`.
-Report: Mirroring processes in group `multiply-add-group` for profile `readme`...
-Report: Collecting nodes from the database. For the first mirror, this can take a while.
-Report: No (new) calculations to mirror in group `multiply-add-group`.
-Report: Mirroring 1 workflows...
 Success: Raw files for profile `readme` mirrored into folder `profile-readme-mirror`.
 ```
 
-and the directory tree:
+we obtain:
 
 ```
 ❯ tree profile-readme-mirror/
@@ -827,7 +937,16 @@ profile-readme-mirror
 ├── groups
 │  ├── add-group
 │  │  └── calculations
-│  │     └── ArithmeticAddCalculation-4
+│  │     ├── ArithmeticAddCalculation-4
+│  │     │  ├── inputs
+│  │     │  │  ├── _aiidasubmit.sh
+│  │     │  │  └── aiida.in
+│  │     │  ├── node_inputs
+│  │     │  └── outputs
+│  │     │     ├── _scheduler-stderr.txt
+│  │     │     ├── _scheduler-stdout.txt
+│  │     │     └── aiida.out
+│  │     └── ArithmeticAddCalculation-14
 │  │        ├── inputs
 │  │        │  ├── _aiidasubmit.sh
 │  │        │  └── aiida.in
@@ -837,25 +956,27 @@ profile-readme-mirror
 │  │           ├── _scheduler-stdout.txt
 │  │           └── aiida.out
 │  └── multiply-add-group
+│     ├── calculations
+│     │  ├── ArithmeticAddCalculation-14 -> /home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/readme/profile-readme-mirror/groups/add-group/calculations/ArithmeticAddCalculation-14
+│     │  └── multiply-12
+│     │     ├── inputs
+│     │     │  └── source_file
+│     │     └── node_inputs
 │     └── workflows
 │        └── MultiplyAddWorkChain-11
-│           ├── 01-multiply-12
-│           │  ├── inputs
-│           │  │  └── source_file
-│           │  └── node_inputs
-│           └── 02-ArithmeticAddCalculation-14
-│              ├── inputs
-│              │  ├── _aiidasubmit.sh
-│              │  └── aiida.in
-│              ├── node_inputs
-│              └── outputs
-│                 ├── _scheduler-stderr.txt
-│                 ├── _scheduler-stdout.txt
-│                 └── aiida.out
+│           ├── 01-multiply-12 -> /home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/readme/profile-readme-mirror/groups/multiply-add-group/calculations/multiply-12
+│           └── 02-ArithmeticAddCalculation-14 -> /home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/readme/profile-readme-mirror/groups/multiply-add-group/calculations/ArithmeticAddCalculation-14
 └── no-group
 ```
 
-Thus, the `verdi profile mirror` command respects your internal AiiDA data organization in groups.
+where the `ArithmeticAddCalculation` with pk=14 is symlinked to the corresponding `calculations` directory of the
+`add-group`.
+Please note that while the symlinking feature is useful for data deduplication, individual subdirectories are **not**
+self-contained. This means that you __cannot__ zip the `multipply-add-group` directory and send it, as it will be
+missing the symlinked calculations.
+Evaluate for yourself if that is a price you are willing to pay for the achieved data deduplication.
+We intend to provide fully self-contained output directories with the feature, which is why the `--symlink-calcs` option
+is turned off by default.
 
 #### Customizing `verdi profile mirrror`
 
