@@ -312,34 +312,36 @@ def generate_profile_default_mirror_path(
     return Path(f'{prefix}-{profile.name}-{appendix}')
 
 
-def generate_group_default_mirror_path(group: orm.Group, prefix: str = 'group', appendix: str = 'mirror') -> Path:
+def generate_group_default_mirror_path(group: orm.Group | None, prefix: str = 'group', appendix: str = 'mirror') -> Path:
     # TODO: Or, make sure mirror not in the group name?
-    if 'group' in group.label:
-        if appendix == 'group' and prefix != 'group':
-            label_elements = [prefix, group.label]
-        elif prefix == 'group' and appendix != 'group':
-            label_elements = [group.label, appendix]
-        elif prefix == 'group' and appendix == 'group':
-            label_elements = [group.label]
-        else:
-            label_elements = [prefix, group.label, appendix]
-
-    elif 'mirror' in group.label:
-        if appendix == 'mirror' and prefix != 'mirror':
-            label_elements = [prefix, group.label]
-        elif prefix == 'mirror' and appendix != 'mirror':
-            label_elements = [group.label, appendix]
-        elif prefix == 'mirror' and appendix == 'mirror':
-            label_elements = [group.label]
-        else:
-            label_elements = [prefix, group.label, appendix]
+    if not group:
+        label_elements = ['no-group', appendix]
 
     else:
-        label_elements = [prefix, group.label, appendix]
+        if 'group' in group.label:
+            if appendix == 'group' and prefix != 'group':
+                label_elements = [prefix, group.label]
+            elif prefix == 'group' and appendix != 'group':
+                label_elements = [group.label, appendix]
+            elif prefix == 'group' and appendix == 'group':
+                label_elements = [group.label]
+            else:
+                label_elements = [prefix, group.label, appendix]
 
-    return_str = '-'.join(label_elements)
+        elif 'mirror' in group.label:
+            if appendix == 'mirror' and prefix != 'mirror':
+                label_elements = [prefix, group.label]
+            elif prefix == 'mirror' and appendix != 'mirror':
+                label_elements = [group.label, appendix]
+            elif prefix == 'mirror' and appendix == 'mirror':
+                label_elements = [group.label]
+            else:
+                label_elements = [prefix, group.label, appendix]
 
-    return Path(return_str)
+        else:
+            label_elements = [prefix, group.label, appendix]
+
+    return Path('-'.join(label_elements))
 
 
 def resolve_click_path_for_mirror(

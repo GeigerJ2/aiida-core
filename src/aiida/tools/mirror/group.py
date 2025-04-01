@@ -68,7 +68,7 @@ class GroupMirror(BaseCollectionMirror):
         """Initialize the GroupMirror class."""
 
         if mirror_paths is None:
-            default_mirror_path = generate_group_default_mirror_path()
+            default_mirror_path = generate_group_default_mirror_path(group=group)
             mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
 
         # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various

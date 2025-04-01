@@ -42,11 +42,6 @@ class BaseCollectionMirror(BaseMirror):
             last_mirror_time=last_mirror_time,
             mirror_logger=mirror_logger,
         )
-        if node_collector_config is None:
-            # import traceback
-            # traceback.print_exc()
-            # import ipdb; ipdb.set_trace()
-            raise Exception
 
         self.node_collector_config = node_collector_config or NodeCollectorConfig()
 
