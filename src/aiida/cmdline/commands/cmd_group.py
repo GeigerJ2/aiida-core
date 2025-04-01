@@ -327,7 +327,7 @@ def group_relabel(group, label):
         echo.echo_success(f"Label changed to '{label}'")
         msg = (
             'Note that if you are mirroring your profile data to disk, to reflect the relabeling of the group, '
-            'run the command: `verdi profile mirror --update-groups.'
+            'run the command: `verdi profile mirror --update-groups.`'
         )
         echo.echo_report(msg)
 
@@ -649,10 +649,10 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
 @options.FILTER_BY_LAST_MIRROR_TIME()
 @options.MIRROR_PROCESSES()
 @options.MIRROR_DATA()
-@options.SYMLINK_CALCS()
 @options.DELETE_MISSING()
 @options.ONLY_TOP_LEVEL_CALCS()
 @options.ONLY_TOP_LEVEL_WORKFLOWS()
+@options.SYMLINK_CALCS()
 # ? @options.UPDATE_GROUPS()
 @options.INCLUDE_INPUTS()
 @options.INCLUDE_OUTPUTS()
@@ -668,11 +668,11 @@ def group_mirror(
     filter_by_last_mirror_time,
     mirror_processes,
     mirror_data,
-    symlink_calcs,
     delete_missing,
     # update_groups,
     only_top_level_calcs,
     only_top_level_workflows,
+    symlink_calcs,
     include_inputs,
     include_outputs,
     include_attributes,
@@ -697,7 +697,7 @@ def group_mirror(
     mirror_paths = resolve_click_path_for_mirror(path=path, entity=group)
     output_path = mirror_paths.parent / mirror_paths.child
 
-    msg = f'Mirroring data of group `{group.label}` at path: `{output_path.name}`.'
+    msg = f'Mirroring data of group `{group.label}` at path `{output_path.name}`.'
     echo.echo_report(msg)
 
     if overwrite:
@@ -730,8 +730,6 @@ def group_mirror(
         group=group,
         mirror_mode=mirror_mode,
         mirror_paths=mirror_paths,
-        # last_mirror_time=None,
-        # mirror_logger=None,
         node_collector_config=node_collector_config,
         config=group_mirror_config,
         process_mirror_config=process_mirror_config,
@@ -740,14 +738,16 @@ def group_mirror(
     try:
         _ = group_mirror_inst.do_mirror(top_level_caller=True)
         # _ = group_mirror_inst._generate_readme()
-        msg = f'Raw files for {group.label} <{group.pk}> mirrored into folder `{output_path.name}`.'
+        msg = f'Raw files for group `{group.label}` <{group.pk}> mirrored into folder `{output_path.name}`.'
         echo.echo_success(msg)
     except ExportValidationError as e:
         echo.echo_critical(f'{e!s}')
     except Exception as e:
-        msg = f'Unexpected error while mirroring {group.label} <{group.pk}>:\n ({e!s}).'
-        echo.echo_critical(msg)
-    
+        import traceback
+        msg = f'Unexpected error while mirroring {group.label} <{group.pk}>:\n ({e!s}). \n'
+
+        echo.echo_critical(msg + traceback.format_exc())
+
     # TODO: This logic below should be in the `do_mirror` call
     # if delete_missing:
     #     if num_processes_to_delete == 0:

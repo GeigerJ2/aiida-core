@@ -33,30 +33,34 @@ class BaseMirror:
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
         last_mirror_time: datetime | None = None,
+        current_mirror_time: datetime | None = None,
         mirror_logger: MirrorLogger | None = None,
     ):
         self.mirror_mode = mirror_mode or MirrorMode.INCREMENTAL
         self.mirror_paths = mirror_paths or MirrorPaths()
         self.last_mirror_time = last_mirror_time
+        current_mirror_time: datetime | None = None,
         self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger)
 
 
     def set_mirror_logger(self, mirror_logger: MirrorLogger | None = None):
-        """If in OVERWRITE mode or if loading from file fails, create a new instance
+        """If in loading from file fails, e.g., due to ``overwrite``, create a new instance
 
         :param mirror_logger: Optional existing logger instance to use
         :return: The appropriate MirrorLogger instance
         """
 
         # If in OVERWRITE mode, create a new instance
-        if self.mirror_mode == MirrorMode.OVERWRITE:
-            return MirrorLogger(mirror_paths=self.mirror_paths)
+        # ! NOTE: This breaks the symlinking...
+        # if self.mirror_mode == MirrorMode.OVERWRITE:
+        #     return MirrorLogger(mirror_paths=self.mirror_paths)
 
         # Use provided mirror_logger if one is passed in
         if mirror_logger is not None:
             return mirror_logger
 
         # Try to load from file, fall back to new instance on failure
+        # NOTE: When in overwrite mode, this file will not exist, so a new instance will be created
         try:
             return MirrorLogger.from_file(mirror_paths=self.mirror_paths)
         except (json.JSONDecodeError, OSError):
@@ -90,4 +94,5 @@ class BaseMirror:
 
         # Append the current mirror time to safeguard file
         with self.safeguard_file_path.open('a') as fhandle:
-            fhandle.write(f'Last mirror time: {self.current_mirror_time.isoformat()}\n')
+            msg = f'Last mirror time: {self.current_mirror_time.isoformat()}\n'
+            fhandle.write(msg)

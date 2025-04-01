@@ -71,6 +71,17 @@ class GroupMirror(BaseCollectionMirror):
             default_mirror_path = generate_group_default_mirror_path()
             mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
 
+        # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
+        # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
+        # However, the pre_mirror is done before instantiation, so running the mirror with `overwrite` still has the
+        # `dump_logger` from the JSON file of the previous run attached...
+        # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
+        # before instantiation??
+        # ! NOTE: THIS IS A HACK
+        # import ipdb; ipdb.set_trace()
+        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.logger_path.exists():
+            mirror_paths.logger_path.unlink()
+
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
@@ -87,6 +98,7 @@ class GroupMirror(BaseCollectionMirror):
         # FIXME: I need to pass the option to both, the GroupMirror and the ProcessMirror
         self.process_mirror_config.symlink_calcs = self.config.symlink_calcs
 
+    @staticmethod
     def load_given_group(group: orm.Group | str | None) -> orm.Group:
         """Validate the given group identifier.
 
@@ -159,6 +171,7 @@ class GroupMirror(BaseCollectionMirror):
         other_store = getattr(self.mirror_logger.stores, other_store_type)
         self.current_store = current_store
         self.other_store = other_store
+        # import ipdb; ipdb.set_trace()
 
         set_progress_bar_tqdm()
 
@@ -231,12 +244,14 @@ class GroupMirror(BaseCollectionMirror):
             mirror_logger=self.mirror_logger,
         )
 
+        # import ipdb; ipdb.set_trace()
         if not self.config.symlink_calcs:
             # Case: symlink_duplicates is disabled
             process_mirror_inst.do_mirror(top_level_caller=False)
 
         else:
             # Try to create symlink from current_store first
+            # import ipdb; ipdb.set_trace()
             symlinked = self._create_symlink_from_store(
                 process_uuid=process.uuid,
                 store_instance=self.current_store,
@@ -245,6 +260,7 @@ class GroupMirror(BaseCollectionMirror):
 
             # If not found in current_store, try other_store
             if not symlinked:
+                # import ipdb; ipdb.set_trace()
                 symlinked = self._create_symlink_from_store(
                     process_uuid=process.uuid,
                     store_instance=self.other_store,
@@ -253,11 +269,13 @@ class GroupMirror(BaseCollectionMirror):
 
             # If not found in either store, create a new mirror
             if not symlinked:
+                # import ipdb; ipdb.set_trace()
                 process_mirror_inst.do_mirror(
-                    process_node=process, output_path=process_mirror_path
+                    top_level_caller=False
                 )
 
         # This happens regardless of which case was executed
+        # import ipdb; ipdb.set_trace()
         self.current_store.add_entry(
             uuid=process.uuid,
             entry=MirrorLog(path=process_mirror_path, time=datetime.now().astimezone()),
@@ -274,7 +292,7 @@ class GroupMirror(BaseCollectionMirror):
                 logger.report(msg)
                 self._mirror_processes(processes=processes)
             else:
-                msg = f"No {process_type} to mirror in group `{self.group.label}`."
+                msg = f"No (new) {process_type} to mirror in group `{self.group.label}`."
                 logger.report(msg)
 
     def do_mirror(self, top_level_caller: bool = False) -> None:
@@ -283,13 +301,30 @@ class GroupMirror(BaseCollectionMirror):
         :return: None
         """
 
+        # TODO: See if I should have the `if` here
+        # if top_level_caller:
+        # import ipdb; ipdb.set_trace()
+
         self.pre_mirror(top_level_caller=top_level_caller)
+
         self.node_container = self.get_node_container(group=self.group)
 
         self._mirror_process_collections()
 
-        self.post_mirror()
-    
+        # NOTE: Should `current_mirror_time` be the time once it is finished? This should be consistent.
+        # Using the start time should be fine for now, as it is what is used for processes, such that processes that
+        # finish while the mirroring is running aren't picked up.
+        self.mirror_logger.stores.groups.add_entry(
+            uuid=self.group.uuid,
+            entry=MirrorLog(
+                path=self.mirror_paths.absolute,
+                time=self.current_mirror_time,
+                links=[],
+            )
+        )
+        if top_level_caller:
+            self.post_mirror()
+
     # for process_type in ('calculations', 'workflows'):
 
 

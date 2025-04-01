@@ -68,6 +68,17 @@ class ProfileMirror(BaseCollectionMirror):
             default_mirror_path = generate_profile_default_mirror_path()
             mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
 
+        # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
+        # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
+        # However, the pre_mirror is done before instantiation, so running the mirror with `overwrite` still has the
+        # `dump_logger` from the JSON file of the previous run attached...
+        # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
+        # before instantiation??
+        # ! NOTE: THIS IS A HACK
+        # import ipdb; ipdb.set_trace()
+        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.logger_path.exists():
+            mirror_paths.logger_path.unlink()
+
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
@@ -130,6 +141,7 @@ class ProfileMirror(BaseCollectionMirror):
                 process_mirror_config=self.process_mirror_config,
                 config=self.group_mirror_config,
                 mirror_logger=self.mirror_logger,
+                node_collector_config=self.node_collector_config
             )
 
             msg = f"Mirroring processes in group `{group.label}` for profile `{self.profile.name}`..."
@@ -196,15 +208,15 @@ class ProfileMirror(BaseCollectionMirror):
 
         # If `groups` given on construction, mirror only data within those groups
         else:
-            if not self.config.only_groups:
-                self._mirror_not_in_any_group()
-
             # Still, even without selecting groups, by default, all profile data should be mirrored
             # Thus, we obtain all groups in the profile here
             profile_groups = cast(
                 list[orm.Group], orm.QueryBuilder().append(orm.Group).all(flat=True)
             )
             self._mirror_per_group(groups=profile_groups)
+
+            if not self.config.only_groups:
+                self._mirror_not_in_any_group()
 
         if self.config.delete_missing: ...
             # TODO: Only delete missing groups here, not processes. Processes handled by `GroupMirror`

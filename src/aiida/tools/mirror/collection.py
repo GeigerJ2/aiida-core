@@ -24,10 +24,7 @@ from aiida.tools.mirror.config import (
     NodeCollectorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLogger
-from aiida.tools.mirror.utils import (
-    MirrorPaths,
-    prepare_mirror_path,
-)
+from aiida.tools.mirror.utils import MirrorPaths
 
 
 class BaseCollectionMirror(BaseMirror):
@@ -45,6 +42,11 @@ class BaseCollectionMirror(BaseMirror):
             last_mirror_time=last_mirror_time,
             mirror_logger=mirror_logger,
         )
+        if node_collector_config is None:
+            # import traceback
+            # traceback.print_exc()
+            # import ipdb; ipdb.set_trace()
+            raise Exception
 
         self.node_collector_config = node_collector_config or NodeCollectorConfig()
 

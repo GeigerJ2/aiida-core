@@ -114,7 +114,7 @@ class MirrorLogStoreCollection:
 class MirrorLogger:
     """Main Logger class for data mirroring."""
 
-    MIRROR_LOG_FILE: str = '.mirror_log.json'
+    MIRROR_LOG_FILE: str = '.aiida_mirror_log.json'
 
     def __init__(
         self,
