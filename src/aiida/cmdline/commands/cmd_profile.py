@@ -347,6 +347,14 @@ def profile_mirror(
     else:
         mirror_mode = MirrorMode.INCREMENTAL
 
+    if groups and overwrite:
+        msg = (
+            "`-G/--groups` and overwrite selected. The latter option would clean the full profile directory. "
+            "Are you sure you want to do this? This is currently not supported. Please manually clean the profile "
+            "mirror directory "
+            )
+        echo.echo_critical(msg)
+
     # Create config options that hold the various settings for dumping data
     node_collector_config = NodeCollectorConfig(
         include_processes=mirror_processes,
