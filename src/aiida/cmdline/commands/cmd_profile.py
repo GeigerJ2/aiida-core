@@ -357,8 +357,8 @@ def profile_mirror(
 
     # Create config options that hold the various settings for dumping data
     node_collector_config = NodeCollectorConfig(
-        include_processes=mirror_processes,
-        include_data=mirror_data,
+        get_processes=mirror_processes,
+        get_data=mirror_data,
         filter_by_last_mirror_time=filter_by_last_mirror_time,
         only_top_level_calcs=only_top_level_calcs,
         only_top_level_workflows=only_top_level_workflows,

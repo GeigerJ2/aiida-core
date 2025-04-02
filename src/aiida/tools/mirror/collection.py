@@ -24,7 +24,7 @@ from aiida.tools.mirror.config import (
     NodeCollectorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLogger
-from aiida.tools.mirror.utils import MirrorPaths
+from aiida.tools.mirror.config import MirrorPaths
 
 
 class BaseCollectionMirror(BaseMirror):

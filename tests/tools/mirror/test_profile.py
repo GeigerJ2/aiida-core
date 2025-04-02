@@ -13,8 +13,7 @@ import pytest
 from aiida import orm
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.profile import ProfileMirror
-from aiida.tools.mirror.config import ProfileMirrorConfig
-from aiida.tools.mirror.utils import MirrorPaths
+from aiida.tools.mirror.config import ProfileMirrorConfig, MirrorPaths
 
 
 def test_delete_missing_group_nodes_retained(): ...

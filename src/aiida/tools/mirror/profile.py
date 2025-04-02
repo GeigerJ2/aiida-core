@@ -31,6 +31,7 @@ from aiida.tools.mirror.collector import MirrorNodeContainer
 from aiida.tools.mirror.config import (
     GroupMirrorConfig,
     MirrorMode,
+    MirrorPaths,
     NodeCollectorConfig,
     NodeMirrorGroupScope,
     ProcessMirrorConfig,
@@ -38,12 +39,8 @@ from aiida.tools.mirror.config import (
 )
 from aiida.tools.mirror.group import GroupMirror
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
-from aiida.tools.mirror.utils import (
-    MirrorPaths,
-    generate_profile_default_mirror_path,
-    safe_delete_dir,
-    NodeMirrorKeyMapper
-)
+from aiida.tools.mirror.utils import generate_profile_default_mirror_path, safe_delete_dir
+
 logger = AIIDA_LOGGER.getChild("tools.mirror.profile")
 
 

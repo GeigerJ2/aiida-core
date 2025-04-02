@@ -36,11 +36,6 @@ logger = AIIDA_LOGGER.getChild('tools.mirror.utils')
 
 
 # TODO: Properly implement this throughout
-@dataclass
-class MirrorTimes:
-    last: datetime | None = None
-    current: datetime | None = field(default_factory=timezone.now)
-
 class NodeMirrorKeyMapper:
     calculation_key: str = 'calculations'
     workflow_key: str = 'workflows'
@@ -82,62 +77,6 @@ class NodeMirrorKeyMapper:
         else:
             msg = f'No node type mapping exists for key: {key}'
             raise ValueError(msg)
-
-# NOTE: Could also add logger and safeguard file path here
-@dataclass
-class MirrorPaths:
-    parent: Path = Path.cwd
-    child: Path = Path('aiida-mirror')
-
-    @classmethod
-    def from_path(cls, path: Path):
-        return cls(parent=path.parent, child=path.name)
-
-    @property
-    def absolute(self) -> Path:
-        """Returns the absolute path by joining parent and child."""
-        return self.parent / self.child
-
-    @property
-    def safeguard_path(self) -> Path:
-        """Returns the path to a safeguard file."""
-        return self.absolute / '.aiida_mirror_safeguard'
-
-    @property
-    def logger_path(self) -> Path:
-        from aiida.tools.mirror.logger import MirrorLogger
-        """Returns the path of the logger JSON."""
-        return self.absolute / MirrorLogger.MIRROR_LOG_FILE
-
-    # NOTE: Should this return a new instance?
-    def extend_paths(self, subdir: str) -> 'MirrorPaths':
-        """
-        Creates a new MirrorPaths instance with an additional subdirectory.
-
-        Args:
-            subdir: The name of the subdirectory to add
-
-        Returns:
-            A new MirrorPaths instance with the updated path structure
-        """
-        return MirrorPaths(parent=self.absolute, child=Path(subdir))
-
-    # @property
-    # def logger_path(self) -> Path:
-    #     """Returns the path to a safeguard file."""
-    #     return self.absolute / ".aiida_safeguard"
-
-    # @property
-    # def logger(self) -> logging.Logger:
-    #     """Returns a logger specific to this dump path."""
-    #     logger_name = f"mirror_paths.{self.parent.name}.{self.child.name}"
-    #     return logging.getLogger(logger_name)
-
-
-# class SafeguardFileMapping(Enum):
-#     PROCESS = '.aiida_process_safeguard'
-#     GROUP = '.aiida_group_safeguard'
-#     PROFILE = '.aiida_profile_safeguard'
 
 
 # NOTE: Could move to BaseMirror class
