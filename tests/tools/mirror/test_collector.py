@@ -10,12 +10,18 @@
 import pytest
 from aiida.tools.mirror.collector import MirrorNodeContainer, MirrorNodeCollector
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
-from aiida.tools.mirror.config import NodeCollectorConfig, NodeMirrorGroupScope, MirrorPaths
+from aiida.tools.mirror.config import (
+    NodeCollectorConfig,
+    NodeMirrorGroupScope,
+    MirrorPaths,
+    MirrorTimes,
+)
 from aiida import orm
 from aiida.tools.graph.deletions import delete_nodes
 from sqlalchemy import inspect
 import copy
 from datetime import datetime
+from aiida.common import timezone
 
 
 class TestMirrorNodeCollector:
@@ -31,19 +37,20 @@ class TestMirrorNodeCollector:
         orm_class = orm.CalculationNode
         mirror_paths = MirrorPaths.from_path(tmp_path)
         mirror_logger = MirrorLogger(mirror_paths=mirror_paths)
-        current_time = datetime.now().astimezone()
+        mirror_times = MirrorTimes(last=timezone.now())
 
-        with pytest.raises(ValueError):
-            mirror_node_collector = MirrorNodeCollector(
-                mirror_logger=mirror_logger, config=NodeCollectorConfig()
-            )
-            _ = mirror_node_collector._resolve_filters(orm_class=orm_class)
+        # NOTE: This doesn't raise anymore
+        # with pytest.raises(ValueError):
+        #     mirror_node_collector = MirrorNodeCollector(
+        #         mirror_logger=mirror_logger, config=NodeCollectorConfig()
+        #     )
+        #     _ = mirror_node_collector._resolve_filters(orm_class=orm_class)
 
         # No filter by time applied
         mirror_node_collector = MirrorNodeCollector(
             mirror_logger=mirror_logger,
             config=NodeCollectorConfig(filter_by_last_mirror_time=False),
-            last_mirror_time=current_time,
+            mirror_times=mirror_times,
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm_class)
         assert filters == {}
@@ -52,16 +59,16 @@ class TestMirrorNodeCollector:
         mirror_node_collector = MirrorNodeCollector(
             mirror_logger=mirror_logger,
             config=NodeCollectorConfig(),
-            last_mirror_time=current_time,
+            mirror_times=mirror_times,
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
-        assert filters == {"mtime": {">=": current_time}}
+        assert filters == {"mtime": {">=": mirror_times.last}}
 
         calc = orm.CalculationNode()
         calc.store()
         mirror_logger.stores.calculations.add_entry(
             uuid=calc.uuid,
-            entry=MirrorLog(path=tmp_path / "calc", time=current_time, links=[]),
+            entry=MirrorLog(path=tmp_path / "calc", time=mirror_times.current, links=[]),
         )
 
         # WorkflowNode shouldn't appear in calculation store and filters
@@ -69,12 +76,13 @@ class TestMirrorNodeCollector:
         wf.store()
         mirror_logger.stores.workflows.add_entry(
             uuid=wf.uuid,
-            entry=MirrorLog(path=tmp_path / "wf", time=current_time, links=[]),
+            entry=MirrorLog(path=tmp_path / "wf", time=mirror_times.current, links=[]),
         )
 
         mirror_node_collector = MirrorNodeCollector(
             mirror_logger=mirror_logger,
             config=NodeCollectorConfig(filter_by_last_mirror_time=False),
+            mirror_times=mirror_times
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
         assert filters == {"uuid": {"!in": [calc.uuid]}}
@@ -82,10 +90,10 @@ class TestMirrorNodeCollector:
         mirror_node_collector = MirrorNodeCollector(
             mirror_logger=mirror_logger,
             config=NodeCollectorConfig(),
-            last_mirror_time=current_time,
+            mirror_times=mirror_times
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
-        assert filters == {"mtime": {">=": current_time}, "uuid": {"!in": [calc.uuid]}}
+        assert filters == {"mtime": {">=": mirror_times.last}, "uuid": {"!in": [calc.uuid]}}
 
         # import ipdb
 
@@ -104,6 +112,7 @@ class TestMirrorNodeCollector:
     def test_collect_to_delete(self, tmp_path):
         mirror_logger = MirrorLogger(mirror_paths=MirrorPaths.from_path(tmp_path))
         empty_mirror_logger = copy.deepcopy(mirror_logger)
+        mirror_times = MirrorTimes(last=timezone.now())
 
         for process_type in (orm.CalculationNode, orm.WorkflowNode):
             processes = [process_type() for i in range(3)]
@@ -125,7 +134,7 @@ class TestMirrorNodeCollector:
         )
 
         mirror_node_collector = MirrorNodeCollector(
-            config=node_collector_config, mirror_logger=empty_mirror_logger
+            config=node_collector_config, mirror_logger=empty_mirror_logger, mirror_times=mirror_times
         )
 
         # mirror_container = mirror_node_collector.collect_to_mirror()

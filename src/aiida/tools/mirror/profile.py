@@ -23,15 +23,16 @@ from pathlib import Path
 from typing import cast
 
 from aiida import orm
+from aiida.common import timezone
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage import load_profile
 from aiida.manage.configuration.profile import Profile
 from aiida.tools.mirror.collection import BaseCollectionMirror
-from aiida.tools.mirror.collector import MirrorNodeContainer
 from aiida.tools.mirror.config import (
     GroupMirrorConfig,
     MirrorMode,
     MirrorPaths,
+    MirrorTimes,
     NodeCollectorConfig,
     NodeMirrorGroupScope,
     ProcessMirrorConfig,
@@ -39,7 +40,10 @@ from aiida.tools.mirror.config import (
 )
 from aiida.tools.mirror.group import GroupMirror
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
-from aiida.tools.mirror.utils import generate_profile_default_mirror_path, safe_delete_dir
+from aiida.tools.mirror.utils import (
+    generate_profile_default_mirror_path,
+    safe_delete_dir,
+)
 
 logger = AIIDA_LOGGER.getChild("tools.mirror.profile")
 
@@ -52,7 +56,7 @@ class ProfileMirror(BaseCollectionMirror):
         profile: str | Profile | None = None,
         mirror_mode: MirrorMode = MirrorMode.INCREMENTAL,
         mirror_paths: MirrorPaths | None = None,
-        last_mirror_time: datetime | None = None,
+        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
         config: ProfileMirrorConfig | None = None,
         node_collector_config: NodeCollectorConfig | None = None,
@@ -73,13 +77,13 @@ class ProfileMirror(BaseCollectionMirror):
         # before instantiation??
         # ! NOTE: THIS IS A HACK
         # import ipdb; ipdb.set_trace()
-        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.logger_path.exists():
-            mirror_paths.logger_path.unlink()
+        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.logger.exists():
+            mirror_paths.logger.unlink()
 
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            last_mirror_time=last_mirror_time,
+            mirror_times=mirror_times,
             mirror_logger=mirror_logger,
             node_collector_config=node_collector_config,
         )
@@ -138,7 +142,7 @@ class ProfileMirror(BaseCollectionMirror):
                 process_mirror_config=self.process_mirror_config,
                 config=self.group_mirror_config,
                 mirror_logger=self.mirror_logger,
-                node_collector_config=self.node_collector_config
+                node_collector_config=self.node_collector_config,
             )
 
             msg = f"Mirroring processes in group `{group.label}` for profile `{self.profile.name}`..."
@@ -150,7 +154,7 @@ class ProfileMirror(BaseCollectionMirror):
                 uuid=group.uuid,
                 entry=MirrorLog(
                     path=mirror_paths_group.absolute,
-                    time=datetime.now().astimezone(),
+                    time=self.mirror_times.current,
                 ),
             )
 
@@ -215,12 +219,13 @@ class ProfileMirror(BaseCollectionMirror):
             if not self.config.only_groups:
                 self._mirror_not_in_any_group()
 
-        if self.config.delete_missing: ...
-            # TODO: Only delete missing groups here, not processes. Processes handled by `GroupMirror`
+        if self.config.delete_missing:
+            ...
+        # TODO: Only delete missing groups here, not processes. Processes handled by `GroupMirror`
         #     import ipdb; ipdb.set_trace()
         #     self.delete_container = MirrorNodeContainer()
 
-            # self.delete_container.
+        # self.delete_container.
 
         self.post_mirror()
 
@@ -234,7 +239,9 @@ class ProfileMirror(BaseCollectionMirror):
         # Cannot use QB here because, when node deleted, it's not in the DB anymore
         mirrored_uuids = set(list(group_log.entries.keys()))
 
-        profile_uuids = orm.QueryBuilder().append(orm.Group, project=['uuid']).all(flat=True)
+        profile_uuids = (
+            orm.QueryBuilder().append(orm.Group, project=["uuid"]).all(flat=True)
+        )
 
         to_delete_uuids = list(mirrored_uuids - profile_uuids)
 
@@ -250,40 +257,39 @@ class ProfileMirror(BaseCollectionMirror):
         group_store = self.mirror_logger.stores.groups
         path = group_store.get_entry(group_uuid).path
         mirror_paths = MirrorPaths.from_path(path)
-        safe_delete_dir(path=path, safeguard_file=mirror_paths.safeguard_path)
+        safe_delete_dir(path=path, safeguard_file=mirror_paths.safeguard)
         self.mirror_logger.del_entry(store=group_store, uuid=group_uuid)
+
 
 # def delete_groups(self):
 #     to_delete_groups = self.groups_to_delete
 #         # ! Problem: Don't have safeguard file in empty group directory
 
-        # if
+# if
 
-        # if delete_missing_processes:
-        #     if num_processes_to_delete == 0:
-        #         msg = 'No processes to delete.'
-        #         logger.report(msg)
-        #     else:
-        #         self.delete_processes()
-        #         msg = f'Deleted {num_processes_to_delete} node directories.'
-        #         logger.report(msg)
+# if delete_missing_processes:
+#     if num_processes_to_delete == 0:
+#         msg = 'No processes to delete.'
+#         logger.report(msg)
+#     else:
+#         self.delete_processes()
+#         msg = f'Deleted {num_processes_to_delete} node directories.'
+#         logger.report(msg)
 
-        # if num_groups_to_delete == 0:
-        #     echo.echo_success('No groups to delete.')
-        # else:
-        #     self.delete_groups()
-        #     echo.echo_success(f'Deleted {num_groups_to_delete} group directories.')
+# if num_groups_to_delete == 0:
+#     echo.echo_success('No groups to delete.')
+# else:
+#     self.delete_groups()
+#     echo.echo_success(f'Deleted {num_groups_to_delete} group directories.')
 
-        # if update_groups:
-        #     relabeled_paths = self.update_groups()
-        #     msg = 'Renamed group directories and updated the log file.'
-        #     echo.echo_success(msg)
-        #     # print(relabeled_paths)
-
+# if update_groups:
+#     relabeled_paths = self.update_groups()
+#     msg = 'Renamed group directories and updated the log file.'
+#     echo.echo_success(msg)
+#     # print(relabeled_paths)
 
 
 #####
-
 
 
 # # TODO: Also move this into a more general method that returns a `NodeContainer`
@@ -303,7 +309,7 @@ class ProfileMirror(BaseCollectionMirror):
 
 
 # def update_groups(self) -> list[dict[str, Path]]:
-    # TODO: Check if mtime of group _after_ last_mirror_time, and if so, run mirroring for new nodes
+# TODO: Check if mtime of group _after_ mirror_times.last, and if so, run mirroring for new nodes
 #     mirror_logger = self.mirror_logger
 
 #     # Order is the same as in the mirroring log file -> Not using a profile QB here

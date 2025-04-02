@@ -9,8 +9,6 @@
 
 """Base class for collection mirror."""
 
-# TODO: Fix `last_mirror_time`
-
 from __future__ import annotations
 
 import json
@@ -21,6 +19,7 @@ from aiida.tools.mirror.base import BaseMirror
 from aiida.tools.mirror.collector import MirrorNodeCollector, MirrorNodeContainer
 from aiida.tools.mirror.config import (
     MirrorMode,
+    MirrorTimes,
     NodeCollectorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLogger
@@ -32,14 +31,14 @@ class BaseCollectionMirror(BaseMirror):
         self,
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
-        last_mirror_time: datetime | None = None,
+        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
         node_collector_config: NodeCollectorConfig | None = None,
     ):
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            last_mirror_time=last_mirror_time,
+            mirror_times=mirror_times,
             mirror_logger=mirror_logger,
         )
 
@@ -54,7 +53,7 @@ class BaseCollectionMirror(BaseMirror):
         """
         node_collector = MirrorNodeCollector(
             config=self.node_collector_config,
-            last_mirror_time=self.last_mirror_time,
+            mirror_times=self.mirror_times,
             mirror_logger=self.mirror_logger,
         )
 

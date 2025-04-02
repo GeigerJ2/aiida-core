@@ -10,24 +10,20 @@
 
 from __future__ import annotations
 
-from aiida.common import timezone
-from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from aiida import load_profile, orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration import Profile
-from aiida.tools.mirror.config import MirrorMode
+from aiida.tools.mirror.config import MirrorMode, MirrorPaths
+
 
 if TYPE_CHECKING:
     from aiida.tools.mirror.logger import MirrorLogger
 
 __all__ = (
-    'MirrorPaths',
     'NodeMirrorKeyMapper',
-    'do_filter_nodes',
     'prepare_mirror_path',
     'safe_delete_dir',
 )
@@ -194,23 +190,6 @@ def _delete_dir_recursive(path):
     except Exception as exception:
         print(f'exception name: {exception.__class__.__name__}')
         print(f'exception msg: {exception}')
-
-
-def do_filter_nodes(nodes: list[str], last_dump_time: datetime | None = None) -> list[str]:
-    """Filter a list of nodes by the last dump time of the corresponding dumper.
-
-    :param nodes: A list of node identifiers, which can be either UUIDs (str) or IDs (int).
-    :param last_dump_time: Only include nodes dumped after this timestamp.
-    :return: A list of node identifiers that have a dump time after the specified last_dump_time.
-    """
-
-    # TODO: Possibly directly use QueryBuilder filter. Though, `nodes` directly accessible from orm.Group.nodes
-    if not nodes or last_dump_time is None:
-        return nodes
-
-    qb = orm.QueryBuilder().append(orm.Node, filters={'uuid': {'in': nodes}})
-    nodes_orm: list[orm.Node] = cast(list[orm.Node], qb.all(flat=True))
-    return [node.uuid for node in nodes_orm if node.mtime > last_dump_time]
 
 
 def generate_process_default_mirror_path(

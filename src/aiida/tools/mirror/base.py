@@ -13,11 +13,8 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-
-from aiida.tools.mirror.config import (
-    MirrorMode,
-    MirrorPaths,
-)
+from aiida.common import timezone
+from aiida.tools.mirror.config import MirrorMode, MirrorPaths, MirrorTimes
 from aiida.tools.mirror.logger import MirrorLogger
 from aiida.tools.mirror.utils import (
     prepare_mirror_path,
@@ -29,16 +26,13 @@ class BaseMirror:
         self,
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
-        last_mirror_time: datetime | None = None,
-        current_mirror_time: datetime | None = None,
+        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
     ):
         self.mirror_mode = mirror_mode or MirrorMode.INCREMENTAL
         self.mirror_paths = mirror_paths or MirrorPaths()
-        self.last_mirror_time = last_mirror_time
-        current_mirror_time: datetime | None = None,
+        self.mirror_times = mirror_times or MirrorTimes()
         self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger)
-
 
     def set_mirror_logger(self, mirror_logger: MirrorLogger | None = None):
         """If in loading from file fails, e.g., due to ``overwrite``, create a new instance
@@ -69,27 +63,24 @@ class BaseMirror:
         _ = prepare_mirror_path(
             path_to_validate=self.mirror_paths.absolute,
             mirror_mode=self.mirror_mode,
-            safeguard_file=self.mirror_paths.safeguard_path,
+            safeguard_file=self.mirror_paths.safeguard,
             top_level_caller=top_level_caller,
         )
 
-        safeguard_file_path = self.mirror_paths.safeguard_path
-
         try:
-            with safeguard_file_path.open('r') as fhandle:
-                last_mirror_time = datetime.fromisoformat(fhandle.readlines()[-1].strip().split()[-1]).astimezone()
+            with self.mirror_paths.safeguard.open("r") as fhandle:
+                self.mirror_times.last = datetime.fromisoformat(
+                    fhandle.readlines()[-1].strip().split()[-1]
+                ).astimezone()
         except (IndexError, FileNotFoundError):
-            last_mirror_time = None
-
-        self.safeguard_file_path = safeguard_file_path
-        self.last_mirror_time = last_mirror_time
-        self.current_mirror_time = datetime.now().astimezone()
+            # Default for `last` is already None
+            pass
 
     def post_mirror(self) -> None:
         """_summary_"""
         self.mirror_logger.save_log()
 
         # Append the current mirror time to safeguard file
-        with self.safeguard_file_path.open('a') as fhandle:
-            msg = f'Last mirror time: {self.current_mirror_time.isoformat()}\n'
+        with self.mirror_paths.safeguard.open("a") as fhandle:
+            msg = f"Last mirror time: {self.mirror_times.start.isoformat()}\n"
             fhandle.write(msg)
