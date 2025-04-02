@@ -20,12 +20,17 @@ from types import SimpleNamespace
 import yaml
 
 from aiida import orm
-from aiida.common import LinkType
+from aiida.common import LinkType, timezone
 from aiida.common.exceptions import NotExistentAttributeError
 from aiida.orm.utils import LinkTriple
 from aiida.tools.archive.exceptions import ExportValidationError
 from aiida.tools.mirror.base import BaseMirror
-from aiida.tools.mirror.config import MirrorMode, MirrorPaths, ProcessMirrorConfig
+from aiida.tools.mirror.config import (
+    MirrorMode,
+    MirrorPaths,
+    ProcessMirrorConfig,
+    MirrorTimes,
+)
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.utils import (
     generate_process_default_mirror_path,
@@ -43,7 +48,7 @@ class ProcessMirror(BaseMirror):
         process_node: orm.ProcessNode,
         mirror_mode: MirrorMode = MirrorMode.INCREMENTAL,
         mirror_paths: MirrorPaths | None = None,
-        last_mirror_time: datetime | None = None,
+        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
         config: ProcessMirrorConfig | None = None,
     ) -> None:
@@ -52,13 +57,15 @@ class ProcessMirror(BaseMirror):
         self.process_node = process_node
 
         if mirror_paths is None:
-            default_mirror_path = generate_process_default_mirror_path(process_node=self.process_node)
+            default_mirror_path = generate_process_default_mirror_path(
+                process_node=self.process_node
+            )
             mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
 
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            last_mirror_time=last_mirror_time,
+            mirror_times=mirror_times,
             mirror_logger=mirror_logger,
         )
 
@@ -250,7 +257,7 @@ class ProcessMirror(BaseMirror):
                 store=workflow_store,
                 uuid=workflow_node.uuid,
                 entry=MirrorLog(
-                    path=output_path.resolve(), time=datetime.now().astimezone()
+                    path=output_path.resolve(), time=self.mirror_times.current
                 ),
             )
 
@@ -275,7 +282,6 @@ class ProcessMirror(BaseMirror):
                     output_path=child_output_path,
                     io_mirror_paths=io_mirror_paths,
                 )
-
 
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
@@ -321,7 +327,7 @@ class ProcessMirror(BaseMirror):
         prepare_mirror_path(
             path_to_validate=output_path,
             mirror_mode=self.mirror_mode,
-            safeguard_file=self.mirror_paths.safeguard_path,
+            safeguard_file=self.mirror_paths.safeguard,
             top_level_caller=False,
         )
 
@@ -380,7 +386,10 @@ class ProcessMirror(BaseMirror):
             if calculation_node.uuid not in calculation_store.entries:
                 calculation_store.add_entry(
                     uuid=calculation_node.uuid,
-                    entry=MirrorLog(path=output_path, time=datetime.now().astimezone()),
+                    entry=MirrorLog(
+                        path=output_path,
+                        time=self.mirror_times.current,
+                    ),
                 )
 
     def _mirror_calculation_io_files(

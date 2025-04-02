@@ -625,8 +625,8 @@ def process_mirror(
     process_mirror_inst = ProcessMirror(
         process_node=process,
         mirror_paths=mirror_paths,
-        last_mirror_time=None,  # ? Is this needed for a single process?
-        # last_mirror_time=last_mirror_time,
+        # ? Is this needed for a single process?
+        mirror_times=None,  
         mirror_mode=mirror_mode,
         config=process_mirror_config,
     )

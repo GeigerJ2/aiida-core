@@ -134,6 +134,7 @@ class MirrorLogger:
             cls._instance._initialized = False
         return cls._instance
 
+    # NOTE: Shouldn't the logger have the `MirrorTimes` attached to it??
     def __init__(
         self,
         mirror_paths: MirrorPaths,

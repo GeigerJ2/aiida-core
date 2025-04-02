@@ -44,12 +44,20 @@ class MirrorMode(Enum):
 @dataclass
 class MirrorTimes:
     last: datetime | None = None
-    current: datetime | None = field(default_factory=timezone.now)
+    # NOTE: Maybe make this a property/function, in a way that it is always evaluated
+    # NOTE: Then, I don't have the exact same time always everywhere
+    start: datetime | None = field(default_factory=timezone.now)
     range_start: datetime | None = None
     range_end: datetime | None = None
 
+    @property
+    def current(self) -> datetime:
+        """
+        Returns the current time whenever accessed, ensuring it's always up-to-date.
+        """
+        return timezone.now()
 
-# NOTE: Could also add logger and safeguard file path here
+
 @dataclass
 class MirrorPaths:
     parent: Path = Path.cwd
@@ -65,12 +73,12 @@ class MirrorPaths:
         return self.parent / self.child
 
     @property
-    def safeguard_path(self) -> Path:
+    def safeguard(self) -> Path:
         """Returns the path to a safeguard file."""
         return self.absolute / '.aiida_mirror_safeguard'
 
     @property
-    def logger_path(self) -> Path:
+    def logger(self) -> Path:
         from aiida.tools.mirror.logger import MirrorLogger
 
         """Returns the path of the logger JSON."""
@@ -94,7 +102,6 @@ class MirrorPaths:
 class NodeCollectorConfig:
     """Shared arguments for mirroring of collections of nodes."""
 
-    # NOTE: Should the `last_mirror_time` also be here
     get_processes: bool = True
     get_data: bool = False
     filter_by_last_mirror_time: bool = True
