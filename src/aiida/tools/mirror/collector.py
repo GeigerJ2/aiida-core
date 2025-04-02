@@ -73,7 +73,7 @@ class MirrorNodeCollector:
 
         container = MirrorNodeContainer()
 
-        if self.config.include_processes:
+        if self.config.get_processes:
             # Get workflow nodes
             workflows = self.get_nodes(
                 orm.WorkflowNode, group=group, top_level_only=self.config.only_top_level_workflows, filters=filters
@@ -93,7 +93,7 @@ class MirrorNodeCollector:
 
             container.calculations = calculations
 
-        if self.config.include_data:
+        if self.config.get_data:
             msg = 'Mirroring of data nodes not implemented yet.'
             raise NotImplementedError(msg)
 

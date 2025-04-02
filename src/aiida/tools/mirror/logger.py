@@ -14,7 +14,8 @@ from datetime import datetime
 from pathlib import Path
 
 from aiida.common.exceptions import NotExistent
-from aiida.tools.mirror.utils import MirrorPaths, NodeMirrorKeyMapper
+from aiida.tools.mirror.utils import NodeMirrorKeyMapper
+from aiida.tools.mirror.config import MirrorPaths
 
 # TODO: Possibly mirror hierarchy of mirrored directory inside json file
 # TODO: Currently, json file has only top-level "groups", "workflows", and "calculations"
@@ -115,15 +116,15 @@ class MirrorLogger:
     """Main Logger class for data mirroring implemented as a Singleton."""
 
     MIRROR_LOG_FILE: str = '.aiida_mirror_log.json'
-    
+
     # Class variable to store the singleton instance
     _instance = None
-    
-    def __new__(cls, 
-                mirror_paths=None, 
-                calculations=None, 
-                workflows=None, 
-                groups=None, 
+
+    def __new__(cls,
+                mirror_paths=None,
+                calculations=None,
+                workflows=None,
+                groups=None,
                 data=None):
         """Override __new__ to implement the singleton pattern."""
         if cls._instance is None:
@@ -209,7 +210,7 @@ class MirrorLogger:
         import json
         from datetime import datetime
         from pathlib import Path
-        
+
         instance = cls(mirror_paths=mirror_paths)
 
         if not instance.log_file_path.exists():
@@ -242,7 +243,7 @@ class MirrorLogger:
             raise
 
         return instance
-        
+
     @classmethod
     def reset_instance(cls):
         """Reset the singleton instance (primarily for testing purposes)."""
@@ -251,7 +252,7 @@ class MirrorLogger:
     def get_store_by_uuid(self, uuid: str) -> MirrorLogStore:
         """Find the store that contains the given UUID."""
         from dataclasses import fields
-        
+
         # Iterate over the fields of the MirrorLogStoreCollection dataclass for generality
         for field_ in fields(self.stores):
             store = getattr(self.stores, field_.name)

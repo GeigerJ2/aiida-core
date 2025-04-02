@@ -25,10 +25,9 @@ from aiida.common.exceptions import NotExistentAttributeError
 from aiida.orm.utils import LinkTriple
 from aiida.tools.archive.exceptions import ExportValidationError
 from aiida.tools.mirror.base import BaseMirror
-from aiida.tools.mirror.config import MirrorMode, ProcessMirrorConfig
+from aiida.tools.mirror.config import MirrorMode, MirrorPaths, ProcessMirrorConfig
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.utils import (
-    MirrorPaths,
     generate_process_default_mirror_path,
     prepare_mirror_path,
 )

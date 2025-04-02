@@ -226,7 +226,7 @@ The default mirroring command will result in a self-contained, logical directory
 ### Mirroring groups
 
 Documentation for the `verdi process mirror` feature is already available
-[here](https://aiida.readthedocs.io/projects/aiida-core/en/latest/howto/data.html#dumping-data-to-disk), thus we will
+[here](https://aiida.readthedocs.io/projects/aiida-core/en/latest/howto/data.html#mirroring-data-to-disk), thus we will
 first focus on the other two commands `verdi group mirror`. Assume you have an AiiDA profile with the following groups:
 
 ```
@@ -1055,32 +1055,215 @@ profile_mirror = ProfileMirror()
 profile_mirror.do_mirror()
 ```
 
-If no options are given, a default mirror output directory is created in the CWD, and the mirror behavior is set to incremental.
+If no options are given, a default mirror output directory is created in the CWD, and the mirror behavior is set to `incremental`.
 
 ### Configuration
 
-#### Configuration classes 
+#### Configuration classes
 
 Each mirror class has a `config` attribute which holds the corresponding `ProcessMirrorConfig`, `GroupMirrorConfig`, and
 `ProfileMirrorConfig` dataclasses, defined in the `src/aiida/tools/mirror/config.py` file.
 If no instances of the config classes are provided, the default values are being used.
 In addition, the `GroupMirror` class also takes the `process_mirror_config` configuration object, while the
 `ProfileMirror` class takes the `process_mirror_config` and `group_mirror_config` arguments.
+This is because these the `GroupMirror` utilizes instances of the `ProcessMirror` to mirror process data, while the
+`ProfileMirror` uses the `GroupMirror` to mirror group data.
+
+The setup of the configuration classes with their default values can be expanded below:
+
+<details>
+<summary>Default values of config classes</summary>
+
+```python
+@dataclass
+class NodeCollectorConfig:
+    """Shared arguments for mirroring of collections of nodes."""
+
+    # NOTE: Should the `last_mirror_time` also be here
+    include_processes: bool = True
+    include_data: bool = False
+    filter_by_last_mirror_time: bool = True
+    only_top_level_calcs: bool = True
+    only_top_level_workflows: bool = True
+    group_scope: NodeMirrorGroupScope = NodeMirrorGroupScope.IN_GROUP
+
+
+@dataclass
+class ProcessMirrorConfig:
+    """Arguments for mirroring process data."""
+
+    include_inputs: bool = True
+    include_outputs: bool = False
+    include_attributes: bool = True
+    include_extras: bool = True
+    flat: bool = False
+    mirror_unsealed: bool = False
+    symlink_calcs: bool = False
+
+
+@dataclass
+class BaseCollectionMirrorConfig:
+    symlink_calcs: bool = False
+    delete_missing: bool = False
+
+
+@dataclass
+class GroupMirrorConfig(BaseCollectionMirrorConfig):
+    """Arguments for mirroring group data."""
+
+    ...
+
+
+@dataclass
+class ProfileMirrorConfig(BaseCollectionMirrorConfig):
+    """Arguments for mirroring profile data."""
+
+    organize_by_groups: bool = True
+    only_groups: bool = False
+    update_groups: bool = True
+    # symlink_between_groups: bool = False
+```
+
+</details>
 
 #### Mode, paths, and logger
 
 In addition, for each Mirror class the `mirror_mode` can be set (available options are `INCREMENTAL` (the default), and
 `OVERWRITE`, implemented via the `MirrorMode` enum), the `mirror_paths` (via the `MirrorPaths` container that holds the mirror parent and child
 directories, among others, and which can be constructed from a single path via the `MirrorPaths.from_path` classmethod).
-Finally, every Mirror class holds a global instance of the `MirrorLogger` (via the `mirror_logger`) attribute, which
-keeps track of the mirrored nodes and their output paths.
+Finally, every Mirror class holds a global instance of the `MirrorLogger` singleton (via the `mirror_logger`) attribute, which
+keeps track of the mirrored nodes and their output paths during a mirroring process.
 After the mirroring operation, it is serialized to the `.aiida_mirror_log.json` file.
-When the mirroring is done multiple times for a group or profile, while new simulation data is obtained, the 
 During incremental mirroring, the `.aiida_mirror_log.json` file is read upon initialization, thus providing information
 which nodes had already been mirrored.
+When the mirroring is done multiple times for a group or profile, this mechanism ensures that only new simulation is mirrored.
 
 ## Code design
 
+The following new classes were introduced:
+
+<details>
+<summary><code>❯ rg '^class'</code></summary>
+
+```
+config.py
+26:class NodeMirrorGroupScope(Enum):
+32:class MirrorMode(Enum):
+39:class NodeCollectorConfig:
+52:class ProcessMirrorConfig:
+65:class BaseCollectionMirrorConfig:
+71:class GroupMirrorConfig(BaseCollectionMirrorConfig):
+78:class ProfileMirrorConfig(BaseCollectionMirrorConfig):
+
+collector.py
+30:class MirrorNodeContainer:
+57:class MirrorNodeCollector:
+
+logger.py
+29:class MirrorLog:
+55:class MirrorLogStore:
+105:class MirrorLogStoreCollection:
+114:class MirrorLogger:
+
+group.py
+53:class GroupMirror(BaseCollectionMirror):
+
+process.py
+39:class ProcessMirror(BaseMirror):
+
+base.py
+30:class BaseMirror:
+
+profile.py
+50:class ProfileMirror(BaseCollectionMirror):
+
+collection.py
+30:class BaseCollectionMirror(BaseMirror):
+
+utils.py
+40:class MirrorTimes:
+44:class NodeMirrorKeyMapper:
+88:class MirrorPaths:
+```
+</details>
+
+Where the main classes are the `BaseMirror` that holds shared attributes for all mirror classes, and implements the
+`pre_mirror` and `post_mirror` methods, for common setup and teardown operations.
+From it, the `ProcessMirror` is derived, as well as the `BaseCollectionMirror`,
+which again presents the parent class for the `GroupMirror` and `ProfileMirror`.
+Its main purpose is to retrieve the specific nodes from AiiDA's DB that will be mirrored, which will then be stored in
+the `MirrorNodeContainer`.
+This is an important step, as retrieval from the DB via the QueryBuilder (and, finally, raw SQL) is much faster than the
+Python code that follows afterwards.
+Thus, _all_ filtering of nodes should be done at this stage, rather than later.
+
+It is evident that _some_ inheritance is used for shared attributes and methods.
+Instead, as passing specific parameters that dictate the behavior of, e.g., the `GroupMirror` and `ProcessMirror`
+instances that are used by the top-level `ProfileMirror` is achieved by attaching the configuration objects as
+attributes to the classes, follows a composition/dependency injection approach.
+Thus, for instance, to set up a heavily modified profile mirror operation, one could use code such as the following:
+
+```python
+
+from pathlib import Path
+from aiida import load_profile
+from aiida.tools.mirror.profile import ProfileMirror
+from aiida.tools.mirror.config import (
+    MirrorMode,
+    MirrorPaths,
+    ProcessMirrorConfig,
+    ProfileMirrorConfig,
+    NodeCollectorConfig,
+)
+
+load_profile()
+
+# Instantiate config classes passing various options
+
+process_mirror_config = ProcessMirrorConfig(
+    include_inputs=False,
+    include_outputs=True,
+    include_attributes=False,
+    include_extras=False,
+)
+
+profile_mirror_config = ProfileMirrorConfig(
+    organize_by_groups=True, only_groups=True, symlink_calcs=True
+)
+
+node_collector_config = NodeCollectorConfig(
+    get_processes=True,
+    filter_by_last_mirror_time=False,
+    only_top_level_calcs=False,
+    only_top_level_workflows=True,
+)
+
+# Instantiate other attributes
+
+mirror_paths = MirrorPaths.from_path(
+    Path("/home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/custom-mirror")
+)
+mirror_mode = MirrorMode.OVERWRITE
+
+# `ProfileMirror` class takes the configuration objects to create
+# the correct instances of the other classes
+
+profile_mirror = ProfileMirror(
+    mirror_mode=mirror_mode,
+    mirror_paths=mirror_paths,
+    config=profile_mirror_config,
+    node_collector_config=node_collector_config,
+    process_mirror_config=process_mirror_config,
+)
+
+profile_mirror.do_mirror()
+
+```
+
+The top-level method for all Mirror classes is `do_mirror` which performs the mirroring operation.
+
+
 ### More on the logger
 
-### Composition and inheritance
+
+

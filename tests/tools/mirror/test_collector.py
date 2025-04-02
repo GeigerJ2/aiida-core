@@ -10,8 +10,7 @@
 import pytest
 from aiida.tools.mirror.collector import MirrorNodeContainer, MirrorNodeCollector
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
-from aiida.tools.mirror.utils import MirrorPaths
-from aiida.tools.mirror.config import NodeCollectorConfig, NodeMirrorGroupScope
+from aiida.tools.mirror.config import NodeCollectorConfig, NodeMirrorGroupScope, MirrorPaths
 from aiida import orm
 from aiida.tools.graph.deletions import delete_nodes
 from sqlalchemy import inspect
