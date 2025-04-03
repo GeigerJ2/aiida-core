@@ -284,7 +284,7 @@ class GroupMirror(BaseCollectionMirror):
 
         # First, mirror calculations and then workflows, as sub-calculations of workflows can be symlinked
         for process_type in ("calculations", "workflows"):
-            processes = getattr(self.node_container, process_type)
+            processes = getattr(self.mirror_node_container, process_type)
             if len(processes) > 0:
                 msg = f"Mirroring {len(processes)} {process_type}..."
                 logger.report(msg)
@@ -307,22 +307,27 @@ class GroupMirror(BaseCollectionMirror):
 
         self.pre_mirror(top_level_caller=top_level_caller)
 
-        self.node_container = self.get_node_container(group=self.group)
+        self.mirror_node_container = self.get_mirror_node_container(group=self.group)
 
         self._mirror_process_collections()
 
         # NOTE: Should `current_mirror_time` be the time once it is finished? This should be consistent.
         # Using the start time should be fine for now, as it is what is used for processes, such that processes that
         # finish while the mirroring is running aren't picked up.
-        self.mirror_logger.stores.groups.add_entry(
-            uuid=self.group.uuid,
-            entry=MirrorLog(
-                path=self.mirror_paths.absolute,
-                time=self.mirror_times.current,
-                links=[],
-            ),
-        )
-        if top_level_caller:
+        if self.group.is_stored:
+            self.mirror_logger.stores.groups.add_entry(
+                uuid=self.group.uuid,
+                entry=MirrorLog(
+                    path=self.mirror_paths.absolute,
+                    time=self.mirror_times.current,
+                    links=[],
+                ),
+            )
+
+        if self.config.delete_missing:
+            self.do_delete()
+
+        if top_level_caller:  #  and self.group
             self.post_mirror()
 
     # for process_type in ('calculations', 'workflows'):
@@ -372,12 +377,5 @@ class GroupMirror(BaseCollectionMirror):
     #     # to_delete_orms =
 
     #     return to_delete_uuids
-
-    # def delete_processes(self):
-    #     # print(f'TO_MIRROR_PROCESSES: {to_mirror_processes}')
-    #     # print(f'TO_DELETE_PROCESSES: {to_delete_processes}')
-
-    #     for to_delete_uuid in self.processes_to_delete:
-    #         delete_missing_node_dir(mirror_logger=self.mirror_logger, to_delete_uuid=to_delete_uuid)
 
     #     # TODO: Add also logging for node/path deletion?

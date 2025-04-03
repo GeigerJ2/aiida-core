@@ -166,7 +166,7 @@ class ProfileMirror(BaseCollectionMirror):
         else:
             no_group_subpath = Path(".")
 
-        mirror_paths_group = MirrorPaths(
+        mirror_paths_no_group = MirrorPaths(
             parent=self.mirror_paths.parent / self.mirror_paths.child,
             child=no_group_subpath,
         )
@@ -175,10 +175,8 @@ class ProfileMirror(BaseCollectionMirror):
         node_collector_config_no_group = copy.deepcopy(self.node_collector_config)
         node_collector_config_no_group.group_scope = NodeMirrorGroupScope.NO_GROUP
 
-        # no_group = orm.Group(label='no_group')
-
         no_group_mirror_inst = GroupMirror(
-            mirror_paths=mirror_paths_group,
+            mirror_paths=mirror_paths_no_group,
             group=None,
             mirror_mode=self.mirror_mode,
             process_mirror_config=self.process_mirror_config,
@@ -202,15 +200,13 @@ class ProfileMirror(BaseCollectionMirror):
 
         self.pre_mirror(top_level_caller=top_level_caller)
 
-        # import ipdb; ipdb.set_trace()
         # If `groups` given on construction, mirror only data within those groups
         if self.groups:
             self._mirror_per_group(groups=self.groups)
 
-        # If `groups` given on construction, mirror only data within those groups
+        # Without selecting groups, by default, all profile data should be mirrored
+        # Thus, we obtain all groups in the profile here
         else:
-            # Still, even without selecting groups, by default, all profile data should be mirrored
-            # Thus, we obtain all groups in the profile here
             profile_groups = cast(
                 list[orm.Group], orm.QueryBuilder().append(orm.Group).all(flat=True)
             )
@@ -220,61 +216,46 @@ class ProfileMirror(BaseCollectionMirror):
                 self._mirror_not_in_any_group()
 
         if self.config.delete_missing:
-            ...
-        # TODO: Only delete missing groups here, not processes. Processes handled by `GroupMirror`
-        #     import ipdb; ipdb.set_trace()
-        #     self.delete_container = MirrorNodeContainer()
-
-        # self.delete_container.
+            self.do_delete()
 
         self.post_mirror()
 
-    def get_groups_to_delete(self) -> list[str]:
+    # NOTE: Probably the code below is not even necessary, as all stores are handled via `do_delete`
 
-        if not self.config.delete_missing:
-            return []
+    # def get_groups_to_delete(self) -> list[str]:
 
-        group_log = self.mirror_logger.stores.groups
+    #     if not self.config.delete_missing:
+    #         return []
 
-        # Cannot use QB here because, when node deleted, it's not in the DB anymore
-        mirrored_uuids = set(list(group_log.entries.keys()))
+    #     group_log = self.mirror_logger.stores.groups
 
-        profile_uuids = (
-            orm.QueryBuilder().append(orm.Group, project=["uuid"]).all(flat=True)
-        )
+    #     # Cannot use QB here because, when node deleted, it's not in the DB anymore
+    #     mirrored_uuids = set(list(group_log.entries.keys()))
 
-        to_delete_uuids = list(mirrored_uuids - profile_uuids)
+    #     profile_uuids = set(
+    #         orm.QueryBuilder().append(orm.Group, project=["uuid"]).all(flat=True)
+    #     )
 
-        return to_delete_uuids
+    #     to_delete_uuids = list(mirrored_uuids - profile_uuids)
 
-    def del_missing_groups(self):
-        groups_to_delete_uuids = self.get_groups_to_delete()
-        if groups_to_delete_uuids:
-            for to_delete_uuid in groups_to_delete_uuids:
-                self.del_missing_group(group_uuid=to_delete_uuid)
+    #     return to_delete_uuids
 
-    def del_missing_group(self, group_uuid):
-        group_store = self.mirror_logger.stores.groups
-        path = group_store.get_entry(group_uuid).path
-        mirror_paths = MirrorPaths.from_path(path)
-        safe_delete_dir(path=path, safeguard_file=mirror_paths.safeguard)
-        self.mirror_logger.del_entry(store=group_store, uuid=group_uuid)
+    # def delete_missing_groups(self):
+    #     groups_to_delete_uuids = self.get_groups_to_delete()
+    #     if groups_to_delete_uuids:
+    #         for to_delete_uuid in groups_to_delete_uuids:
+    #             self.delete_missing_group(group_uuid=to_delete_uuid)
 
+    # def delete_missing_group(self, group_uuid):
+    #     group_store = self.mirror_logger.stores.groups
+    #     path = group_store.get_entry(group_uuid).path
+    #     mirror_paths = MirrorPaths.from_path(path)
+    #     safe_delete_dir(path=path, safeguard_file=mirror_paths.safeguard)
+    #     self.mirror_logger.del_entry(store=group_store, uuid=group_uuid)
 
-# def delete_groups(self):
-#     to_delete_groups = self.groups_to_delete
-#         # ! Problem: Don't have safeguard file in empty group directory
+    # def delete_missing_nodes(self):
+    #     ...
 
-# if
-
-# if delete_missing_processes:
-#     if num_processes_to_delete == 0:
-#         msg = 'No processes to delete.'
-#         logger.report(msg)
-#     else:
-#         self.delete_processes()
-#         msg = f'Deleted {num_processes_to_delete} node directories.'
-#         logger.report(msg)
 
 # if num_groups_to_delete == 0:
 #     echo.echo_success('No groups to delete.')

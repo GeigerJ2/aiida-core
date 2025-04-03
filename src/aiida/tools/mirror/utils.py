@@ -22,11 +22,15 @@ from aiida.tools.mirror.config import MirrorMode, MirrorPaths
 if TYPE_CHECKING:
     from aiida.tools.mirror.logger import MirrorLogger
 
+
+
 __all__ = (
     'NodeMirrorKeyMapper',
     'prepare_mirror_path',
     'safe_delete_dir',
 )
+
+MirrorEntityType = orm.CalculationNode | orm.WorkflowNode | orm.Data
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.utils')
 
@@ -36,6 +40,7 @@ class NodeMirrorKeyMapper:
     calculation_key: str = 'calculations'
     workflow_key: str = 'workflows'
     data_key: str = 'data'
+    group_key: str = 'groups'
 
     @classmethod
     def get_key_from_instance(cls, node_inst: orm.Node) -> str:
@@ -46,6 +51,8 @@ class NodeMirrorKeyMapper:
                 return cls.workflow_key
             case orm.Data():
                 return cls.data_key
+            case orm.Group():
+                return cls.group_key
             case _:
                 msg = f'Mirroring not implemented yet for node type: {type(node_inst)}'
                 raise NotImplementedError(msg)
@@ -58,6 +65,8 @@ class NodeMirrorKeyMapper:
             return cls.workflow_key
         elif issubclass(orm_class, orm.Data):
             return cls.data_key
+        elif issubclass(orm_class, orm.Group):
+            return cls.group_key
         else:
             msg = f'Mirroring not implemented yet for node type: {orm_class}'
             raise NotImplementedError(msg)
@@ -70,6 +79,8 @@ class NodeMirrorKeyMapper:
             return orm.WorkflowNode
         elif key == cls.data_key:
             return orm.Data
+        elif key == cls.group_key:
+            return orm.Group
         else:
             msg = f'No node type mapping exists for key: {key}'
             raise ValueError(msg)
@@ -294,7 +305,7 @@ def resolve_click_path_for_mirror(
     raise ValueError(f"Unsupported entity type '{type(entity).__name__}'. Supported types: {supported_types}.")
 
 
-def delete_missing_node_dir(mirror_logger: 'MirrorLogger', to_delete_uuid: str) -> None:
+def delete_missing_node_dir(mirror_logger: MirrorLogger, to_delete_uuid: str) -> None:
     # TODO: Possibly make a delete method for the path and the log, and then call that in the loop
 
     current_store = mirror_logger.get_store_by_uuid(uuid=to_delete_uuid)
@@ -304,7 +315,6 @@ def delete_missing_node_dir(mirror_logger: 'MirrorLogger', to_delete_uuid: str) 
     # ! Cannot load the node via its UUID here and use the type to get the correct store, as the Node is deleted
     # ! from the DB. Should find a better solution
 
-    # breakpoint()
     path_to_delete = mirror_logger.get_path_by_uuid(uuid=to_delete_uuid)
     if path_to_delete is not None:
         try:
