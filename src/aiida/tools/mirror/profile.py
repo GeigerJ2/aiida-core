@@ -154,7 +154,7 @@ class ProfileMirror(BaseCollectionMirror):
                 uuid=group.uuid,
                 entry=MirrorLog(
                     path=mirror_paths_group.absolute,
-                    time=self.mirror_times.current,
+                    time=self.mirror_times.current(),
                 ),
             )
 
@@ -219,6 +219,28 @@ class ProfileMirror(BaseCollectionMirror):
             self.do_delete()
 
         self.post_mirror()
+
+    def do_delete(self) -> None:
+        """Main method to handle deletion of groups and nodes.
+
+        This method orchestrates the deletion process by:
+        1. Deleting group entities first
+        2. Deleting individual marked nodes
+        3. Cleaning up any nodes that were part of deleted groups
+
+        :return: None
+        """
+        _ = self.set_delete_node_container()
+
+        # First, handle groups and collect deleted group labels
+        deleted_groups = self._delete_mirror_groups()
+
+        # Then handle direct node deletions
+        self._delete_mirror_nodes()
+
+        # Finally, clean up nodes that were part of deleted groups
+        if deleted_groups:
+            self._delete_mirror_group_subnodes(deleted_groups)
 
     # NOTE: Probably the code below is not even necessary, as all stores are handled via `do_delete`
 

@@ -276,7 +276,7 @@ class GroupMirror(BaseCollectionMirror):
         # import ipdb; ipdb.set_trace()
         self.current_store.add_entry(
             uuid=process.uuid,
-            entry=MirrorLog(path=process_mirror_path, time=self.mirror_times.current),
+            entry=MirrorLog(path=process_mirror_path, time=self.mirror_times.current()),
         )
 
     def _mirror_process_collections(self) -> None:
@@ -307,7 +307,7 @@ class GroupMirror(BaseCollectionMirror):
 
         self.pre_mirror(top_level_caller=top_level_caller)
 
-        self.mirror_node_container = self.get_mirror_node_container(group=self.group)
+        _ = self.set_mirror_node_container(group=self.group)
 
         self._mirror_process_collections()
 
@@ -319,7 +319,7 @@ class GroupMirror(BaseCollectionMirror):
                 uuid=self.group.uuid,
                 entry=MirrorLog(
                     path=self.mirror_paths.absolute,
-                    time=self.mirror_times.current,
+                    time=self.mirror_times.current(),
                     links=[],
                 ),
             )

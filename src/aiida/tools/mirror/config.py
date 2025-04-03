@@ -50,7 +50,6 @@ class MirrorTimes:
     range_start: datetime | None = None
     range_end: datetime | None = None
 
-    @property
     def current(self) -> datetime:
         """
         Returns the current time whenever accessed, ensuring it's always up-to-date.

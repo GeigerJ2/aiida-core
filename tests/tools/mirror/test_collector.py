@@ -69,7 +69,7 @@ class TestMirrorNodeCollector:
         calc.store()
         mirror_logger.stores.calculations.add_entry(
             uuid=calc.uuid,
-            entry=MirrorLog(path=tmp_path / "calc", time=mirror_times.current, links=[]),
+            entry=MirrorLog(path=tmp_path / "calc", time=mirror_times.current(), links=[]),
         )
 
         # WorkflowNode shouldn't appear in calculation store and filters
@@ -77,7 +77,7 @@ class TestMirrorNodeCollector:
         wf.store()
         mirror_logger.stores.workflows.add_entry(
             uuid=wf.uuid,
-            entry=MirrorLog(path=tmp_path / "wf", time=mirror_times.current, links=[]),
+            entry=MirrorLog(path=tmp_path / "wf", time=mirror_times.current(), links=[]),
         )
 
         mirror_node_collector = MirrorNodeCollector(

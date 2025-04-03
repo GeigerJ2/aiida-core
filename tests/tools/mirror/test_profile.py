@@ -39,7 +39,7 @@ def test_get_groups_to_delete(tmp_path):
             uuid=group.uuid,
             entry=MirrorLog(
                 path=tmp_path / group_label,
-                time=mirror_times.current
+                time=mirror_times.current()
             ),
         )
         groups.append(group)
@@ -72,7 +72,7 @@ def test_del_missing_groups(tmp_path):
             uuid=group.uuid,
             entry=MirrorLog(
                 path=tmp_path / group_label,
-                time=mirror_times.current
+                time=mirror_times.current()
             ),
         )
         groups.append(group)

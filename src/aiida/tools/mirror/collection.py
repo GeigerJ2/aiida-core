@@ -45,7 +45,7 @@ class BaseCollectionMirror(BaseMirror):
 
         self.node_collector_config = node_collector_config or NodeCollectorConfig()
 
-    def get_mirror_node_container(self, group: orm.Group | None = None) -> MirrorNodeContainer:
+    def set_mirror_node_container(self, group: orm.Group | None = None) -> None:
         """
         Returns a NodeContainer by collecting nodes using the NodeDumpCollector.
 
@@ -58,9 +58,9 @@ class BaseCollectionMirror(BaseMirror):
             mirror_logger=self.mirror_logger,
         )
 
-        return node_collector.collect_to_mirror(group=group)
+        self.mirror_node_container = node_collector.collect_to_mirror(group=group)
 
-    def get_delete_node_container(self) -> MirrorNodeContainer:
+    def set_delete_node_container(self) -> None:
         """
         Returns a NodeContainer by collecting nodes using the NodeDumpCollector.
 
@@ -73,29 +73,98 @@ class BaseCollectionMirror(BaseMirror):
             mirror_logger=self.mirror_logger,
         )
 
-        return node_collector.collect_to_delete()
-
+        self.delete_node_container = node_collector.collect_to_delete()
 
     # Implement this here, as for the deletion, we don't care about the group
     def do_delete(self) -> None:
-        delete_node_container = self.get_delete_node_container()
-        # store_names = [field.name for field in fields(delete_node_container)]
-        # NOTE: Hard-code `store_names` to
-        # in descending order of the size of the entity. E.g., better to just delete the whole group at once
-        # rather than deleting each node inside of it individually
-        for store_name in ("groups", "workflows", "calculations", "data"):
-            to_delete_uuids = getattr(delete_node_container, store_name)
+        """Main method to handle deletion of groups and nodes.
+
+        This method orchestrates the deletion process by:
+        1. Deleting group entities first
+        2. Deleting individual marked nodes
+        3. Cleaning up any nodes that were part of deleted groups
+
+        :return: None
+        """
+        _ = self.set_delete_node_container()
+
+        # First, handle groups and collect deleted group labels
+        deleted_groups = self._delete_mirror_groups()
+
+        # Then handle direct node deletions
+        self._delete_mirror_nodes()
+
+        # Finally, clean up nodes that were part of deleted groups
+        if deleted_groups:
+            self._delete_mirror_group_subnodes(deleted_groups)
+
+    def _delete_mirror_groups(self) -> list:
+        """Delete groups and return a list of their labels for further processing.
+
+        Deletes all groups marked for deletion in the delete_node_container
+        and collects their labels for identifying related subnodes.
+
+        :return: Labels of deleted groups
+        """
+
+        to_delete_groups = getattr(self.delete_node_container, 'groups')
+        group_store = self.mirror_logger.groups
+        deleted_groups = []
+
+        # First collect the group labels
+        if len(to_delete_groups) > 0:
+            for to_delete_group in to_delete_groups:
+                group_label = group_store.get_entry(uuid=to_delete_group).path.name
+                deleted_groups.append(group_label)
+
+        # Then delete the groups
+        for to_delete_group in to_delete_groups:
+            path = group_store.get_entry(to_delete_group).path
+            _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
+            self.mirror_logger.del_entry(store=group_store, uuid=to_delete_group)
+
+        return deleted_groups
+
+    def _delete_mirror_nodes(self) -> None:
+        """Delete individual nodes marked for deletion.
+
+        Processes workflows, calculations, and data entities that were
+        explicitly marked for deletion in the delete_node_container.
+
+        :return: None
+        """
+        for store_name in ('workflows', 'calculations', 'data'):
+            to_delete_uuids = getattr(self.delete_node_container, store_name)
             log_store = getattr(self.mirror_logger, store_name)
-            # if store_name == "groups":
-            #     import ipdb; ipdb.set_trace()
+
             for to_delete_uuid in to_delete_uuids:
                 path = log_store.get_entry(to_delete_uuid).path
-                mirror_paths = MirrorPaths.from_path(path)
-                _ = safe_delete_dir(path=path, safeguard_file=mirror_paths.safeguard)
+                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
                 self.mirror_logger.del_entry(store=log_store, uuid=to_delete_uuid)
 
-            # if len(store) > 0:
-            #     # Process the entries in the store
-            #     for entry in store:
-            #         # Your deletion logic here
-            #         pass
+    def _delete_mirror_group_subnodes(self, deleted_groups: list) -> None:
+        """Delete nodes that were part of deleted groups but not explicitly marked for deletion.
+
+        After groups are deleted, this method cleans up any nodes that belonged
+        to those groups but weren't directly marked for deletion.
+
+        :param deleted_groups: List of group labels that were deleted
+        :type deleted_groups: list
+        :return: None
+        """
+        for store_name in ('workflows', 'calculations', 'data'):
+            log_store = getattr(self.mirror_logger, store_name)
+            additional_delete_nodes = []
+
+            # Find all nodes that belong to deleted groups
+            for deleted_group in deleted_groups:
+                for entry_uuid, entry in log_store.entries.items():
+                    path_str = str(entry.path)
+                    if deleted_group in path_str:
+                        additional_delete_nodes.append(entry_uuid)
+
+            # Delete the identified nodes
+            for additional_delete_node in additional_delete_nodes:
+                path = log_store.get_entry(additional_delete_node).path
+                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
+                self.mirror_logger.del_entry(store=log_store, uuid=additional_delete_node)

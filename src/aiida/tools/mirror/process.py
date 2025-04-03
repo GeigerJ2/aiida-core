@@ -257,7 +257,7 @@ class ProcessMirror(BaseMirror):
                 store=workflow_store,
                 uuid=workflow_node.uuid,
                 entry=MirrorLog(
-                    path=output_path.resolve(), time=self.mirror_times.current
+                    path=output_path.resolve(), time=self.mirror_times.current()
                 ),
             )
 
@@ -388,7 +388,7 @@ class ProcessMirror(BaseMirror):
                     uuid=calculation_node.uuid,
                     entry=MirrorLog(
                         path=output_path,
-                        time=self.mirror_times.current,
+                        time=self.mirror_times.current(),
                     ),
                 )
 
