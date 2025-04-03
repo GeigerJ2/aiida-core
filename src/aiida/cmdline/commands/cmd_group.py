@@ -327,7 +327,7 @@ def group_relabel(group, label):
         echo.echo_success(f"Label changed to '{label}'")
         msg = (
             'Note that if you are mirroring your profile data to disk, to reflect the relabeling of the group, '
-            'run the command: `verdi profile mirror --update-groups.`'
+            'run the command: `verdi [group|profile] mirror --update-groups.`'
         )
         echo.echo_report(msg)
 
@@ -652,7 +652,7 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
 @options.ONLY_TOP_LEVEL_CALCS()
 @options.ONLY_TOP_LEVEL_WORKFLOWS()
 @options.SYMLINK_CALCS()
-# ? @options.UPDATE_GROUPS()
+@options.UPDATE_GROUPS()
 @options.INCLUDE_INPUTS()
 @options.INCLUDE_OUTPUTS()
 @options.INCLUDE_ATTRIBUTES()
@@ -668,7 +668,7 @@ def group_mirror(
     mirror_processes,
     mirror_data,
     delete_missing,
-    # update_groups,
+    update_groups,
     only_top_level_calcs,
     only_top_level_workflows,
     symlink_calcs,

@@ -117,7 +117,7 @@ class ProfileMirror(BaseCollectionMirror):
 
         # self.group_container_mapping: dict[orm.Group, MirrorNodeContainer] = {}
 
-    def _mirror_per_group(self, groups: list[orm.Group]) -> None:
+    def mirror_per_group(self, groups: list[orm.Group]) -> None:
         """Iterate through a list of groups and mirror the contained processes in their dedicated directories.
 
         :param groups: List of ``orm.Group`` entities.
@@ -158,7 +158,7 @@ class ProfileMirror(BaseCollectionMirror):
                 ),
             )
 
-    def _mirror_not_in_any_group(self) -> None:
+    def mirror_not_in_any_group(self) -> None:
         """Mirror the profile's process data not contained in any group."""
 
         if self.config.organize_by_groups:
@@ -200,9 +200,12 @@ class ProfileMirror(BaseCollectionMirror):
 
         self.pre_mirror(top_level_caller=top_level_caller)
 
+        if self.config.update_groups:
+            self.update_groups()
+
         # If `groups` given on construction, mirror only data within those groups
         if self.groups:
-            self._mirror_per_group(groups=self.groups)
+            self.mirror_per_group(groups=self.groups)
 
         # Without selecting groups, by default, all profile data should be mirrored
         # Thus, we obtain all groups in the profile here
@@ -210,10 +213,10 @@ class ProfileMirror(BaseCollectionMirror):
             profile_groups = cast(
                 list[orm.Group], orm.QueryBuilder().append(orm.Group).all(flat=True)
             )
-            self._mirror_per_group(groups=profile_groups)
+            self.mirror_per_group(groups=profile_groups)
 
             if not self.config.only_groups:
-                self._mirror_not_in_any_group()
+                self.mirror_not_in_any_group()
 
         if self.config.delete_missing:
             self.do_delete()
@@ -309,49 +312,3 @@ class ProfileMirror(BaseCollectionMirror):
 #         delete_missing_node_dir(mirror_logger=self.mirror_logger, to_delete_uuid=to_delete_uuid)
 
 #     # TODO: Add also logging for node/path deletion?
-
-
-# def update_groups(self) -> list[dict[str, Path]]:
-# TODO: Check if mtime of group _after_ mirror_times.last, and if so, run mirroring for new nodes
-#     mirror_logger = self.mirror_logger
-
-#     # Order is the same as in the mirroring log file -> Not using a profile QB here
-#     # Also, if the group is new (and contains new nodes), it will be mirrored anyway
-#     mirrored_group_uuids = list(mirror_logger.groups.entries.keys())
-
-#     old_mapping: dict[str, Path] = dict(
-#         zip(
-#             mirrored_group_uuids,
-#             [p.path for p in mirror_logger.groups.entries.values()],
-#         )
-#     )
-
-#     new_mapping: dict[str, Path] = dict(
-#         zip(
-#             mirrored_group_uuids,
-#             [self.mirror_parent_path / 'groups' / get_group_subpath(orm.load_group(g)) for g in mirrored_group_uuids],
-#         )
-#     )
-
-#     modified_paths: list[dict[str, Path]] = []
-
-#     for uuid, old_path in old_mapping.items():
-#         new_path = new_mapping.get(uuid)
-
-#         if new_path and old_path != new_path:
-#             # logger.report(f'Renaming {old_path} -> {new_path}')
-#             old_path.rename(new_path)
-#             try:
-#                 mirror_logger.groups.entries[uuid].path = new_path
-#             except:
-#                 # import ipdb, ipdb.set_trace()
-#                 raise
-
-#             modified_paths.append(
-#                 {
-#                     'old': old_path,
-#                     'new': new_path,
-#                 }
-#             )
-
-#     return modified_paths

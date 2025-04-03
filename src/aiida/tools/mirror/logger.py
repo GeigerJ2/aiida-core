@@ -13,8 +13,8 @@ from datetime import datetime
 from pathlib import Path
 
 from aiida.common.exceptions import NotExistent
-from aiida.tools.mirror.utils import NodeMirrorKeyMapper
 from aiida.tools.mirror.config import MirrorPaths
+from aiida.tools.mirror.utils import NodeMirrorKeyMapper
 
 # TODO: Possibly mirror hierarchy of mirrored directory inside json file
 # TODO: Currently, json file has only top-level "groups", "workflows", and "calculations"
@@ -100,6 +100,35 @@ class MirrorLogStore:
         store.entries = {uuid: MirrorLog.from_dict(entry) for uuid, entry in data.items()}
         return store
 
+    def update_paths(self, old_str: str, new_str: str) -> None:
+        """Update all paths in the store by replacing exact occurrences of old_str with new_str.
+
+        Args:
+            old_str: The string to be replaced in paths
+            new_str: The replacement string
+        """
+        count = 0
+        if not old_str.startswith('/'):
+            old_str = f"/{old_str}"
+        if not new_str.startswith('/'):
+            new_str = f"/{new_str}"
+        for uuid, entry in self.entries.items():
+            # Check if old_str exists in the path
+            path_str = str(entry.path)
+            if old_str in path_str:
+                # Create a new path with the replaced string
+                new_path = Path(path_str.replace(old_str, new_str))
+                entry.path = new_path
+
+            # Also update any link paths
+            # for i, link_path in enumerate(entry.links):
+            #     link_path_str = str(link_path)
+            #     if old_str in link_path_str:
+            #         entry.links[i] = Path(link_path_str.replace(old_str, new_str))
+            #         count += 1
+
+        return count  # Return number of paths updated
+
 
 @dataclass
 class MirrorLogStoreCollection:
@@ -111,6 +140,9 @@ class MirrorLogStoreCollection:
     data: MirrorLogStore
 
 
+# NOTE: Shouldn't the logger have the `MirrorTimes` attached to it??
+
+
 class MirrorLogger:
     """Main Logger class for data mirroring implemented as a Singleton."""
 
@@ -119,12 +151,7 @@ class MirrorLogger:
     # Class variable to store the singleton instance
     _instance = None
 
-    def __new__(cls,
-                mirror_paths=None,
-                calculations=None,
-                workflows=None,
-                groups=None,
-                data=None):
+    def __new__(cls, mirror_paths=None, calculations=None, workflows=None, groups=None, data=None):
         """Override __new__ to implement the singleton pattern."""
         if cls._instance is None:
             # Only create a new instance if one doesn't exist
@@ -133,7 +160,6 @@ class MirrorLogger:
             cls._instance._initialized = False
         return cls._instance
 
-    # NOTE: Shouldn't the logger have the `MirrorTimes` attached to it??
     def __init__(
         self,
         mirror_paths: MirrorPaths,
@@ -182,7 +208,6 @@ class MirrorLogger:
     def save_log(self) -> None:
         """Save the log to a JSON file."""
         import json
-        from datetime import datetime
 
         def serialize_logs(container: MirrorLogStore) -> dict:
             serialized = {}
@@ -251,7 +276,6 @@ class MirrorLogger:
 
     def get_store_by_uuid(self, uuid: str) -> MirrorLogStore:
         """Find the store that contains the given UUID."""
-        from dataclasses import fields
 
         # Iterate over the fields of the MirrorLogStoreCollection dataclass for generality
         for field_ in fields(self.stores):
@@ -301,3 +325,29 @@ class MirrorLogger:
 
     def get_store_by_orm(self, orm_type) -> MirrorLogStore:
         return getattr(self, NodeMirrorKeyMapper.get_key_from_class(orm_type))
+
+    def update_paths(self, old_str: str, new_str: str) -> dict[str, int]:
+        """Update all paths across all stores by replacing exact occurrences of old_str with new_str.
+
+        This method iterates through all stores (calculations, workflows, groups, data)
+        and updates any paths that contain the old_str.
+
+        Args:
+            old_str: The string to be replaced in paths
+            new_str: The replacement string
+
+        Returns:
+            dict: A dictionary with the number of updated paths per store
+        """
+
+        # Update each store
+        if not old_str.startswith('/'):
+            old_str = f"/{old_str}"
+        if not new_str.startswith('/'):
+            new_str = f"/{new_str}"
+
+        for store_name in ['calculations', 'workflows', 'groups', 'data']:
+            if store_name == 'calcluations':
+                import ipdb; ipdb.set_trace()
+            store: MirrorLogStore = getattr(self, store_name)
+            _ = store.update_paths(old_str, new_str)
