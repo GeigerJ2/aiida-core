@@ -29,6 +29,7 @@ from .utils import compare_tree
 
 # @pytest.mark.usefixtures('aiida_profile_clean')
 
+
 # @pytest.mark.usefixtures('aiida_profile_clean_class')
 class TestGroupMirror:
     # @pytest.mark.usefixtures('aiida_profile_clean')
@@ -174,9 +175,8 @@ class TestGroupMirror:
 
         compare_tree(expected=expected_tree_no_dedup, base_path=tmp_path, relative_path=Path(multiply_add_group_label))
 
-
     # def test_
-        # pytest.set_trace()
+    # pytest.set_trace()
 
     # def test_dump_workflows(self):
     #     pass

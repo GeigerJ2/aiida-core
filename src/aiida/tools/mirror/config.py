@@ -17,15 +17,15 @@ from pathlib import Path
 from aiida.common import timezone
 
 __all__ = (
-    'NodeMirrorGroupScope',
-    'MirrorMode',
-    'NodeCollectorConfig',
-    'ProcessMirrorConfig',
     'BaseCollectionMirrorConfig',
     'GroupMirrorConfig',
-    'ProfileMirrorConfig',
+    'MirrorMode',
     'MirrorPaths',
-    'MirrorTimes'
+    'MirrorTimes',
+    'NodeCollectorConfig',
+    'NodeMirrorGroupScope',
+    'ProcessMirrorConfig',
+    'ProfileMirrorConfig',
 )
 
 

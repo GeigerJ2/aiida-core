@@ -13,8 +13,8 @@ from datetime import datetime
 from pathlib import Path
 
 from aiida.common.exceptions import NotExistent
-from aiida.tools.mirror.utils import NodeMirrorKeyMapper
 from aiida.tools.mirror.config import MirrorPaths
+from aiida.tools.mirror.utils import NodeMirrorKeyMapper
 
 # TODO: Possibly mirror hierarchy of mirrored directory inside json file
 # TODO: Currently, json file has only top-level "groups", "workflows", and "calculations"
@@ -119,12 +119,7 @@ class MirrorLogger:
     # Class variable to store the singleton instance
     _instance = None
 
-    def __new__(cls,
-                mirror_paths=None,
-                calculations=None,
-                workflows=None,
-                groups=None,
-                data=None):
+    def __new__(cls, mirror_paths=None, calculations=None, workflows=None, groups=None, data=None):
         """Override __new__ to implement the singleton pattern."""
         if cls._instance is None:
             # Only create a new instance if one doesn't exist
@@ -182,7 +177,6 @@ class MirrorLogger:
     def save_log(self) -> None:
         """Save the log to a JSON file."""
         import json
-        from datetime import datetime
 
         def serialize_logs(container: MirrorLogStore) -> dict:
             serialized = {}
@@ -251,7 +245,6 @@ class MirrorLogger:
 
     def get_store_by_uuid(self, uuid: str) -> MirrorLogStore:
         """Find the store that contains the given UUID."""
-        from dataclasses import fields
 
         # Iterate over the fields of the MirrorLogStoreCollection dataclass for generality
         for field_ in fields(self.stores):

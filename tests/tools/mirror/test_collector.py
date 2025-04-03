@@ -7,31 +7,27 @@
 ###########################################################################
 """Tests for the dumping of group data to disk."""
 
+import copy
+
 import pytest
+
+from aiida import orm
+from aiida.common import timezone
+from aiida.tools.graph.deletions import delete_nodes
 from aiida.tools.mirror.collector import MirrorNodeCollector
-from aiida.tools.mirror.container import MirrorNodeContainer
-from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.config import (
-    NodeCollectorConfig,
-    NodeMirrorGroupScope,
     MirrorPaths,
     MirrorTimes,
+    NodeCollectorConfig,
+    NodeMirrorGroupScope,
 )
-from aiida import orm
-from aiida.tools.graph.deletions import delete_nodes
-from sqlalchemy import inspect
-import copy
-from datetime import datetime
-from aiida.common import timezone
+from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 
 
 class TestMirrorNodeCollector:
     def test_collect_to_mirror(): ...
 
-    def test_resolve_filters(
-        self, tmp_path
-    ):  # , setup_add_group, setup_multiply_add_group
-
+    def test_resolve_filters(self, tmp_path):  # , setup_add_group, setup_multiply_add_group
         # add_group = setup_add_group
         # multiply_add_group = setup_multiply_add_group
 
@@ -63,13 +59,13 @@ class TestMirrorNodeCollector:
             mirror_times=mirror_times,
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
-        assert filters == {"mtime": {">=": mirror_times.last}}
+        assert filters == {'mtime': {'>=': mirror_times.last}}
 
         calc = orm.CalculationNode()
         calc.store()
         mirror_logger.stores.calculations.add_entry(
             uuid=calc.uuid,
-            entry=MirrorLog(path=tmp_path / "calc", time=mirror_times.current, links=[]),
+            entry=MirrorLog(path=tmp_path / 'calc', time=mirror_times.current, links=[]),
         )
 
         # WorkflowNode shouldn't appear in calculation store and filters
@@ -77,24 +73,22 @@ class TestMirrorNodeCollector:
         wf.store()
         mirror_logger.stores.workflows.add_entry(
             uuid=wf.uuid,
-            entry=MirrorLog(path=tmp_path / "wf", time=mirror_times.current, links=[]),
+            entry=MirrorLog(path=tmp_path / 'wf', time=mirror_times.current, links=[]),
         )
 
         mirror_node_collector = MirrorNodeCollector(
             mirror_logger=mirror_logger,
             config=NodeCollectorConfig(filter_by_last_mirror_time=False),
-            mirror_times=mirror_times
+            mirror_times=mirror_times,
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
-        assert filters == {"uuid": {"!in": [calc.uuid]}}
+        assert filters == {'uuid': {'!in': [calc.uuid]}}
 
         mirror_node_collector = MirrorNodeCollector(
-            mirror_logger=mirror_logger,
-            config=NodeCollectorConfig(),
-            mirror_times=mirror_times
+            mirror_logger=mirror_logger, config=NodeCollectorConfig(), mirror_times=mirror_times
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
-        assert filters == {"mtime": {">=": mirror_times.last}, "uuid": {"!in": [calc.uuid]}}
+        assert filters == {'mtime': {'>=': mirror_times.last}, 'uuid': {'!in': [calc.uuid]}}
 
         # import ipdb
 
@@ -108,7 +102,7 @@ class TestMirrorNodeCollector:
         # group_scope: NodeMirrorGroupScope = NodeMirrorGroupScope.IN_GROUP
 
     # @pytest.mark.parametrize -> Parametrize different options here, e.g. `only_top_level` stuff
-    @pytest.mark.usefixtures("aiida_profile_clean")
+    @pytest.mark.usefixtures('aiida_profile_clean')
     def test_collect_to_delete(self, tmp_path):
         mirror_logger = MirrorLogger(mirror_paths=MirrorPaths.from_path(tmp_path))
         empty_mirror_logger = copy.deepcopy(mirror_logger)
@@ -123,15 +117,10 @@ class TestMirrorNodeCollector:
             mirror_logger.add_entries(
                 store,
                 uuids=[c.uuid for c in processes],
-                entries=[
-                    MirrorLog(path=(tmp_path / f"-{proc.__class__.__name__[:4]}"))
-                    for proc in processes
-                ],
+                entries=[MirrorLog(path=(tmp_path / f'-{proc.__class__.__name__[:4]}')) for proc in processes],
             )
 
-        node_collector_config = NodeCollectorConfig(
-            group_scope=NodeMirrorGroupScope.NO_GROUP
-        )
+        node_collector_config = NodeCollectorConfig(group_scope=NodeMirrorGroupScope.NO_GROUP)
 
         mirror_node_collector = MirrorNodeCollector(
             config=node_collector_config, mirror_logger=empty_mirror_logger, mirror_times=mirror_times
@@ -141,18 +130,9 @@ class TestMirrorNodeCollector:
 
         mirror_container = mirror_node_collector.collect_to_mirror()
 
-        delete_container = mirror_node_collector.collect_to_delete(
-            mirror_logger=mirror_logger
-        )
+        delete_container = mirror_node_collector.collect_to_delete(mirror_logger=mirror_logger)
 
-        assert (
-            len(
-                delete_container.workflows
-                + delete_container.calculations
-                + delete_container.data
-            )
-            == 0
-        )
+        assert len(delete_container.workflows + delete_container.calculations + delete_container.data) == 0
 
         del_calculation = mirror_container.calculations.pop(0)
         del_workflow = mirror_container.workflows.pop(0)

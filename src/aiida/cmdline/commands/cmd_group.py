@@ -682,12 +682,7 @@ def group_mirror(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.mirror import GroupMirror
-    from aiida.tools.mirror.config import (
-        GroupMirrorConfig,
-        MirrorMode,
-        ProcessMirrorConfig,
-        NodeCollectorConfig
-    )
+    from aiida.tools.mirror.config import GroupMirrorConfig, MirrorMode, NodeCollectorConfig, ProcessMirrorConfig
     from aiida.tools.mirror.utils import resolve_click_path_for_mirror
 
     # FIXME: If nodes not newly created since the last Mirroring, but only added to the group, those are not picked up
@@ -710,7 +705,7 @@ def group_mirror(
             get_data=mirror_data,
             filter_by_last_mirror_time=filter_by_last_mirror_time,
             only_top_level_calcs=only_top_level_calcs,
-            only_top_level_workflows=only_top_level_workflows
+            only_top_level_workflows=only_top_level_workflows,
         )
 
         process_mirror_config = ProcessMirrorConfig(
@@ -744,6 +739,7 @@ def group_mirror(
             echo.echo_critical(f'{e!s}')
         except Exception as e:
             import traceback
+
             msg = f'Unexpected error while mirroring {group.label} <{group.pk}>:\n ({e!s}). \n'
             echo.echo_critical(msg + traceback.format_exc())
 

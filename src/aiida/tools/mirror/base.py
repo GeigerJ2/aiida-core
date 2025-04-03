@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from aiida.common import timezone
+
 from aiida.tools.mirror.config import MirrorMode, MirrorPaths, MirrorTimes
 from aiida.tools.mirror.logger import MirrorLogger
 from aiida.tools.mirror.utils import (
@@ -68,7 +68,7 @@ class BaseMirror:
         )
 
         try:
-            with self.mirror_paths.safeguard.open("r") as fhandle:
+            with self.mirror_paths.safeguard.open('r') as fhandle:
                 self.mirror_times.last = datetime.fromisoformat(
                     fhandle.readlines()[-1].strip().split()[-1]
                 ).astimezone()
@@ -81,6 +81,6 @@ class BaseMirror:
         self.mirror_logger.save_log()
 
         # Append the current mirror time to safeguard file
-        with self.mirror_paths.safeguard.open("a") as fhandle:
-            msg = f"Last mirror time: {self.mirror_times.start.isoformat()}\n"
+        with self.mirror_paths.safeguard.open('a') as fhandle:
+            msg = f'Last mirror time: {self.mirror_times.start.isoformat()}\n'
             fhandle.write(msg)

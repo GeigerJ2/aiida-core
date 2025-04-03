@@ -11,20 +11,18 @@
 
 from __future__ import annotations
 
-
 from aiida import orm
 from aiida.tools.mirror.base import BaseMirror
 from aiida.tools.mirror.collector import MirrorNodeCollector
-from aiida.tools.mirror.container import MirrorNodeContainer
 from aiida.tools.mirror.config import (
     MirrorMode,
     MirrorPaths,
     MirrorTimes,
     NodeCollectorConfig,
 )
+from aiida.tools.mirror.container import MirrorNodeContainer
 from aiida.tools.mirror.logger import MirrorLogger
-from aiida.tools.mirror.utils import NodeMirrorKeyMapper, safe_delete_dir
-from dataclasses import fields
+from aiida.tools.mirror.utils import safe_delete_dir
 
 
 class BaseCollectionMirror(BaseMirror):
@@ -75,7 +73,6 @@ class BaseCollectionMirror(BaseMirror):
 
         return node_collector.collect_to_delete()
 
-
     # Implement this here, as for the deletion, we don't care about the group
     def do_delete(self) -> None:
         delete_node_container = self.get_delete_node_container()
@@ -83,7 +80,7 @@ class BaseCollectionMirror(BaseMirror):
         # NOTE: Hard-code `store_names` to
         # in descending order of the size of the entity. E.g., better to just delete the whole group at once
         # rather than deleting each node inside of it individually
-        for store_name in ("groups", "workflows", "calculations", "data"):
+        for store_name in ('groups', 'workflows', 'calculations', 'data'):
             to_delete_uuids = getattr(delete_node_container, store_name)
             log_store = getattr(self.mirror_logger, store_name)
             # if store_name == "groups":

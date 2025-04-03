@@ -619,14 +619,14 @@ def process_mirror(
         include_attributes=include_attributes,
         include_extras=include_extras,
         flat=flat,
-        mirror_unsealed=mirror_unsealed
+        mirror_unsealed=mirror_unsealed,
     )
 
     process_mirror_inst = ProcessMirror(
         process_node=process,
         mirror_paths=mirror_paths,
         # ? Is this needed for a single process?
-        mirror_times=None,  
+        mirror_times=None,
         mirror_mode=mirror_mode,
         config=process_mirror_config,
     )

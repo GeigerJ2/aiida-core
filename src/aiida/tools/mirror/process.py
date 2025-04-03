@@ -13,14 +13,13 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import yaml
 
 from aiida import orm
-from aiida.common import LinkType, timezone
+from aiida.common import LinkType
 from aiida.common.exceptions import NotExistentAttributeError
 from aiida.orm.utils import LinkTriple
 from aiida.tools.archive.exceptions import ExportValidationError
@@ -28,8 +27,8 @@ from aiida.tools.mirror.base import BaseMirror
 from aiida.tools.mirror.config import (
     MirrorMode,
     MirrorPaths,
-    ProcessMirrorConfig,
     MirrorTimes,
+    ProcessMirrorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.utils import (
@@ -57,9 +56,7 @@ class ProcessMirror(BaseMirror):
         self.process_node = process_node
 
         if mirror_paths is None:
-            default_mirror_path = generate_process_default_mirror_path(
-                process_node=self.process_node
-            )
+            default_mirror_path = generate_process_default_mirror_path(process_node=self.process_node)
             mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
 
         super().__init__(
@@ -120,36 +117,30 @@ class ProcessMirror(BaseMirror):
         )
 
         # `verdi process status`
-        process_status = format_call_graph(
-            calc_node=process_node, max_depth=None, call_link_label=True
-        )
-        _readme_string += f"\n\n\nOutput of `verdi process status {pk}`:\n\n```shell\n{process_status}\n```"
+        process_status = format_call_graph(calc_node=process_node, max_depth=None, call_link_label=True)
+        _readme_string += f'\n\n\nOutput of `verdi process status {pk}`:\n\n```shell\n{process_status}\n```'
 
         # `verdi process report`
         # Copied over from `cmd_process`
         if isinstance(process_node, orm.CalcJobNode):
             process_report = get_calcjob_report(process_node)
         elif isinstance(process_node, orm.WorkChainNode):
-            process_report = get_workchain_report(
-                process_node, levelname="REPORT", indent_size=2, max_depth=None
-            )
+            process_report = get_workchain_report(process_node, levelname='REPORT', indent_size=2, max_depth=None)
         elif isinstance(process_node, (orm.CalcFunctionNode, orm.WorkFunctionNode)):
             process_report = get_process_function_report(process_node)
         else:
-            process_report = f"Nothing to show for node type {process_node.__class__}"
+            process_report = f'Nothing to show for node type {process_node.__class__}'
 
-        _readme_string += f"\n\n\nOutput of `verdi process report {pk}`:\n\n```shell\n{process_report}\n```"
+        _readme_string += f'\n\n\nOutput of `verdi process report {pk}`:\n\n```shell\n{process_report}\n```'
 
         # `verdi process show`?
         process_show = get_node_info(node=process_node)
-        _readme_string += f"\n\n\nOutput of `verdi process show {pk}`:\n\n```shell\n{process_show}\n```"
+        _readme_string += f'\n\n\nOutput of `verdi process show {pk}`:\n\n```shell\n{process_show}\n```'
 
-        (self.mirror_paths.absolute / "README.md").write_text(_readme_string)
+        (self.mirror_paths.absolute / 'README.md').write_text(_readme_string)
 
     @staticmethod
-    def _generate_child_node_label(
-        index: int, link_triple: LinkTriple, append_pk: bool = True
-    ) -> str:
+    def _generate_child_node_label(index: int, link_triple: LinkTriple, append_pk: bool = True) -> str:
         """Small helper function to generate and clean directory label for child nodes during recursion.
 
         :param index: Index assigned to step at current level of recursion.
@@ -160,7 +151,7 @@ class ProcessMirror(BaseMirror):
         link_label = link_triple.link_label
 
         # Generate directories with naming scheme akin to `verdi process status`
-        label_list = [f"{index:02d}", link_label]
+        label_list = [f'{index:02d}', link_label]
 
         try:
             process_label = node.process_label
@@ -175,10 +166,10 @@ class ProcessMirror(BaseMirror):
         if append_pk:
             label_list += [str(node.pk)]
 
-        node_label = "-".join(label_list)
+        node_label = '-'.join(label_list)
         # `CALL-` as part of the link labels also for MultiplyAddWorkChain -> Seems general enough, so remove
-        node_label = node_label.replace("CALL-", "")
-        return node_label.replace("None-", "")
+        node_label = node_label.replace('CALL-', '')
+        return node_label.replace('None-', '')
 
     # TODO: Make the ProcessNode an attribute of the class?
     def do_mirror(
@@ -202,7 +193,7 @@ class ProcessMirror(BaseMirror):
 
         if not process_node.is_sealed and not self.config.mirror_unsealed:
             raise ExportValidationError(
-                f"Process `{process_node.pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True."
+                f'Process `{process_node.pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True.'
             )
 
         # This here is mainly for `include_attributes` and `include_extras`.
@@ -256,23 +247,15 @@ class ProcessMirror(BaseMirror):
             self.mirror_logger.add_entry(
                 store=workflow_store,
                 uuid=workflow_node.uuid,
-                entry=MirrorLog(
-                    path=output_path.resolve(), time=self.mirror_times.current
-                ),
+                entry=MirrorLog(path=output_path.resolve(), time=self.mirror_times.current),
             )
 
-        called_links = workflow_node.base.links.get_outgoing(
-            link_type=(LinkType.CALL_CALC, LinkType.CALL_WORK)
-        ).all()
-        called_links = sorted(
-            called_links, key=lambda link_triple: link_triple.node.ctime
-        )
+        called_links = workflow_node.base.links.get_outgoing(link_type=(LinkType.CALL_CALC, LinkType.CALL_WORK)).all()
+        called_links = sorted(called_links, key=lambda link_triple: link_triple.node.ctime)
 
         for index, link_triple in enumerate(called_links, start=1):
             child_node = link_triple.node
-            child_label = self._generate_child_node_label(
-                index=index, link_triple=link_triple
-            )
+            child_label = self._generate_child_node_label(index=index, link_triple=link_triple)
             child_output_path = output_path.resolve() / child_label
 
             # Recursive function call for `WorkFlowNode`
@@ -285,14 +268,10 @@ class ProcessMirror(BaseMirror):
 
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
-
                 calculation_store = self.mirror_logger.stores.calculations
 
                 # import ipdb; ipdb.set_trace()
-                if (
-                    not self.config.symlink_calcs
-                    or child_node.uuid not in calculation_store.entries.keys()
-                ):
+                if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
                     self._mirror_calculation(
                         calculation_node=child_node,
                         output_path=child_output_path,
@@ -333,14 +312,10 @@ class ProcessMirror(BaseMirror):
 
         self._write_node_yaml(process_node=calculation_node, output_path=output_path)
 
-        io_mirror_mapping = self._generate_calculation_io_mapping(
-            io_mirror_paths=io_mirror_paths
-        )
+        io_mirror_mapping = self._generate_calculation_io_mapping(io_mirror_paths=io_mirror_paths)
 
         # Mirror the repository contents of the node
-        calculation_node.base.repository.copy_tree(
-            output_path.resolve() / io_mirror_mapping.repository
-        )
+        calculation_node.base.repository.copy_tree(output_path.resolve() / io_mirror_mapping.repository)
 
         # Mirror the repository contents of `outputs.retrieved`
         with contextlib.suppress(NotExistentAttributeError):
@@ -350,9 +325,7 @@ class ProcessMirror(BaseMirror):
 
         # Mirror the node_inputs
         if self.config.include_inputs:
-            input_links = calculation_node.base.links.get_incoming(
-                link_type=LinkType.INPUT_CALC
-            )
+            input_links = calculation_node.base.links.get_incoming(link_type=LinkType.INPUT_CALC)
             # Need to create the path before, otherwise getting Exception
             input_path = output_path / io_mirror_mapping.inputs
             input_path.mkdir(parents=True, exist_ok=True)
@@ -364,14 +337,8 @@ class ProcessMirror(BaseMirror):
 
         # Mirror the node_outputs apart from `retrieved`
         if self.config.include_outputs:
-            output_links = list(
-                calculation_node.base.links.get_outgoing(link_type=LinkType.CREATE)
-            )
-            output_links = [
-                output_link
-                for output_link in output_links
-                if output_link.link_label != "retrieved"
-            ]
+            output_links = list(calculation_node.base.links.get_outgoing(link_type=LinkType.CREATE))
+            output_links = [output_link for output_link in output_links if output_link.link_label != 'retrieved']
 
             self._mirror_calculation_io_files(
                 parent_path=output_path / io_mirror_mapping.outputs,
@@ -407,16 +374,14 @@ class ProcessMirror(BaseMirror):
             link_label = link_triple.link_label
 
             if not self.config.flat:
-                linked_node_path = parent_path / Path(*link_label.split("__"))
+                linked_node_path = parent_path / Path(*link_label.split('__'))
             else:
                 # Don't use link_label at all -> But, relative path inside FolderData is retained
                 linked_node_path = parent_path
 
             link_triple.node.base.repository.copy_tree(linked_node_path.resolve())
 
-    def _generate_calculation_io_mapping(
-        self, io_mirror_paths: list[str | Path] | None = None
-    ) -> SimpleNamespace:
+    def _generate_calculation_io_mapping(self, io_mirror_paths: list[str | Path] | None = None) -> SimpleNamespace:
         """Helper function to generate mapping for entities dumped for each `CalculationNode`.
 
         This is to avoid exposing AiiDA terminology, like `repository` to the user, while keeping track of which
@@ -428,41 +393,37 @@ class ProcessMirror(BaseMirror):
         """
 
         aiida_entities_to_mirror: list[str] = [
-            "repository",
-            "retrieved",
-            "inputs",
-            "outputs",
+            'repository',
+            'retrieved',
+            'inputs',
+            'outputs',
         ]
         default_calculation_io_mirror_paths: list[str | Path] = [
-            "inputs",
-            "outputs",
-            "node_inputs",
-            "node_outputs",
+            'inputs',
+            'outputs',
+            'node_inputs',
+            'node_outputs',
         ]
         if self.config.flat and io_mirror_paths is None:
             logger.info(
-                "Flat set to True and no `io_mirror_paths`. Mirroring in a flat directory, files might be overwritten."
+                'Flat set to True and no `io_mirror_paths`. Mirroring in a flat directory, files might be overwritten.'
             )
-            empty_calculation_io_mirror_paths = [""] * 4
+            empty_calculation_io_mirror_paths = [''] * 4
 
-            return SimpleNamespace(
-                **dict(zip(aiida_entities_to_mirror, empty_calculation_io_mirror_paths))
-            )
+            return SimpleNamespace(**dict(zip(aiida_entities_to_mirror, empty_calculation_io_mirror_paths)))
 
         if not self.config.flat and io_mirror_paths is None:
             logger.info(
-                "Flat set to False but no `io_mirror_paths` provided. "
-                + f"Will use the defaults {default_calculation_io_mirror_paths}."
+                'Flat set to False but no `io_mirror_paths` provided. '
+                + f'Will use the defaults {default_calculation_io_mirror_paths}.'
             )
             io_mirror_paths = default_calculation_io_mirror_paths
 
         elif self.config.flat:
-            logger.info(
-                "Flat set to True but `io_mirror_paths` provided. These will be used, but `inputs` not nested."
-            )
+            logger.info('Flat set to True but `io_mirror_paths` provided. These will be used, but `inputs` not nested.')
         else:
             logger.info(
-                "Flat set to False but no `io_mirror_paths` provided. These will be used, but `node_inputs` flattened."
+                'Flat set to False but no `io_mirror_paths` provided. These will be used, but `node_inputs` flattened.'
             )
 
         assert io_mirror_paths is not None
@@ -472,7 +433,7 @@ class ProcessMirror(BaseMirror):
         self,
         process_node: orm.ProcessNode,
         output_path: Path,
-        output_filename: str = ".aiida_node_metadata.yaml",
+        output_filename: str = '.aiida_node_metadata.yaml',
     ) -> None:
         """Mirror the selected `ProcessNode` properties, attributes, and extras to a YAML file.
 
@@ -482,34 +443,30 @@ class ProcessMirror(BaseMirror):
         """
 
         node_properties = [
-            "label",
-            "description",
-            "pk",
-            "uuid",
-            "ctime",
-            "mtime",
-            "node_type",
-            "process_type",
-            "is_finished_ok",
+            'label',
+            'description',
+            'pk',
+            'uuid',
+            'ctime',
+            'mtime',
+            'node_type',
+            'process_type',
+            'is_finished_ok',
         ]
 
-        user_properties = ("first_name", "last_name", "email", "institution")
+        user_properties = ('first_name', 'last_name', 'email', 'institution')
 
-        computer_properties = ("label", "hostname", "scheduler_type", "transport_type")
+        computer_properties = ('label', 'hostname', 'scheduler_type', 'transport_type')
 
         metadata_dict = {
-            metadata_property: getattr(process_node, metadata_property)
-            for metadata_property in node_properties
+            metadata_property: getattr(process_node, metadata_property) for metadata_property in node_properties
         }
-        node_dict = {"Node data": metadata_dict}
+        node_dict = {'Node data': metadata_dict}
         # Add user data
         with contextlib.suppress(AttributeError):
             node_dbuser = process_node.user
-            user_dict = {
-                user_property: getattr(node_dbuser, user_property)
-                for user_property in user_properties
-            }
-            node_dict["User data"] = user_dict
+            user_dict = {user_property: getattr(node_dbuser, user_property) for user_property in user_properties}
+            node_dict['User data'] = user_dict
 
         # Add computer data
         with contextlib.suppress(AttributeError):
@@ -518,16 +475,16 @@ class ProcessMirror(BaseMirror):
                 computer_property: getattr(node_dbcomputer, computer_property)
                 for computer_property in computer_properties
             }
-            node_dict["Computer data"] = computer_dict
+            node_dict['Computer data'] = computer_dict
         # Add node attributes
         if self.config.include_attributes:
             node_attributes = process_node.base.attributes.all
-            node_dict["Node attributes"] = node_attributes
+            node_dict['Node attributes'] = node_attributes
 
         if self.config.include_extras:
             if node_extras := process_node.base.extras.all:
-                node_dict["Node extras"] = node_extras
+                node_dict['Node extras'] = node_extras
 
         output_file = output_path.resolve() / output_filename
-        with open(output_file, "w") as handle:
+        with open(output_file, 'w') as handle:
             yaml.dump(node_dict, handle, sort_keys=False)

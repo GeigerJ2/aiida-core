@@ -316,14 +316,14 @@ def profile_mirror(
     include_attributes,
     include_extras,
     flat,
-    mirror_unsealed
+    mirror_unsealed,
 ):
     """Mirror all data in an AiiDA profile's storage to disk."""
 
-    from aiida.tools.mirror import ProfileMirror
-    from aiida.tools.mirror.config import MirrorMode, ProcessMirrorConfig, ProfileMirrorConfig, NodeCollectorConfig
-    from aiida.tools.mirror.utils import resolve_click_path_for_mirror
     from aiida.tools.archive.exceptions import ExportValidationError
+    from aiida.tools.mirror import ProfileMirror
+    from aiida.tools.mirror.config import MirrorMode, NodeCollectorConfig, ProcessMirrorConfig, ProfileMirrorConfig
+    from aiida.tools.mirror.utils import resolve_click_path_for_mirror
 
     profile = ctx.obj['profile']
 
@@ -349,10 +349,10 @@ def profile_mirror(
 
     if groups and overwrite:
         msg = (
-            "`-G/--groups` and overwrite selected. The latter option would clean the full profile directory. "
-            "Are you sure you want to do this? This is currently not supported. Please manually clean the profile "
-            "mirror directory "
-            )
+            '`-G/--groups` and overwrite selected. The latter option would clean the full profile directory. '
+            'Are you sure you want to do this? This is currently not supported. Please manually clean the profile '
+            'mirror directory '
+        )
         echo.echo_critical(msg)
 
     # Create config options that hold the various settings for dumping data
@@ -370,7 +370,7 @@ def profile_mirror(
         include_attributes=include_attributes,
         include_extras=include_extras,
         flat=flat,
-        mirror_unsealed=mirror_unsealed
+        mirror_unsealed=mirror_unsealed,
     )
 
     profile_mirror_config = ProfileMirrorConfig(
@@ -411,5 +411,6 @@ def profile_mirror(
         echo.echo_critical(f'{e!s}')
     except Exception as e:
         import traceback
+
         msg = f'Unexpected error while mirroring {profile.name}:\n ({e!s}).\n'
         echo.echo_critical(msg + traceback.format_exc())
