@@ -8,7 +8,8 @@
 """Tests for the dumping of group data to disk."""
 
 import pytest
-from aiida.tools.mirror.collector import MirrorNodeContainer, MirrorNodeCollector
+from aiida.tools.mirror.collector import MirrorNodeCollector
+from aiida.tools.mirror.container import MirrorNodeContainer
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.config import (
     NodeCollectorConfig,
@@ -99,7 +100,6 @@ class TestMirrorNodeCollector:
 
         # ipdb.set_trace()
 
-        # NOTE: Should the `last_mirror_time` also be here
         # include_processes: bool = True
         # include_data: bool = False
         # filter_by_last_mirror_time: bool = True

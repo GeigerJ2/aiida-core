@@ -85,7 +85,7 @@ def test_del_missing_groups(tmp_path):
     # import ipdb; ipdb.set_trace()
     _ = orm.Group.collection.delete(groups[0].pk)
 
-    profile_mirror.del_missing_groups()
+    profile_mirror.delete_missing_groups()
     assert path_to_del
 
     # assert profile_mirror.get_groups_to_delete() == [groups[0].uuid]
