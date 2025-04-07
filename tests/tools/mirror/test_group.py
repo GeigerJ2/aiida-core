@@ -20,6 +20,40 @@ from aiida.tools.mirror import GroupMirror
 
 from .utils import compare_tree
 
+tree_multiply_add_group = {
+    "multiply-add-group-mirror": [
+        ".aiida_mirror_log.json",
+        ".aiida_mirror_safeguard",
+        {"workflows": [
+            {"MultiplyAddWorkChain-5": [
+                ".aiida_mirror_safeguard",
+                ".aiida_node_metadata.yaml",
+                {"01-multiply-6": [
+                    ".aiida_node_metadata.yaml",
+                    {"inputs": ["source_file"]},
+                    {"node_inputs": []}
+                ]},
+                {"02-ArithmeticAddCalculation-8": [
+                    ".aiida_node_metadata.yaml",
+                    {"inputs": [
+                        "_aiidasubmit.sh",
+                        "aiida.in",
+                        {".aiida": ["calcinfo.json", "job_tmpl.json"]}
+                    ]},
+                    {
+                        "node_inputs": []},
+                    {"outputs": [
+                        "_scheduler-stderr.txt",
+                        "_scheduler-stdout.txt",
+                        "aiida.out"
+                    ]}
+                ]}
+            ]}
+        ]}
+    ]
+}
+
+
 # Fixture that depends on generate_calculation_node_add_class
 # @pytest.fixture(scope="class")
 # def setup_calculation_node_add_class(generate_calculation_node_add_class):

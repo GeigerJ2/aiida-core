@@ -139,7 +139,7 @@ class GroupMirror(BaseCollectionMirror):
         """
         # NOTE: In principle, a node can only be once in a group
 
-        if len(list(processes)) == 0:
+        if len(processes) == 0:
             return
 
         # Setup common resources needed for mirroring

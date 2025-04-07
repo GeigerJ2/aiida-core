@@ -16,14 +16,116 @@ from aiida.tools.mirror.config import MirrorPaths, MirrorTimes, ProfileMirrorCon
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.profile import ProfileMirror
 
-from .utils import compare_tree, tree_add_calc  # tree_multip
+from .utils import compare_tree  # , tree_add_calc  # tree_multip
+
+profile_mirror_label = "profile-mirror"
+add_group_label = "add-group"
+multiply_add_group_label = "multiply-add-group"
+
+tree_profile_multiply_add_group = {
+    "profile-mirror": [
+        ".aiida_mirror_log.json",
+        ".aiida_mirror_safeguard",
+        {
+            "groups": [
+                {
+                    "multiply-add-group": [
+                        {
+                            "workflows": [
+                                {
+                                    "MultiplyAddWorkChain-5": [
+                                        ".aiida_mirror_safeguard",
+                                        ".aiida_node_metadata.yaml",
+                                        {
+                                            "01-multiply-6": [
+                                                ".aiida_node_metadata.yaml",
+                                                {"inputs": ["source_file"]},
+                                                {"node_inputs": []},
+                                            ]
+                                        },
+                                        {
+                                            "02-ArithmeticAddCalculation-8": [
+                                                ".aiida_node_metadata.yaml",
+                                                {
+                                                    "inputs": [
+                                                        "_aiidasubmit.sh",
+                                                        "aiida.in",
+                                                        {
+                                                            ".aiida": [
+                                                                "calcinfo.json",
+                                                                "job_tmpl.json",
+                                                            ]
+                                                        },
+                                                    ]
+                                                },
+                                                {"node_inputs": []},
+                                                {
+                                                    "outputs": [
+                                                        "_scheduler-stderr.txt",
+                                                        "_scheduler-stdout.txt",
+                                                        "aiida.out",
+                                                    ]
+                                                },
+                                            ]
+                                        },
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+    ]
+}
+
+tree_profile_add_group = {
+    "profile-mirror": [
+        ".aiida_mirror_log.json",
+        ".aiida_mirror_safeguard",
+        {
+            "groups": [
+                {
+                    "add-group": [
+                        {
+                            "calculations": [
+                                {
+                                    "ArithmeticAddCalculation-4": [
+                                        ".aiida_mirror_safeguard",
+                                        ".aiida_node_metadata.yaml",
+                                        {
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
+                                                {
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
+                                                    ]
+                                                },
+                                            ]
+                                        },
+                                        {"node_inputs": []},
+                                        {
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
+                                            ]
+                                        },
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+    ]
+}
 
 
 class TestProfileMirror:
-
-    _profile_mirror_path = Path("profile-mirror")
-    _add_group_label = "add-group"
-    _multiply_add_group_label = "multiply-add-group"
 
     def test_mirror_per_group(self): ...
 
@@ -31,19 +133,24 @@ class TestProfileMirror:
 
     def test_do_mirror_add_group(self, tmp_path, setup_add_group):
         add_group = setup_add_group
-        mirror_paths = MirrorPaths.from_path(tmp_path / self._profile_mirror_path)
+        mirror_paths = MirrorPaths.from_path(tmp_path / profile_mirror_label)
         profile_mirror_inst = ProfileMirror(mirror_paths=mirror_paths)
-        profile_mirror_inst.do_mirror()
-        import ipdb
+        profile_mirror_inst.do_mirror(top_level_caller=True)
 
-        ipdb.set_trace()
         compare_tree(
-            expected=tree_add_calc,
+            expected=tree_profile_add_group,
             base_path=tmp_path,
-            relative_path=self._profile_mirror_path / "groups" / self._add_group_label / 'calculations',
         )
 
-    def test_do_mirror_multiply_add_group(self): ...
+    def test_do_mirror_multiply_add_group(self, tmp_path, setup_multiply_add_group):
+        multiply_add_group = setup_multiply_add_group
+        mirror_paths = MirrorPaths.from_path(tmp_path / profile_mirror_label)
+        profile_mirror_inst = ProfileMirror(mirror_paths=mirror_paths)
+        profile_mirror_inst.do_mirror(top_level_caller=True)
+        compare_tree(
+            expected=tree_profile_multiply_add_group,
+            base_path=tmp_path,
+        )
 
     def test_do_mirror_no_group(self): ...
 
