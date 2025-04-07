@@ -74,8 +74,8 @@ class ProfileMirror(BaseCollectionMirror):
         # before instantiation??
         # ! NOTE: THIS IS A HACK
         # import ipdb; ipdb.set_trace()
-        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.logger.exists():
-            mirror_paths.logger.unlink()
+        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
+            mirror_paths.log_path.unlink()
 
         super().__init__(
             mirror_mode=mirror_mode,
@@ -149,7 +149,6 @@ class ProfileMirror(BaseCollectionMirror):
                 uuid=group.uuid,
                 entry=MirrorLog(
                     mirror_path=mirror_paths_group.absolute,
-                    mirror_time=self.mirror_times.current,
                 ),
             )
 

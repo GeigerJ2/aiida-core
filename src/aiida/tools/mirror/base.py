@@ -58,34 +58,6 @@ class BaseMirror:
         except (json.JSONDecodeError, OSError):
             return MirrorLogger(mirror_paths=self.mirror_paths)
 
-    # def pre_mirror(self, top_level_caller: bool = False) -> None:
-    #     """_summary_"""
-
-    #     _ = prepare_mirror_path(
-    #         path_to_validate=self.mirror_paths.absolute,
-    #         mirror_mode=self.mirror_mode,
-    #         safeguard_file=self.mirror_paths.safeguard,
-    #         top_level_caller=top_level_caller,
-    #     )
-
-    #     try:
-    #         with self.mirror_paths.safeguard.open('r') as fhandle:
-    #             self.mirror_times.last = datetime.fromisoformat(
-    #                 fhandle.readlines()[-1].strip().split()[-1]
-    #             ).astimezone()
-    #     except (IndexError, FileNotFoundError):
-    #         # Default for `last` is already None
-    #         pass
-
-    # def post_mirror(self) -> None:
-    #     """_summary_"""
-    #     self.mirror_logger.save_log()
-
-    #     # Append the current mirror time to safeguard file
-    #     with self.mirror_paths.safeguard.open('a') as fhandle:
-    #         msg = f'Last mirror time: {self.mirror_times.current.isoformat()}\n'
-    #         fhandle.write(msg)
-
     def pre_mirror(self, top_level_caller: bool = False) -> None:
         """Prepare for mirroring operation."""
 
@@ -95,9 +67,6 @@ class BaseMirror:
             safeguard_file=self.mirror_paths.safeguard,
             top_level_caller=top_level_caller,
         )
-
-        # Get the last mirror time from the logger
-        self.mirror_times.last = self.mirror_logger.last_mirror_time
 
     def post_mirror(self) -> None:
         """Post-processing after mirroring operation."""

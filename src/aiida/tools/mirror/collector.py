@@ -41,10 +41,17 @@ class MirrorNodeCollector:
         self.config = config or NodeCollectorConfig()
 
     def collect_to_mirror(self, group: orm.Group | None = None, filters: dict | None = None) -> MirrorNodeContainer:
-        msg = 'Collecting nodes from the database. For the first mirror, this can take a while.'
+        if group:
+            msg = f'Collecting nodes from the database for group `{group.label}`. For the first mirror, this can take a while.'
+        else:
+            msg = 'Collecting nodes not in any group from the database. For the first mirror, this can take a while.'
+            
         logger.report(msg)
 
         container = MirrorNodeContainer()
+        # if group:
+        #     if group.label == 'multiply-add-group':
+        #         import ipdb; ipdb.set_trace()
 
         if self.config.get_processes:
             # Get workflow nodes
@@ -126,6 +133,7 @@ class MirrorNodeCollector:
         # Filter by modification time if requested
         elif self.config.filter_by_last_mirror_time and self.mirror_times.last:
             filters['mtime'] = {'>=': self.mirror_times.last.astimezone()}
+            import ipdb; ipdb.set_trace()
 
         # Filter out already logged nodes if mirror_logger is available
         # NOTE: Move this outside and make it depend on the passing of the store???
@@ -144,6 +152,11 @@ class MirrorNodeCollector:
         filters: dict | None = None,
     ) -> list[orm.Node]:
         # Basic filters for the query
+        
+        # if group:
+        #     if group.label == 'multiply-add-group':
+        #         import ipdb; ipdb.set_trace()
+        
         if not filters:
             filters = self._resolve_filters(orm_type)
 
@@ -231,54 +244,3 @@ class MirrorNodeCollector:
                 if isinstance(node, orm.CalculationNode):
                     descendants.append(node)
         return descendants
-
-    # def collect_to_delete(
-    #     self,
-    #     mirror_logger: MirrorLogger,
-    #     group: orm.Group | None = None,
-    # ) -> MirrorNodeContainer:
-    #     # for orm_class in (orm.CalculationNode, orm.WorkflowNode):  # orm.Data
-    #     #     store = getattr(self.mirror_logger, NodeMirrorKeyMapper.get_key_from_class(orm_class=orm_class))
-
-    #     # TODO: Currently, the
-
-    #     # profile_container = self.mirror_container or self.collect_to_mirror()
-
-    #     # NOTE: Wouldn't have to create the empty one here, if the argument wasn't required
-    #     empty_mirror_logger = MirrorLogger(mirror_paths=mirror_logger.mirror_paths)
-    #     to_mirror_container = self.collect_to_mirror(empty_mirror_logger)
-
-    #     # import ipdb; ipdb.set_trace()
-
-    #     logged_container = MirrorNodeContainer(
-    #         calculations=[orm.load_node(n) for n in mirror_logger.calculations.entries.keys()],
-    #         workflows=[orm.load_node(n) for n in mirror_logger.workflows.entries.keys()],
-    #         data=[orm.load_node(n) for n in mirror_logger.data.entries.keys()],
-    #     )
-
-    #     to_delete_container = MirrorNodeContainer(
-    #         calculations=[n for n in logged_container.calculations if n not in to_mirror_container.calculations],
-    #         workflows=[n for n in logged_container.workflows if n not in to_mirror_container.workflows],
-    #         data=[n for n in logged_container.data if n not in to_mirror_container.data],
-    #     )
-
-    #     return to_delete_container
-
-    #     # if self.config.include_processes:
-    #     #     calculations = orm.QueryBuilder().append(orm.CalculationNode).all(flat=True)
-    #     #     workflows = orm.QueryBuilder().append(orm.WorkflowNode).all(flat=True)
-    #     #     profile_container.calculations = calculations
-    #     #     profile_container.workflows = workflows
-
-    #     #     logger_container.calculations = list(mirror_logger.calculations.entries.keys())
-    #     #     logger_container.workflows = list(mirror_logger.workflows.entries.keys())
-
-    #     # if self.config.include_data:
-    #     #     data = orm.QueryBuilder().append(orm.WorkflowNode).all(flat=True)
-    #     #     profile_container.data = data
-
-    #     #     logger_container.data = list(mirror_logger.data.entries.keys())
-
-    #     # import ipdb
-
-    #     # ipdb.set_trace()

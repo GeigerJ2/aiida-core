@@ -79,8 +79,8 @@ class GroupMirror(BaseCollectionMirror):
         # before instantiation??
         # ! NOTE: THIS IS A HACK
         # import ipdb; ipdb.set_trace()
-        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.logger.exists():
-            mirror_paths.logger.unlink()
+        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
+            mirror_paths.log_path.unlink()
 
         super().__init__(
             mirror_mode=mirror_mode,
@@ -263,7 +263,7 @@ class GroupMirror(BaseCollectionMirror):
         # import ipdb; ipdb.set_trace()
         self.current_store.add_entry(
             uuid=process.uuid,
-            entry=MirrorLog(mirror_path=process_mirror_path, mirror_time=self.mirror_times.current),
+            entry=MirrorLog(mirror_path=process_mirror_path)
         )
 
     def _mirror_process_collections(self) -> None:
@@ -305,7 +305,6 @@ class GroupMirror(BaseCollectionMirror):
                 uuid=self.group.uuid,
                 entry=MirrorLog(
                     mirror_path=self.mirror_paths.absolute,
-                    mirror_time=self.mirror_times.current,
                 ),
             )
 

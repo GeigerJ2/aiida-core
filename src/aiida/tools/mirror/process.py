@@ -247,7 +247,7 @@ class ProcessMirror(BaseMirror):
             self.mirror_logger.add_entry(
                 store=workflow_store,
                 uuid=workflow_node.uuid,
-                entry=MirrorLog(mirror_path=output_path.resolve(), mirror_time=self.mirror_times.current),
+                entry=MirrorLog(mirror_path=output_path.resolve()),
             )
 
         called_links = workflow_node.base.links.get_outgoing(link_type=(LinkType.CALL_CALC, LinkType.CALL_WORK)).all()
@@ -355,7 +355,6 @@ class ProcessMirror(BaseMirror):
                     uuid=calculation_node.uuid,
                     entry=MirrorLog(
                         mirror_path=output_path,
-                        mirror_time=self.mirror_times.current,
                     ),
                 )
 

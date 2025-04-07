@@ -94,7 +94,7 @@ class MirrorPaths:
         return self.absolute / '.aiida_mirror_safeguard'
 
     @property
-    def logger(self) -> Path:
+    def log_path(self) -> Path:
         from aiida.tools.mirror.logger import MirrorLogger
 
         """Returns the path of the logger JSON."""
