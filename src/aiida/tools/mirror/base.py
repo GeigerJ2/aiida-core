@@ -26,12 +26,10 @@ class BaseMirror:
         self,
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
-        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
     ):
         self.mirror_mode = mirror_mode or MirrorMode.INCREMENTAL
         self.mirror_paths = mirror_paths or MirrorPaths()
-        self.mirror_times = mirror_times or MirrorTimes()
         self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger)
 
     def set_mirror_logger(self, mirror_logger: MirrorLogger | None = None):
@@ -70,9 +68,6 @@ class BaseMirror:
 
     def post_mirror(self) -> None:
         """Post-processing after mirroring operation."""
-        
-        # Update the last mirror time in the logger
-        self.mirror_logger.last_mirror_time = self.mirror_times.current
-        
+         
         # Save the log file with updated information
         self.mirror_logger.save_log()

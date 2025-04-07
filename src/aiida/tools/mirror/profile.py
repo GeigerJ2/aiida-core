@@ -53,7 +53,6 @@ class ProfileMirror(BaseCollectionMirror):
         profile: str | Profile | None = None,
         mirror_mode: MirrorMode = MirrorMode.INCREMENTAL,
         mirror_paths: MirrorPaths | None = None,
-        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
         config: ProfileMirrorConfig | None = None,
         node_collector_config: NodeCollectorConfig | None = None,
@@ -80,7 +79,6 @@ class ProfileMirror(BaseCollectionMirror):
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            mirror_times=mirror_times,
             mirror_logger=mirror_logger,
             node_collector_config=node_collector_config,
         )
@@ -161,7 +159,7 @@ class ProfileMirror(BaseCollectionMirror):
             no_group_subpath = Path('.')
 
         mirror_paths_no_group = MirrorPaths(
-            parent=self.mirror_paths.parent / self.mirror_paths.child,
+            parent=self.mirror_paths.absolute,
             child=no_group_subpath,
         )
 
@@ -179,10 +177,10 @@ class ProfileMirror(BaseCollectionMirror):
             node_collector_config=node_collector_config_no_group,
         )
 
-        msg = f'Mirroring processes not in any group for profile `{self.profile.name}`...'
+        msg = f'Mirroring ungrouped processes for profile `{self.profile.name}`...'
         logger.report(msg)
+        # import ipdb; ipdb.set_trace()
         no_group_mirror_inst.do_mirror()
-        # TODO: Possibly add entry to logger
 
     def do_mirror(self, top_level_caller: bool = False):
         """_summary_
@@ -190,7 +188,8 @@ class ProfileMirror(BaseCollectionMirror):
         :param
         """
 
-        self.pre_mirror(top_level_caller=top_level_caller)
+        if top_level_caller:
+            self.pre_mirror(top_level_caller=top_level_caller)
 
         if self.config.update_groups:
             self.update_groups()
@@ -211,7 +210,8 @@ class ProfileMirror(BaseCollectionMirror):
         if self.config.delete_missing:
             self.do_delete()
 
-        self.post_mirror()
+        if top_level_caller:
+            self.post_mirror()
 
     def do_delete(self) -> None:
         """Main method to handle deletion of groups and nodes.

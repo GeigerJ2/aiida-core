@@ -8,7 +8,7 @@
 ###########################################################################
 
 from __future__ import annotations
-
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
@@ -41,14 +41,21 @@ class MirrorMode(Enum):
     DRY_RUN = auto()
 
 
+
 @dataclass
 class MirrorTimes:
+    _instance = None
     last: datetime | None = None
     # Fixed time set at instantiation
     _current: datetime = field(default_factory=timezone.now)
     # start: datetime | None = field(default_factory=timezone.now)
     range_start: datetime | None = None
     range_end: datetime | None = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     @property
     def current(self) -> datetime:
@@ -57,21 +64,14 @@ class MirrorTimes:
         """
         return self._current
 
-
-# @dataclass
-# class MirrorTimes:
-#     last: datetime | None = None
-#     # NOTE: Maybe make this a property/function, in a way that it is always evaluated
-#     # NOTE: Then, I don't have the exact same time always everywhere
-#     start: datetime | None = field(default_factory=timezone.now)
-#     range_start: datetime | None = None
-#     range_end: datetime | None = None
-
-#     def current(self) -> datetime:
-#         """
-#         Returns the current time whenever accessed, ensuring it's always up-to-date.
-#         """
-#         return timezone.now()
+    @classmethod
+    def from_file(cls, mirror_paths: "MirrorPaths") -> "MirrorTimes":
+        try:
+            with mirror_paths.log_path.open("r", encoding="utf-8") as f:
+                prev_mirror_data = json.load(f)
+                return cls(last=datetime.fromisoformat(prev_mirror_data['last_mirror_time']))
+        except:
+            raise
 
 
 @dataclass

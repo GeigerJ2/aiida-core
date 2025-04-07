@@ -58,8 +58,6 @@ class GroupMirror(BaseCollectionMirror):
         group: orm.Group | None,
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
-        # NOTE: This should be part of the logger...
-        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
         node_collector_config: NodeCollectorConfig | None = None,
         config: GroupMirrorConfig | None = None,
@@ -85,7 +83,6 @@ class GroupMirror(BaseCollectionMirror):
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            mirror_times=mirror_times,
             mirror_logger=mirror_logger,
             node_collector_config=node_collector_config,
         )
@@ -120,7 +117,8 @@ class GroupMirror(BaseCollectionMirror):
             return group
 
         else:
-            return orm.Group(label='no-group')
+            # return orm.Group(label='no-group')
+            return None
 
     # staticmethod so I can use it before instantiation of the GroupDumper, as that will need the subpath already
     @staticmethod
@@ -198,7 +196,6 @@ class GroupMirror(BaseCollectionMirror):
             except FileExistsError:
                 # For debugging
                 raise
-                pass
 
         return True
 
@@ -226,7 +223,6 @@ class GroupMirror(BaseCollectionMirror):
             process_node=process,
             mirror_mode=self.mirror_mode,
             mirror_paths=process_paths,
-            mirror_times=self.mirror_times,
             config=self.process_mirror_config,
             mirror_logger=self.mirror_logger,
         )
@@ -234,7 +230,7 @@ class GroupMirror(BaseCollectionMirror):
         # import ipdb; ipdb.set_trace()
         if not self.config.symlink_calcs:
             # Case: symlink_duplicates is disabled
-            process_mirror_inst.do_mirror(top_level_caller=False)
+            process_mirror_inst.do_mirror()
 
         else:
             # Try to create symlink from current_store first
@@ -257,7 +253,7 @@ class GroupMirror(BaseCollectionMirror):
             # If not found in either store, create a new mirror
             if not symlinked:
                 # import ipdb; ipdb.set_trace()
-                process_mirror_inst.do_mirror(top_level_caller=False)
+                process_mirror_inst.do_mirror()
 
         # This happens regardless of which case was executed
         # import ipdb; ipdb.set_trace()
@@ -278,7 +274,10 @@ class GroupMirror(BaseCollectionMirror):
                 logger.report(msg)
                 self.mirror_processes(processes=processes)
             else:
-                msg = f'No (new) {process_type} to mirror in group `{self.group.label}`.'
+                if self.group:
+                    msg = f'No (new) {process_type} to mirror in group `{self.group.label}`.'
+                else:
+                    msg = f'No (new) ungrouped {process_type} to mirror.'
                 logger.report(msg)
 
     def do_mirror(self, top_level_caller: bool = False) -> None:
@@ -287,20 +286,16 @@ class GroupMirror(BaseCollectionMirror):
         :return: None
         """
 
-        # TODO: See if I should have the `if` here
-        # if top_level_caller:
-        # import ipdb; ipdb.set_trace()
-
-        self.pre_mirror(top_level_caller=top_level_caller)
+        if top_level_caller:
+            self.pre_mirror(top_level_caller=top_level_caller)
 
         _ = self.set_mirror_node_container(group=self.group)
 
         self._mirror_process_collections()
 
-        # NOTE: Should `current_mirror_time` be the time once it is finished? This should be consistent.
-        # Using the start time should be fine for now, as it is what is used for processes, such that processes that
-        # finish while the mirroring is running aren't picked up.
-        if self.group.is_stored:
+        # FIXME: This is a small hack to only write an entry into the logger for actual groups
+        # and not the `no-group` container
+        if self.group:
             self.mirror_logger.stores.groups.add_entry(
                 uuid=self.group.uuid,
                 entry=MirrorLog(

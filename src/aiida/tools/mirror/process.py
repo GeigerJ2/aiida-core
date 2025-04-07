@@ -27,7 +27,6 @@ from aiida.tools.mirror.base import BaseMirror
 from aiida.tools.mirror.config import (
     MirrorMode,
     MirrorPaths,
-    MirrorTimes,
     ProcessMirrorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
@@ -47,7 +46,6 @@ class ProcessMirror(BaseMirror):
         process_node: orm.ProcessNode,
         mirror_mode: MirrorMode = MirrorMode.INCREMENTAL,
         mirror_paths: MirrorPaths | None = None,
-        mirror_times: MirrorTimes | None = None,
         mirror_logger: MirrorLogger | None = None,
         config: ProcessMirrorConfig | None = None,
     ) -> None:
@@ -62,7 +60,6 @@ class ProcessMirror(BaseMirror):
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            mirror_times=mirror_times,
             mirror_logger=mirror_logger,
         )
 
@@ -175,7 +172,7 @@ class ProcessMirror(BaseMirror):
     def do_mirror(
         self,
         io_mirror_paths: list[str | Path] | None = None,
-        top_level_caller: bool = True,
+        top_level_caller: bool = False,
     ) -> None:
         """Mirrors all data involved in a `ProcessNode`, including its outgoing links.
 
@@ -203,7 +200,8 @@ class ProcessMirror(BaseMirror):
         # for key, value in kwargs.items():
         #     setattr(self, key, value)
 
-        self.pre_mirror(top_level_caller=top_level_caller)
+        if top_level_caller:
+            self.pre_mirror(top_level_caller=top_level_caller)
 
         if isinstance(process_node, orm.CalculationNode):
             self._mirror_calculation(
@@ -219,7 +217,8 @@ class ProcessMirror(BaseMirror):
                 io_mirror_paths=io_mirror_paths,
             )
 
-        self.post_mirror()
+        if top_level_caller:
+            self.post_mirror()
 
     def _mirror_workflow(
         self,

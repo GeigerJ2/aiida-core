@@ -13,7 +13,6 @@ from typing import Any, Dict
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.config import (
-    MirrorTimes,
     NodeCollectorConfig,
     NodeMirrorGroupScope,
 )
@@ -33,25 +32,22 @@ class MirrorNodeCollector:
     def __init__(
         self,
         mirror_logger: MirrorLogger,
-        mirror_times: MirrorTimes,
         config: NodeCollectorConfig | None = None,
     ):
         self.mirror_logger = mirror_logger
-        self.mirror_times = mirror_times
         self.config = config or NodeCollectorConfig()
+        # import ipdb; ipdb.set_trace()
 
     def collect_to_mirror(self, group: orm.Group | None = None, filters: dict | None = None) -> MirrorNodeContainer:
         if group:
             msg = f'Collecting nodes from the database for group `{group.label}`. For the first mirror, this can take a while.'
         else:
-            msg = 'Collecting nodes not in any group from the database. For the first mirror, this can take a while.'
+            msg = 'Collecting ungrouped nodes from the database. For the first mirror, this can take a while.'
             
+
         logger.report(msg)
 
         container = MirrorNodeContainer()
-        # if group:
-        #     if group.label == 'multiply-add-group':
-        #         import ipdb; ipdb.set_trace()
 
         if self.config.get_processes:
             # Get workflow nodes
@@ -72,7 +68,7 @@ class MirrorNodeCollector:
             )
 
             # If not using top-level-only filter, add descendant calculations from workflows
-            if not self.config.only_top_level_calcs and workflows:
+            if not workflows and self.config.only_top_level_calcs:
                 descendant_calcs = self._get_workflow_descendants(workflows)
                 # Combine and remove duplicates
                 calculations = list(set(calculations + descendant_calcs))
@@ -82,16 +78,6 @@ class MirrorNodeCollector:
         if self.config.get_data:
             msg = 'Mirroring of data nodes not implemented yet.'
             raise NotImplementedError(msg)
-
-            # # Get data nodes
-            # try:
-            #     data_nodes = self._get_nodes('data', group=group, scope=self.config.group_scope, filters=filters)
-
-            #     container.data = data_nodes
-            # except NotImplementedError:
-            #     # Keep the existing behavior
-            #     msg = 'Mirroring of data nodes not yet implemented.'
-            #     raise NotImplementedError(msg)
 
         self.mirror_container = container
 
@@ -126,19 +112,19 @@ class MirrorNodeCollector:
 
         # This might be too annoying to log always, and raising here would require manually setting
         # `filter-by-last-mirror-time` to False for the first mirror
-        if self.config.filter_by_last_mirror_time and not self.mirror_times.last:
+        if self.config.filter_by_last_mirror_time and not self.mirror_logger.mirror_times.last:
             msg = 'Cannot filter by last mirror time if no last mirror time available. Will not filter nodes by time.'
             logger.debug(msg)
 
         # Filter by modification time if requested
-        elif self.config.filter_by_last_mirror_time and self.mirror_times.last:
-            filters['mtime'] = {'>=': self.mirror_times.last.astimezone()}
-            import ipdb; ipdb.set_trace()
+        elif self.config.filter_by_last_mirror_time and self.mirror_logger.mirror_times.last:
+            filters['mtime'] = {'>=': self.mirror_logger.mirror_times.last.astimezone()}
 
         # Filter out already logged nodes if mirror_logger is available
         # NOTE: Move this outside and make it depend on the passing of the store???
         # if self.mirror_logger and hasattr(self.mirror_logger, orm_key):
         store = getattr(self.mirror_logger, orm_key)
+        # import ipdb; ipdb.set_trace()
         if len(store) > 0:
             filters['uuid'] = {'!in': list(store.entries.keys())}
 
@@ -183,7 +169,6 @@ class MirrorNodeCollector:
                 for node in nodes:
                     if isinstance(node, orm.ProcessNode):
                         descendant_nodes.extend([n for n in node.called_descendants if isinstance(n, orm.WorkflowNode)])
-                # import ipdb; ipdb.set_trace()
                 nodes += descendant_nodes
 
         elif self.config.group_scope == NodeMirrorGroupScope.ANY:

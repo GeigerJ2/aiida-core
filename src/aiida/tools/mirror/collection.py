@@ -32,16 +32,14 @@ from aiida.tools.mirror.utils import safe_delete_dir
 class BaseCollectionMirror(BaseMirror):
     def __init__(
         self,
-        mirror_mode: MirrorMode | None = None,
-        mirror_paths: MirrorPaths | None = None,
-        mirror_times: MirrorTimes | None = None,
-        mirror_logger: MirrorLogger | None = None,
+        mirror_mode: MirrorMode,
+        mirror_paths: MirrorPaths,
+        mirror_logger: MirrorLogger,
         node_collector_config: NodeCollectorConfig | None = None,
     ):
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            mirror_times=mirror_times,
             mirror_logger=mirror_logger,
         )
 
@@ -55,9 +53,8 @@ class BaseCollectionMirror(BaseMirror):
             NodeContainer: The collected node container
         """
         node_collector = MirrorNodeCollector(
-            config=self.node_collector_config,
-            mirror_times=self.mirror_times,
             mirror_logger=self.mirror_logger,
+            config=self.node_collector_config
         )
 
         self.mirror_node_container = node_collector.collect_to_mirror(group=group)
@@ -71,7 +68,6 @@ class BaseCollectionMirror(BaseMirror):
         """
         node_collector = MirrorNodeCollector(
             config=self.node_collector_config,
-            mirror_times=self.mirror_times,
             mirror_logger=self.mirror_logger,
         )
 
