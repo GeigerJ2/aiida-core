@@ -38,15 +38,15 @@ class MirrorLog:
 
     def to_dict(self) -> dict:
         return {
-            "mirror_path": str(self.mirror_path),
-            "mirror_time": self.mirror_time.isoformat(),
+            'mirror_path': str(self.mirror_path),
+            'mirror_time': self.mirror_time.isoformat(),
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "MirrorLog":
+    def from_dict(cls, data: dict) -> 'MirrorLog':
         return cls(
-            mirror_path=Path(data["mirror_path"]),
-            mirror_time=datetime.fromisoformat(data["mirror_time"]),
+            mirror_path=Path(data['mirror_path']),
+            mirror_time=datetime.fromisoformat(data['mirror_time']),
         )
 
 
@@ -94,11 +94,9 @@ class MirrorLogStore:
         return {uuid: entry.to_dict() for uuid, entry in self.entries.items()}
 
     @classmethod
-    def from_dict(cls, data: dict) -> "MirrorLogStore":
+    def from_dict(cls, data: dict) -> 'MirrorLogStore':
         store = cls()
-        store.entries = {
-            uuid: MirrorLog.from_dict(entry) for uuid, entry in data.items()
-        }
+        store.entries = {uuid: MirrorLog.from_dict(entry) for uuid, entry in data.items()}
         return store
 
     def update_paths(self, old_str: str, new_str: str) -> None:
@@ -108,10 +106,10 @@ class MirrorLogStore:
             old_str: The string to be replaced in paths
             new_str: The replacement string
         """
-        if not old_str.startswith("/"):
-            old_str = f"/{old_str}"
-        if not new_str.startswith("/"):
-            new_str = f"/{new_str}"
+        if not old_str.startswith('/'):
+            old_str = f'/{old_str}'
+        if not new_str.startswith('/'):
+            new_str = f'/{new_str}'
         for uuid, entry in self.entries.items():
             # Check if old_str exists in the path
             path_str = str(entry.mirror_path)
@@ -131,12 +129,10 @@ class MirrorLogStoreCollection:
     data: MirrorLogStore
 
 
-
-
 class MirrorLogger:
     """Main Logger class for data mirroring implemented as a Singleton."""
 
-    MIRROR_LOG_FILE: str = ".aiida_mirror_log.json"
+    MIRROR_LOG_FILE: str = '.aiida_mirror_log.json'
 
     # Class variable to store the singleton instance
     _instance = None
@@ -166,7 +162,7 @@ class MirrorLogger:
         data: MirrorLogStore | None = None,
     ) -> None:
         # Only initialize once even if __init__ is called multiple times
-        if not getattr(self, "_initialized", False):
+        if not getattr(self, '_initialized', False):
             self.mirror_paths = mirror_paths
             self.calculations = calculations or MirrorLogStore()
             self.workflows = workflows or MirrorLogStore()
@@ -185,9 +181,7 @@ class MirrorLogger:
     def add_entry(self, store: MirrorLogStore, uuid: str, entry: MirrorLog) -> None:
         store.add_entry(uuid, entry)
 
-    def add_entries(
-        self, store: MirrorLogStore, uuids: list[str], entries: list[MirrorLog]
-    ) -> None:
+    def add_entries(self, store: MirrorLogStore, uuids: list[str], entries: list[MirrorLog]) -> None:
         for uuid, entry in zip(uuids, entries):
             store.add_entry(uuid, entry)
 
@@ -212,23 +206,23 @@ class MirrorLogger:
             serialized = {}
             for uuid, entry in container.entries.items():
                 serialized[uuid] = {
-                    "mirror_path": str(entry.mirror_path),
-                    "mirror_time": entry.mirror_time.isoformat(),
+                    'mirror_path': str(entry.mirror_path),
+                    'mirror_time': entry.mirror_time.isoformat(),
                 }
             return serialized
 
         log_dict = {
-            "calculations": serialize_logs(self.calculations),
-            "workflows": serialize_logs(self.workflows),
-            "groups": serialize_logs(self.groups),
-            "data": serialize_logs(self.data),
+            'calculations': serialize_logs(self.calculations),
+            'workflows': serialize_logs(self.workflows),
+            'groups': serialize_logs(self.groups),
+            'data': serialize_logs(self.data),
         }
 
-        with self.log_file_path.open("w", encoding="utf-8") as f:
+        with self.log_file_path.open('w', encoding='utf-8') as f:
             json.dump(log_dict, f, indent=4)
 
     @classmethod
-    def from_file(cls, mirror_paths: "MirrorPaths") -> "MirrorLogger":
+    def from_file(cls, mirror_paths: 'MirrorPaths') -> 'MirrorLogger':
         """Alternative constructor to load from an existing JSON file."""
         import json
         from datetime import datetime
@@ -240,7 +234,7 @@ class MirrorLogger:
             return instance
 
         try:
-            with instance.log_file_path.open("r", encoding="utf-8") as f:
+            with instance.log_file_path.open('r', encoding='utf-8') as f:
                 data = json.load(f)
 
             def deserialize_logs(category_data: dict) -> MirrorLogStore:
@@ -249,16 +243,16 @@ class MirrorLogger:
                     container.add_entry(
                         uuid,
                         MirrorLog(
-                            mirror_path=Path(entry["mirror_path"]),
-                            mirror_time=datetime.fromisoformat(entry["mirror_time"]),
+                            mirror_path=Path(entry['mirror_path']),
+                            mirror_time=datetime.fromisoformat(entry['mirror_time']),
                         ),
                     )
 
                 return container
 
-            instance.calculations = deserialize_logs(data["calculations"])
-            instance.workflows = deserialize_logs(data["workflows"])
-            instance.groups = deserialize_logs(data["groups"])
+            instance.calculations = deserialize_logs(data['calculations'])
+            instance.workflows = deserialize_logs(data['workflows'])
+            instance.groups = deserialize_logs(data['groups'])
             # instance.data = deserialize_logs(data['data'])
 
         except (json.JSONDecodeError, OSError):
@@ -280,7 +274,7 @@ class MirrorLogger:
             if uuid in store.entries:
                 return store
 
-        msg = f"No corresponding `MirrorLogStore` found for UUID: `{uuid}`."
+        msg = f'No corresponding `MirrorLogStore` found for UUID: `{uuid}`.'
         raise NotExistent(msg)
 
     def get_mirror_path_by_uuid(self, uuid: str) -> Path | None:
@@ -295,7 +289,7 @@ class MirrorLogger:
             mirror_path = current_store.entries[uuid].mirror_path
             return mirror_path
         except KeyError as exc:
-            msg = f"UUID: `{uuid}` not contained in store `{current_store}`."
+            msg = f'UUID: `{uuid}` not contained in store `{current_store}`.'
             raise KeyError(msg) from exc
         except:
             # For debugging
@@ -314,10 +308,10 @@ class MirrorLogger:
             return container.to_dict()
 
         return {
-            "calculations": serialize_logs(self.calculations),
-            "workflows": serialize_logs(self.workflows),
-            "groups": serialize_logs(self.groups),
-            "data": serialize_logs(self.data),
+            'calculations': serialize_logs(self.calculations),
+            'workflows': serialize_logs(self.workflows),
+            'groups': serialize_logs(self.groups),
+            'data': serialize_logs(self.data),
         }
 
     def get_store_by_orm(self, orm_type) -> MirrorLogStore:
@@ -338,13 +332,13 @@ class MirrorLogger:
         """
 
         # Update each store
-        if not old_str.startswith("/"):
-            old_str = f"/{old_str}"
-        if not new_str.startswith("/"):
-            new_str = f"/{new_str}"
+        if not old_str.startswith('/'):
+            old_str = f'/{old_str}'
+        if not new_str.startswith('/'):
+            new_str = f'/{new_str}'
 
-        for store_name in ["calculations", "workflows", "groups", "data"]:
-            if store_name == "calcluations":
+        for store_name in ['calculations', 'workflows', 'groups', 'data']:
+            if store_name == 'calcluations':
                 import ipdb
 
                 ipdb.set_trace()

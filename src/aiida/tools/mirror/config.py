@@ -17,15 +17,15 @@ from pathlib import Path
 from aiida.common import timezone
 
 __all__ = (
-    'NodeMirrorGroupScope',
-    'MirrorMode',
-    'NodeCollectorConfig',
-    'ProcessMirrorConfig',
     'BaseCollectionMirrorConfig',
     'GroupMirrorConfig',
-    'ProfileMirrorConfig',
+    'MirrorMode',
     'MirrorPaths',
-    'MirrorTimes'
+    'MirrorTimes',
+    'NodeCollectorConfig',
+    'NodeMirrorGroupScope',
+    'ProcessMirrorConfig',
+    'ProfileMirrorConfig',
 )
 
 
@@ -39,7 +39,6 @@ class MirrorMode(Enum):
     OVERWRITE = auto()
     INCREMENTAL = auto()
     DRY_RUN = auto()
-
 
 
 @dataclass
@@ -57,6 +56,7 @@ class MirrorTimes:
         Returns the fixed time that was set upon instantiation of the class.
         """
         return self._current
+
 
 # @dataclass
 # class MirrorTimes:

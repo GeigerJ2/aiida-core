@@ -11,9 +11,9 @@
 import pytest
 
 from aiida import orm
+from aiida.tools.mirror.config import MirrorPaths, MirrorTimes, ProfileMirrorConfig
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.profile import ProfileMirror
-from aiida.tools.mirror.config import ProfileMirrorConfig, MirrorPaths, MirrorTimes
 
 
 def test_delete_missing_group_nodes_retained(): ...
@@ -37,10 +37,7 @@ def test_get_groups_to_delete(tmp_path):
         mirror_logger.add_entry(
             store=mirror_logger.stores.groups,
             uuid=group.uuid,
-            entry=MirrorLog(
-                mirror_path=tmp_path / group_label,
-                mirror_time=mirror_times.current
-            ),
+            entry=MirrorLog(mirror_path=tmp_path / group_label, mirror_time=mirror_times.current),
         )
         groups.append(group)
 
@@ -70,10 +67,7 @@ def test_del_missing_groups(tmp_path):
         mirror_logger.add_entry(
             store=mirror_logger.stores.groups,
             uuid=group.uuid,
-            entry=MirrorLog(
-                mirror_path=tmp_path / group_label,
-                mirror_time=mirror_times.current
-            ),
+            entry=MirrorLog(mirror_path=tmp_path / group_label, mirror_time=mirror_times.current),
         )
         groups.append(group)
 

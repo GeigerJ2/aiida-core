@@ -11,13 +11,11 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from aiida import orm
 from aiida.common.exceptions import NotExistent
-from aiida.common import timezone
 from aiida.common.log import AIIDA_LOGGER
 from aiida.common.progress_reporter import (
     get_progress_reporter,
@@ -40,7 +38,7 @@ from aiida.tools.mirror.utils import (
     generate_process_default_mirror_path,
 )
 
-logger = AIIDA_LOGGER.getChild("tools.mirror.group")
+logger = AIIDA_LOGGER.getChild('tools.mirror.group')
 
 # NOTE: `load_mirror_logger` could be put in general Parent cparent class
 # NOTE: Accessing via `group.nodes` might be nice, keep in mind
@@ -122,7 +120,7 @@ class GroupMirror(BaseCollectionMirror):
             return group
 
         else:
-            return orm.Group(label="no-group")
+            return orm.Group(label='no-group')
 
     # staticmethod so I can use it before instantiation of the GroupDumper, as that will need the subpath already
     @staticmethod
@@ -132,18 +130,16 @@ class GroupMirror(BaseCollectionMirror):
             return Path(group.label)
 
         group_entry_point_name = group_entry_point.name
-        if group_entry_point_name == "core":
-            return Path(f"{group.label}")
-        if group_entry_point_name == "core.import":
-            return Path("import") / f"{group.label}"
+        if group_entry_point_name == 'core':
+            return Path(f'{group.label}')
+        if group_entry_point_name == 'core.import':
+            return Path('import') / f'{group.label}'
 
-        group_subpath = Path(*group_entry_point_name.split("."))
+        group_subpath = Path(*group_entry_point_name.split('.'))
 
-        return group_subpath / f"{group.label}"
+        return group_subpath / f'{group.label}'
 
-    def mirror_processes(
-        self, processes: list[orm.CalculationNode] | list[orm.WorkflowNode]
-    ) -> None:
+    def mirror_processes(self, processes: list[orm.CalculationNode] | list[orm.WorkflowNode]) -> None:
         """Dump a list of AiiDA calculations or workflows to disk.
 
         :param processes: List of AiiDA calculations or workflows from the ``ProcessesToMirrorContainer``.
@@ -154,19 +150,14 @@ class GroupMirror(BaseCollectionMirror):
             return
 
         # Setup common resources needed for mirroring
-        process_type_path = (
-            self.mirror_paths.absolute
-            / NodeMirrorKeyMapper.get_key_from_instance(node_inst=processes[0])
+        process_type_path = self.mirror_paths.absolute / NodeMirrorKeyMapper.get_key_from_instance(
+            node_inst=processes[0]
         )
         process_type_path.mkdir(exist_ok=True, parents=True)
 
         # NOTE: This seems a bit hacky. Can probably be improved
-        current_store_type = NodeMirrorKeyMapper.get_key_from_instance(
-            node_inst=next(iter(processes))
-        )
-        other_store_type = (
-            "calculations" if current_store_type == "workflows" else "workflows"
-        )
+        current_store_type = NodeMirrorKeyMapper.get_key_from_instance(node_inst=next(iter(processes)))
+        other_store_type = 'calculations' if current_store_type == 'workflows' else 'workflows'
 
         current_store = getattr(self.mirror_logger.stores, current_store_type)
         other_store = getattr(self.mirror_logger.stores, other_store_type)
@@ -177,9 +168,7 @@ class GroupMirror(BaseCollectionMirror):
         set_progress_bar_tqdm()
 
         # Mirror each process with progress tracking
-        with get_progress_reporter()(
-            desc="Mirroring new processes", total=len(processes)
-        ) as progress:
+        with get_progress_reporter()(desc='Mirroring new processes', total=len(processes)) as progress:
             for process in processes:
                 self._mirror_process(
                     process=process,
@@ -187,9 +176,7 @@ class GroupMirror(BaseCollectionMirror):
                 )
                 progress.update()
 
-    def _create_symlink_from_store(
-        self, process_uuid: str, store_instance: Any, process_mirror_path: Path
-    ) -> bool:
+    def _create_symlink_from_store(self, process_uuid: str, store_instance: Any, process_mirror_path: Path) -> bool:
         """Create a symlink from an existing entry in a store to a new path.
 
         :param process_uuid: The UUID of the process to link
@@ -283,16 +270,14 @@ class GroupMirror(BaseCollectionMirror):
         """Handle mirroring of different process collections."""
 
         # First, mirror calculations and then workflows, as sub-calculations of workflows can be symlinked
-        for process_type in ("calculations", "workflows"):
+        for process_type in ('calculations', 'workflows'):
             processes = getattr(self.mirror_node_container, process_type)
             if len(processes) > 0:
-                msg = f"Mirroring {len(processes)} {process_type}..."
+                msg = f'Mirroring {len(processes)} {process_type}...'
                 logger.report(msg)
                 self.mirror_processes(processes=processes)
             else:
-                msg = (
-                    f"No (new) {process_type} to mirror in group `{self.group.label}`."
-                )
+                msg = f'No (new) {process_type} to mirror in group `{self.group.label}`.'
                 logger.report(msg)
 
     def do_mirror(self, top_level_caller: bool = False) -> None:

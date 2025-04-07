@@ -1174,7 +1174,9 @@ def generate_workchain_node_io():
 
     return _generate_workchain_node_io
 
+
 from aiida import orm
+
 
 @pytest.fixture()
 def setup_no_process_group() -> orm.Group:

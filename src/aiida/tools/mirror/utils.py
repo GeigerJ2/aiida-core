@@ -11,17 +11,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from aiida import load_profile, orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration import Profile
 from aiida.tools.mirror.config import MirrorMode, MirrorPaths
 
-
 if TYPE_CHECKING:
     from aiida.tools.mirror.logger import MirrorLogger
-
 
 
 __all__ = (
@@ -241,34 +239,35 @@ def generate_profile_default_mirror_path(
     return Path(f'{prefix}-{profile.name}-{appendix}')
 
 
-def generate_group_default_mirror_path(group: orm.Group | None, prefix: str = 'group', appendix: str = 'mirror') -> Path:
+def generate_group_default_mirror_path(
+    group: orm.Group | None, prefix: str = 'group', appendix: str = 'mirror'
+) -> Path:
     # TODO: Or, make sure mirror not in the group name?
     if not group:
         label_elements = ['no-group', appendix]
 
-    else:
-        if 'group' in group.label:
-            if appendix == 'group' and prefix != 'group':
-                label_elements = [prefix, group.label]
-            elif prefix == 'group' and appendix != 'group':
-                label_elements = [group.label, appendix]
-            elif prefix == 'group' and appendix == 'group':
-                label_elements = [group.label]
-            else:
-                label_elements = [prefix, group.label, appendix]
-
-        elif 'mirror' in group.label:
-            if appendix == 'mirror' and prefix != 'mirror':
-                label_elements = [prefix, group.label]
-            elif prefix == 'mirror' and appendix != 'mirror':
-                label_elements = [group.label, appendix]
-            elif prefix == 'mirror' and appendix == 'mirror':
-                label_elements = [group.label]
-            else:
-                label_elements = [prefix, group.label, appendix]
-
+    elif 'group' in group.label:
+        if appendix == 'group' and prefix != 'group':
+            label_elements = [prefix, group.label]
+        elif prefix == 'group' and appendix != 'group':
+            label_elements = [group.label, appendix]
+        elif prefix == 'group' and appendix == 'group':
+            label_elements = [group.label]
         else:
             label_elements = [prefix, group.label, appendix]
+
+    elif 'mirror' in group.label:
+        if appendix == 'mirror' and prefix != 'mirror':
+            label_elements = [prefix, group.label]
+        elif prefix == 'mirror' and appendix != 'mirror':
+            label_elements = [group.label, appendix]
+        elif prefix == 'mirror' and appendix == 'mirror':
+            label_elements = [group.label]
+        else:
+            label_elements = [prefix, group.label, appendix]
+
+    else:
+        label_elements = [prefix, group.label, appendix]
 
     return Path('-'.join(label_elements))
 
@@ -326,5 +325,3 @@ def delete_missing_node_dir(mirror_logger: MirrorLogger, to_delete_uuid: str) ->
             current_store.del_entry(uuid=to_delete_uuid)
         except:
             raise
-
-

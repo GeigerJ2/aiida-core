@@ -866,7 +866,7 @@ SYMLINK_CALCS = OverridableOption(
     default=False,
     show_default=True,
     help='Symlink workflow sub-calculations to their own dedicated directories.',
-#   (must be used in conjunction with no-only-top-level-calcs)
+    #   (must be used in conjunction with no-only-top-level-calcs)
 )
 
 # SYMLINK_BETWEEN_GROUPS = OverridableOption(

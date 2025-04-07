@@ -10,12 +10,13 @@
 """Base class for collection mirror."""
 
 from __future__ import annotations
+
+import shutil
 from pathlib import Path
 
 from aiida import orm
 from aiida.tools.mirror.base import BaseMirror
 from aiida.tools.mirror.collector import MirrorNodeCollector
-from aiida.tools.mirror.container import MirrorNodeContainer
 from aiida.tools.mirror.config import (
     MirrorMode,
     MirrorPaths,
@@ -23,10 +24,9 @@ from aiida.tools.mirror.config import (
     NodeCollectorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLogger
+
 # from aiida.tools.mirror.group import GroupMirror
-from aiida.tools.mirror.utils import NodeMirrorKeyMapper, safe_delete_dir
-from dataclasses import fields
-import shutil
+from aiida.tools.mirror.utils import safe_delete_dir
 
 
 class BaseCollectionMirror(BaseMirror):
@@ -172,7 +172,6 @@ class BaseCollectionMirror(BaseMirror):
                 self.mirror_logger.del_entry(store=log_store, uuid=additional_delete_node)
 
     def update_groups(self):
-
         mirror_logger = self.mirror_logger
         old_mirror_logger_dict = self.mirror_logger.to_dict()
 

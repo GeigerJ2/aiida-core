@@ -1264,6 +1264,3 @@ The top-level method for all Mirror classes is `do_mirror` which performs the mi
 
 
 ### More on the logger
-
-
-

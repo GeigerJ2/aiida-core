@@ -18,12 +18,10 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-from datetime import datetime
 from pathlib import Path
 from typing import cast
 
 from aiida import orm
-from aiida.common import timezone
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage import load_profile
 from aiida.manage.configuration.profile import Profile
@@ -42,10 +40,9 @@ from aiida.tools.mirror.group import GroupMirror
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
 from aiida.tools.mirror.utils import (
     generate_profile_default_mirror_path,
-    safe_delete_dir,
 )
 
-logger = AIIDA_LOGGER.getChild("tools.mirror.profile")
+logger = AIIDA_LOGGER.getChild('tools.mirror.profile')
 
 
 class ProfileMirror(BaseCollectionMirror):
@@ -127,13 +124,11 @@ class ProfileMirror(BaseCollectionMirror):
 
         for group in groups:
             if self.config.organize_by_groups:
-                group_subpath = "groups" / GroupMirror.get_group_subpath(group=group)
+                group_subpath = 'groups' / GroupMirror.get_group_subpath(group=group)
             else:
-                group_subpath = Path(".")
+                group_subpath = Path('.')
 
-            mirror_paths_group = MirrorPaths(
-                parent=self.mirror_paths.absolute, child=group_subpath
-            )
+            mirror_paths_group = MirrorPaths(parent=self.mirror_paths.absolute, child=group_subpath)
 
             group_mirror_inst = GroupMirror(
                 group=group,
@@ -145,7 +140,7 @@ class ProfileMirror(BaseCollectionMirror):
                 node_collector_config=self.node_collector_config,
             )
 
-            msg = f"Mirroring processes in group `{group.label}` for profile `{self.profile.name}`..."
+            msg = f'Mirroring processes in group `{group.label}` for profile `{self.profile.name}`...'
             logger.report(msg)
 
             group_mirror_inst.do_mirror()
@@ -162,9 +157,9 @@ class ProfileMirror(BaseCollectionMirror):
         """Mirror the profile's process data not contained in any group."""
 
         if self.config.organize_by_groups:
-            no_group_subpath = Path("no-group")
+            no_group_subpath = Path('no-group')
         else:
-            no_group_subpath = Path(".")
+            no_group_subpath = Path('.')
 
         mirror_paths_no_group = MirrorPaths(
             parent=self.mirror_paths.parent / self.mirror_paths.child,
@@ -185,9 +180,7 @@ class ProfileMirror(BaseCollectionMirror):
             node_collector_config=node_collector_config_no_group,
         )
 
-        msg = (
-            f"Mirroring processes not in any group for profile `{self.profile.name}`..."
-        )
+        msg = f'Mirroring processes not in any group for profile `{self.profile.name}`...'
         logger.report(msg)
         no_group_mirror_inst.do_mirror()
         # TODO: Possibly add entry to logger
@@ -210,9 +203,7 @@ class ProfileMirror(BaseCollectionMirror):
         # Without selecting groups, by default, all profile data should be mirrored
         # Thus, we obtain all groups in the profile here
         else:
-            profile_groups = cast(
-                list[orm.Group], orm.QueryBuilder().append(orm.Group).all(flat=True)
-            )
+            profile_groups = cast(list[orm.Group], orm.QueryBuilder().append(orm.Group).all(flat=True))
             self.mirror_per_group(groups=profile_groups)
 
             if not self.config.only_groups:
