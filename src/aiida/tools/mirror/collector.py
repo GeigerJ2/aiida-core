@@ -90,7 +90,7 @@ class MirrorNodeCollector:
         for orm_type in (orm.CalculationNode, orm.WorkflowNode, orm.Data, orm.Group):
             store_name = NodeMirrorKeyMapper.get_key_from_class(orm_class=orm_type)
             mirror_store = getattr(self.mirror_logger, store_name)
-            dumped_uuids = set(mirror_store.entries.keys())
+            mirrored_uuids = set(mirror_store.entries.keys())
             qb = orm.QueryBuilder()
             # if group:
             #     qb.append(orm.Group, filters={'id': group.id}, tag='group')
@@ -99,9 +99,9 @@ class MirrorNodeCollector:
             qb.append(orm_type, project=['uuid'])
 
             db_uuids = set(qb.all(flat=True))
-            # Ensure that the nodes were _actually_ already dumped in the past
-            db_uuids = set([db_uuid for db_uuid in db_uuids if db_uuid in dumped_uuids])
-            to_delete_uuids = dumped_uuids - db_uuids
+            # Ensure that the nodes were _actually_ already mirrored in the past
+            db_uuids = set([db_uuid for db_uuid in db_uuids if db_uuid in mirrored_uuids])
+            to_delete_uuids = mirrored_uuids - db_uuids
             setattr(delete_node_container, store_name, to_delete_uuids)
 
         return delete_node_container

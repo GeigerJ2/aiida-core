@@ -45,7 +45,7 @@ class TestGroupMirror:
 
     #     assert collection_dumper._should_dump_processes() is True
 
-    def test_mirror_processes(self, ):
+    # def test_mirror_processes(self, ):
     # @pytest.mark.usefixtures('aiida_profile_clean')
     # def test_resolve_collection_nodes(self, setup_add_group, generate_calculation_node_add):
     #     add_group: orm.Group = setup_add_group

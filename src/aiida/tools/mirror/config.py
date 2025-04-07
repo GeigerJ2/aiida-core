@@ -17,15 +17,15 @@ from pathlib import Path
 from aiida.common import timezone
 
 __all__ = (
-    'BaseCollectionMirrorConfig',
-    'GroupMirrorConfig',
-    'MirrorMode',
-    'MirrorPaths',
-    'MirrorTimes',
-    'NodeCollectorConfig',
-    'NodeMirrorGroupScope',
-    'ProcessMirrorConfig',
-    'ProfileMirrorConfig',
+    "BaseCollectionMirrorConfig",
+    "GroupMirrorConfig",
+    "MirrorMode",
+    "MirrorPaths",
+    "MirrorTimes",
+    "NodeCollectorConfig",
+    "NodeMirrorGroupScope",
+    "ProcessMirrorConfig",
+    "ProfileMirrorConfig",
 )
 
 
@@ -39,7 +39,6 @@ class MirrorMode(Enum):
     OVERWRITE = auto()
     INCREMENTAL = auto()
     DRY_RUN = auto()
-
 
 
 @dataclass
@@ -69,7 +68,9 @@ class MirrorTimes:
         try:
             with mirror_paths.log_path.open("r", encoding="utf-8") as f:
                 prev_mirror_data = json.load(f)
-                return cls(last=datetime.fromisoformat(prev_mirror_data['last_mirror_time']))
+                return cls(
+                    last=datetime.fromisoformat(prev_mirror_data["last_mirror_time"])
+                )
         except:
             raise
 
@@ -77,7 +78,7 @@ class MirrorTimes:
 @dataclass
 class MirrorPaths:
     parent: Path = Path.cwd
-    child: Path = Path('aiida-mirror')
+    child: Path = Path("aiida-mirror")
 
     @classmethod
     def from_path(cls, path: Path):
@@ -91,7 +92,7 @@ class MirrorPaths:
     @property
     def safeguard(self) -> Path:
         """Returns the path to a safeguard file."""
-        return self.absolute / '.aiida_mirror_safeguard'
+        return self.absolute / ".aiida_mirror_safeguard"
 
     @property
     def log_path(self) -> Path:
@@ -101,7 +102,7 @@ class MirrorPaths:
         return self.absolute / MirrorLogger.MIRROR_LOG_FILE
 
     # NOTE: Should this return a new instance?
-    def extend_paths(self, subdir: str) -> 'MirrorPaths':
+    def extend_paths(self, subdir: str) -> "MirrorPaths":
         """
         Creates a new MirrorPaths instance with an additional subdirectory.
 

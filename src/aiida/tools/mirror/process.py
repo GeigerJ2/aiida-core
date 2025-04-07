@@ -190,7 +190,7 @@ class ProcessMirror(BaseMirror):
 
         if not process_node.is_sealed and not self.config.mirror_unsealed:
             raise ExportValidationError(
-                f'Process `{process_node.pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True.'
+                f'Process `{process_node.pk}` must be sealed before it can be dumped, or `--mirror-unsealed` set to True.'
             )
 
         # This here is mainly for `include_attributes` and `include_extras`.

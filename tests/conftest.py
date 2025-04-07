@@ -1180,7 +1180,7 @@ from aiida import orm
 
 @pytest.fixture()
 def setup_no_process_group() -> orm.Group:
-    no_process_group, _ = orm.Group.collection.get_or_create(label='no-process')
+    no_process_group, _ = orm.Group.collection.get_or_create(label='no-process-group')
     if no_process_group.is_empty:
         int_node = orm.Int(1).store()
         no_process_group.add_nodes([int_node])
@@ -1190,7 +1190,7 @@ def setup_no_process_group() -> orm.Group:
 # @pytest.mark.usefixtures('aiida_profile_clean')
 @pytest.fixture()
 def setup_add_group(generate_calculation_node_add) -> orm.Group:
-    add_group, _ = orm.Group.collection.get_or_create(label='add')
+    add_group, _ = orm.Group.collection.get_or_create(label='add-group')
     if add_group.is_empty:
         add_node = generate_calculation_node_add()
         add_group.add_nodes([add_node])
@@ -1200,7 +1200,7 @@ def setup_add_group(generate_calculation_node_add) -> orm.Group:
 # @pytest.mark.usefixtures('aiida_profile_clean')
 @pytest.fixture()
 def setup_multiply_add_group(generate_workchain_multiply_add) -> orm.Group:
-    multiply_add_group, _ = orm.Group.collection.get_or_create(label='multiply-add')
+    multiply_add_group, _ = orm.Group.collection.get_or_create(label='multiply-add-group')
     if multiply_add_group.is_empty:
         multiply_add_node = generate_workchain_multiply_add()
         multiply_add_group.add_nodes([multiply_add_node])

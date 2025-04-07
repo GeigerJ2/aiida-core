@@ -6,7 +6,7 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-"""Utility functions for dumping features."""
+"""Utility functions for mirroring features."""
 
 from __future__ import annotations
 
@@ -91,13 +91,13 @@ def prepare_mirror_path(
     safeguard_file: str,
     top_level_caller: bool = False,
 ) -> None:
-    """Create default dumping directory for a given process node and return it as absolute path.
+    """Create default mirroring directory for a given process node and return it as absolute path.
 
-    :param validate_path: Path to validate for dumping.
+    :param validate_path: Path to validate for mirroring.
     :param safeguard_file: Mirroring-specific file that indicates that the directory indeed originated from a `verdi ...
-        dump` command to avoid accidentally deleting wrong directory.
+        mirror` command to avoid accidentally deleting wrong directory.
         Default: `.aiida_node_metadata.yaml`
-    :return: The absolute created dump path.
+    :return: The absolute created mirror path.
     :raises ValueError: If both `overwrite` and `incremental` are set to True.
     :raises FileExistsError: If a file or non-empty directory exists at the given path and none of `overwrite` or
         `incremental` are enabled.
@@ -112,7 +112,7 @@ def prepare_mirror_path(
         raise ValueError(msg)
 
     # Additional logging for top-level directory
-    # Don't want to repeat that for all sub-directories created during dumping
+    # Don't want to repeat that for all sub-directories created during mirroring
     if top_level_caller:
         if mirror_mode == MirrorMode.INCREMENTAL:
             msg = 'Incremental mirroring selected. Will update directory.'
@@ -202,35 +202,35 @@ def _delete_dir_recursive(path):
 
 
 def generate_process_default_mirror_path(
-    process_node: orm.ProcessNode, prefix: str | None = 'dump', append_pk: bool = True
+    process_node: orm.ProcessNode, prefix: str | None = 'mirror', append_pk: bool = True
 ) -> Path:
-    """Simple helper function to generate the default parent-dumping directory if none given.
+    """Simple helper function to generate the default parent-mirroring directory if none given.
 
-    This function is not called for the recursive sub-calls of `_dump_calculation` as it just creates the default
-    parent folder for the dumping, if no name is given.
+    This function is not called for the recursive sub-calls of `_mirror_calculation` as it just creates the default
+    parent folder for the mirroring, if no name is given.
 
     :param process_node: The `ProcessNode` for which the directory is created.
-    :return: The absolute default parent dump path.
+    :return: The absolute default parent mirror path.
     """
 
-    entities_to_dump = []
+    entities_to_mirror = []
 
     # No '' and None
     if prefix is not None:
-        entities_to_dump += [prefix]
+        entities_to_mirror += [prefix]
 
     try:
         if process_node.process_label is not None:
-            entities_to_dump.append(process_node.process_label)
+            entities_to_mirror.append(process_node.process_label)
     except AttributeError:
         # This case came up during testing, not sure how relevant it actually is
         if process_node.process_type is not None:
-            entities_to_dump.append(process_node.process_type)
+            entities_to_mirror.append(process_node.process_type)
 
     if append_pk:
-        entities_to_dump += [str(process_node.pk)]
+        entities_to_mirror += [str(process_node.pk)]
 
-    return Path('-'.join(entities_to_dump))
+    return Path('-'.join(entities_to_mirror))
 
 
 def generate_profile_default_mirror_path(
@@ -281,23 +281,23 @@ def resolve_click_path_for_mirror(
         Profile: generate_profile_default_mirror_path,
     }
 
-    for entity_class, dump_path_generator in _entity_mirror_functions.items():
+    for entity_class, mirror_path_generator in _entity_mirror_functions.items():
         if isinstance(entity, entity_class):
             if path:
                 path = Path(path)
                 if path.is_absolute():
-                    dump_sub_path = Path(path.name)
-                    dump_parent_path = path.parent
+                    mirror_sub_path = Path(path.name)
+                    mirror_parent_path = path.parent
                 else:
-                    dump_sub_path = path
-                    dump_parent_path = Path.cwd()
+                    mirror_sub_path = path
+                    mirror_parent_path = Path.cwd()
             else:
-                dump_sub_path = dump_path_generator(entity)
-                dump_parent_path = Path.cwd()
+                mirror_sub_path = mirror_path_generator(entity)
+                mirror_parent_path = Path.cwd()
 
             return MirrorPaths(
-                parent=dump_parent_path,
-                child=dump_sub_path,
+                parent=mirror_parent_path,
+                child=mirror_sub_path,
             )
 
     supported_types = ', '.join(cls.__name__ for cls in _entity_mirror_functions)

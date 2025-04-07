@@ -30,7 +30,6 @@ from aiida.tools.mirror.config import (
     GroupMirrorConfig,
     MirrorMode,
     MirrorPaths,
-    MirrorTimes,
     NodeCollectorConfig,
     NodeMirrorGroupScope,
     ProcessMirrorConfig,
@@ -283,22 +282,3 @@ class ProfileMirror(BaseCollectionMirror):
 #     msg = 'Renamed group directories and updated the log file.'
 #     echo.echo_success(msg)
 #     # print(relabeled_paths)
-
-
-#####
-
-
-# # TODO: Also move this into a more general method that returns a `NodeContainer`
-# @cached_property
-
-# def delete_processes(self):
-#     # to_mirror_processes = self.processes_to_mirror
-#     to_delete_processes = self.processes_to_delete
-
-#     # print(f'TO_MIRROR_PROCESSES: {to_mirror_processes}')
-#     # print(f'TO_DELETE_PROCESSES: {to_delete_processes}')
-
-#     for to_delete_uuid in to_delete_processes:
-#         delete_missing_node_dir(mirror_logger=self.mirror_logger, to_delete_uuid=to_delete_uuid)
-
-#     # TODO: Add also logging for node/path deletion?
