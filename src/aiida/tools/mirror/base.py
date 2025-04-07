@@ -53,12 +53,41 @@ class BaseMirror:
         # Try to load from file, fall back to new instance on failure
         # NOTE: When in overwrite mode, this file will not exist, so a new instance will be created
         try:
+            # import ipdb; ipdb.set_trace()
             return MirrorLogger.from_file(mirror_paths=self.mirror_paths)
         except (json.JSONDecodeError, OSError):
             return MirrorLogger(mirror_paths=self.mirror_paths)
 
+    # def pre_mirror(self, top_level_caller: bool = False) -> None:
+    #     """_summary_"""
+
+    #     _ = prepare_mirror_path(
+    #         path_to_validate=self.mirror_paths.absolute,
+    #         mirror_mode=self.mirror_mode,
+    #         safeguard_file=self.mirror_paths.safeguard,
+    #         top_level_caller=top_level_caller,
+    #     )
+
+    #     try:
+    #         with self.mirror_paths.safeguard.open('r') as fhandle:
+    #             self.mirror_times.last = datetime.fromisoformat(
+    #                 fhandle.readlines()[-1].strip().split()[-1]
+    #             ).astimezone()
+    #     except (IndexError, FileNotFoundError):
+    #         # Default for `last` is already None
+    #         pass
+
+    # def post_mirror(self) -> None:
+    #     """_summary_"""
+    #     self.mirror_logger.save_log()
+
+    #     # Append the current mirror time to safeguard file
+    #     with self.mirror_paths.safeguard.open('a') as fhandle:
+    #         msg = f'Last mirror time: {self.mirror_times.current.isoformat()}\n'
+    #         fhandle.write(msg)
+
     def pre_mirror(self, top_level_caller: bool = False) -> None:
-        """_summary_"""
+        """Prepare for mirroring operation."""
 
         _ = prepare_mirror_path(
             path_to_validate=self.mirror_paths.absolute,
@@ -67,20 +96,14 @@ class BaseMirror:
             top_level_caller=top_level_caller,
         )
 
-        try:
-            with self.mirror_paths.safeguard.open('r') as fhandle:
-                self.mirror_times.last = datetime.fromisoformat(
-                    fhandle.readlines()[-1].strip().split()[-1]
-                ).astimezone()
-        except (IndexError, FileNotFoundError):
-            # Default for `last` is already None
-            pass
+        # Get the last mirror time from the logger
+        self.mirror_times.last = self.mirror_logger.last_mirror_time
 
     def post_mirror(self) -> None:
-        """_summary_"""
+        """Post-processing after mirroring operation."""
+        
+        # Update the last mirror time in the logger
+        self.mirror_logger.last_mirror_time = self.mirror_times.current
+        
+        # Save the log file with updated information
         self.mirror_logger.save_log()
-
-        # Append the current mirror time to safeguard file
-        with self.mirror_paths.safeguard.open('a') as fhandle:
-            msg = f'Last mirror time: {self.mirror_times.current.isoformat()}\n'
-            fhandle.write(msg)

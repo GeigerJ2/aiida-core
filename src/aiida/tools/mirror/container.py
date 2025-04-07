@@ -113,7 +113,7 @@ class MirrorNodeContainer:
         if node_type:
             attr = NodeMirrorKeyMapper.get_key_from_class(node_type)
         elif len(nodes) > 0:
-            attr = NodeMirrorKeyMapper.get_key_from_class(type(nodes[0]))
+            attr = NodeMirrorKeyMapper.get_key_from_instance(nodes[0])
         else:
             raise ValueError
 

@@ -272,6 +272,7 @@ class GroupMirror(BaseCollectionMirror):
         # First, mirror calculations and then workflows, as sub-calculations of workflows can be symlinked
         for process_type in ('calculations', 'workflows'):
             processes = getattr(self.mirror_node_container, process_type)
+            # import ipdb; ipdb.set_trace()
             if len(processes) > 0:
                 msg = f'Mirroring {len(processes)} {process_type}...'
                 logger.report(msg)

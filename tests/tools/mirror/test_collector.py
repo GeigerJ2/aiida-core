@@ -143,6 +143,6 @@ class TestMirrorNodeCollector:
 
         import ipdb
 
-        ipdb.set_trace()
+        # ipdb.set_trace()
 
         pass

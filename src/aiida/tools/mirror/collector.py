@@ -139,10 +139,10 @@ class MirrorNodeCollector:
     def get_nodes(
         self,
         orm_type: orm.Node,
-        group: 'orm.Group' = None,
+        group: orm.Group = None,
         top_level_only: bool = False,
         filters: dict | None = None,
-    ) -> list['orm.Node']:
+    ) -> list[orm.Node]:
         # Basic filters for the query
         if not filters:
             filters = self._resolve_filters(orm_type)
@@ -180,7 +180,8 @@ class MirrorNodeCollector:
             nodes = self._query_no_group_nodes(orm_type, filters)
 
         else:
-            raise ValueError('Unknown scope: ')
+            msg = 'Unknown scope'
+            raise ValueError(msg)
 
         # Apply top-level filtering if requested
         if top_level_only:
@@ -189,19 +190,19 @@ class MirrorNodeCollector:
         return nodes
 
     def _query_group_nodes(
-        self, orm_class: orm.Node, group: 'orm.Group', filters: Dict[str, Any] = {}
-    ) -> list['orm.Node']:
+        self, orm_class: orm.Node, group: orm.Group, filters: Dict[str, Any] = {}
+    ) -> list[orm.Node]:
         qb = orm.QueryBuilder()
         qb.append(orm.Group, filters={'id': group.id}, tag='group')
         qb.append(orm_class, filters=filters, with_group='group', tag='node')
         return qb.all(flat=True)
 
-    def _query_all_nodes(self, orm_class: orm.Node, filters: Dict[str, Any]) -> list['orm.Node']:
+    def _query_all_nodes(self, orm_class: orm.Node, filters: Dict[str, Any]) -> list[orm.Node]:
         qb = orm.QueryBuilder()
         qb.append(orm_class, filters=filters, tag='node')
         return qb.all(flat=True)
 
-    def _query_no_group_nodes(self, orm_class: orm.Node, filters: Dict[str, Any]) -> list['orm.Node']:
+    def _query_no_group_nodes(self, orm_class: orm.Node, filters: Dict[str, Any]) -> list[orm.Node]:
         # First get all nodes
         all_nodes = self._query_all_nodes(orm_class, filters)
 
@@ -223,7 +224,7 @@ class MirrorNodeCollector:
         # Return only nodes that are not in any group
         return [node for node in all_nodes if node not in all_grouped_nodes]
 
-    def _get_workflow_descendants(self, workflows: list['orm.WorkflowNode']) -> list[orm.Node]:
+    def _get_workflow_descendants(self, workflows: list[orm.WorkflowNode]) -> list[orm.Node]:
         descendants = []
         for workflow in workflows:
             for node in workflow.called_descendants:

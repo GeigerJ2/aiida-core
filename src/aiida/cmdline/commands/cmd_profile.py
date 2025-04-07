@@ -337,11 +337,6 @@ def profile_mirror(
     msg = f'Mirroring data of profile `{profile.name}` at path `{output_path_absolute.name}`.'
     echo.echo_report(msg)
 
-    # The logging of this behavior is taken care of in `prepare_dump_path`
-    # FIXME: Resolve this to
-    # if overwrite and incremental:
-    #     incremental = False
-
     if overwrite:
         mirror_mode = MirrorMode.OVERWRITE
     else:
@@ -350,9 +345,7 @@ def profile_mirror(
     if groups and overwrite:
         msg = (
             'Critical: `-G/--groups` and overwrite selected. The latter option would clean the full profile '
-            'directory. Are you sure you want to do this? This is currently not supported. Please manually '
-            'clean the group subdirectory of your profile mirror, and re-run `verdi profile mirror -G '
-            '<your-group`.'
+            'directory.'
         )
         echo.echo_critical(msg)
 
@@ -393,6 +386,8 @@ def profile_mirror(
         groups=groups,
     )
 
+    # import ipdb; ipdb.set_trace()
+
     # # FIXME: This doesn't respect the -G --groups selection
     # if dry_run:
     #     dry_run_message = (
@@ -405,7 +400,6 @@ def profile_mirror(
 
     try:
         _ = profile_mirror_inst.do_mirror(top_level_caller=True)
-        # _ = group_mirror_inst._generate_readme()
         msg = f'Raw files for profile `{profile.name}` mirrored into folder `{mirror_paths.child}`.'
         echo.echo_success(msg)
     except ExportValidationError as e:
