@@ -38,8 +38,8 @@ def test_get_groups_to_delete(tmp_path):
             store=mirror_logger.stores.groups,
             uuid=group.uuid,
             entry=MirrorLog(
-                path=tmp_path / group_label,
-                time=mirror_times.current()
+                mirror_path=tmp_path / group_label,
+                mirror_time=mirror_times.current
             ),
         )
         groups.append(group)
@@ -71,8 +71,8 @@ def test_del_missing_groups(tmp_path):
             store=mirror_logger.stores.groups,
             uuid=group.uuid,
             entry=MirrorLog(
-                path=tmp_path / group_label,
-                time=mirror_times.current()
+                mirror_path=tmp_path / group_label,
+                mirror_time=mirror_times.current
             ),
         )
         groups.append(group)
@@ -80,7 +80,7 @@ def test_del_missing_groups(tmp_path):
     config = ProfileMirrorConfig(delete_missing=True)
     profile_mirror = ProfileMirror(mirror_paths=mirror_paths, mirror_logger=mirror_logger, config=config)
 
-    path_to_del = group_store.get_entry(uuid=groups[0].uuid).path
+    path_to_del = group_store.get_entry(uuid=groups[0].uuid).mirror_path
 
     # import ipdb; ipdb.set_trace()
     _ = orm.Group.collection.delete(groups[0].pk)

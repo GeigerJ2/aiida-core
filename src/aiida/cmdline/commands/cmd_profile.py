@@ -349,10 +349,11 @@ def profile_mirror(
 
     if groups and overwrite:
         msg = (
-            "`-G/--groups` and overwrite selected. The latter option would clean the full profile directory. "
-            "Are you sure you want to do this? This is currently not supported. Please manually clean the profile "
-            "mirror directory "
-            )
+            "Critical: `-G/--groups` and overwrite selected. The latter option would clean the full profile "
+            "directory. Are you sure you want to do this? This is currently not supported. Please manually "
+            "clean the group subdirectory of your profile mirror, and re-run `verdi profile mirror -G "
+            "<your-group`."
+        )
         echo.echo_critical(msg)
 
     # Create config options that hold the various settings for dumping data

@@ -153,8 +153,8 @@ class ProfileMirror(BaseCollectionMirror):
             group_store.add_entry(
                 uuid=group.uuid,
                 entry=MirrorLog(
-                    path=mirror_paths_group.absolute,
-                    time=self.mirror_times.current(),
+                    mirror_path=mirror_paths_group.absolute,
+                    mirror_time=self.mirror_times.current,
                 ),
             )
 

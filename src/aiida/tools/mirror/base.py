@@ -82,5 +82,5 @@ class BaseMirror:
 
         # Append the current mirror time to safeguard file
         with self.mirror_paths.safeguard.open("a") as fhandle:
-            msg = f"Last mirror time: {self.mirror_times.start.isoformat()}\n"
+            msg = f"Last mirror time: {self.mirror_times.current.isoformat()}\n"
             fhandle.write(msg)

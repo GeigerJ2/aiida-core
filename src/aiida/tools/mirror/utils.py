@@ -315,7 +315,7 @@ def delete_missing_node_dir(mirror_logger: MirrorLogger, to_delete_uuid: str) ->
     # ! Cannot load the node via its UUID here and use the type to get the correct store, as the Node is deleted
     # ! from the DB. Should find a better solution
 
-    path_to_delete = mirror_logger.get_path_by_uuid(uuid=to_delete_uuid)
+    path_to_delete = mirror_logger.get_mirror_path_by_uuid(uuid=to_delete_uuid)
     if path_to_delete is not None:
         try:
             safe_delete_dir(

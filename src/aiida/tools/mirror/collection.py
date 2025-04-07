@@ -116,12 +116,12 @@ class BaseCollectionMirror(BaseMirror):
         # First collect the group labels
         if len(to_delete_groups) > 0:
             for to_delete_group in to_delete_groups:
-                group_label = group_store.get_entry(uuid=to_delete_group).path.name
+                group_label = group_store.get_entry(uuid=to_delete_group).mirror_path.name
                 deleted_groups.append(group_label)
 
         # Then delete the groups
         for to_delete_group in to_delete_groups:
-            path = group_store.get_entry(to_delete_group).path
+            path = group_store.get_entry(to_delete_group).mirror_path
             _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
             self.mirror_logger.del_entry(store=group_store, uuid=to_delete_group)
 
@@ -183,7 +183,7 @@ class BaseCollectionMirror(BaseMirror):
         old_mapping: dict[str, Path] = dict(
             zip(
                 mirrored_group_uuids,
-                [p.path for p in mirror_logger.groups.entries.values()],
+                [p.mirror_path for p in mirror_logger.groups.entries.values()],
             )
         )
 

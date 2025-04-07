@@ -41,20 +41,37 @@ class MirrorMode(Enum):
     DRY_RUN = auto()
 
 
+
 @dataclass
 class MirrorTimes:
     last: datetime | None = None
-    # NOTE: Maybe make this a property/function, in a way that it is always evaluated
-    # NOTE: Then, I don't have the exact same time always everywhere
-    start: datetime | None = field(default_factory=timezone.now)
+    # Fixed time set at instantiation
+    _current: datetime = field(default_factory=timezone.now)
+    # start: datetime | None = field(default_factory=timezone.now)
     range_start: datetime | None = None
     range_end: datetime | None = None
 
+    @property
     def current(self) -> datetime:
         """
-        Returns the current time whenever accessed, ensuring it's always up-to-date.
+        Returns the fixed time that was set upon instantiation of the class.
         """
-        return timezone.now()
+        return self._current
+
+# @dataclass
+# class MirrorTimes:
+#     last: datetime | None = None
+#     # NOTE: Maybe make this a property/function, in a way that it is always evaluated
+#     # NOTE: Then, I don't have the exact same time always everywhere
+#     start: datetime | None = field(default_factory=timezone.now)
+#     range_start: datetime | None = None
+#     range_end: datetime | None = None
+
+#     def current(self) -> datetime:
+#         """
+#         Returns the current time whenever accessed, ensuring it's always up-to-date.
+#         """
+#         return timezone.now()
 
 
 @dataclass

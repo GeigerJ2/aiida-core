@@ -141,7 +141,7 @@ class GroupMirror(BaseCollectionMirror):
 
         return group_subpath / f"{group.label}"
 
-    def _mirror_processes(
+    def mirror_processes(
         self, processes: list[orm.CalculationNode] | list[orm.WorkflowNode]
     ) -> None:
         """Dump a list of AiiDA calculations or workflows to disk.
@@ -276,7 +276,7 @@ class GroupMirror(BaseCollectionMirror):
         # import ipdb; ipdb.set_trace()
         self.current_store.add_entry(
             uuid=process.uuid,
-            entry=MirrorLog(path=process_mirror_path, time=self.mirror_times.current()),
+            entry=MirrorLog(mirror_path=process_mirror_path, mirror_time=self.mirror_times.current),
         )
 
     def _mirror_process_collections(self) -> None:
@@ -288,7 +288,7 @@ class GroupMirror(BaseCollectionMirror):
             if len(processes) > 0:
                 msg = f"Mirroring {len(processes)} {process_type}..."
                 logger.report(msg)
-                self._mirror_processes(processes=processes)
+                self.mirror_processes(processes=processes)
             else:
                 msg = (
                     f"No (new) {process_type} to mirror in group `{self.group.label}`."
@@ -318,9 +318,8 @@ class GroupMirror(BaseCollectionMirror):
             self.mirror_logger.stores.groups.add_entry(
                 uuid=self.group.uuid,
                 entry=MirrorLog(
-                    path=self.mirror_paths.absolute,
-                    time=self.mirror_times.current(),
-                    links=[],
+                    mirror_path=self.mirror_paths.absolute,
+                    mirror_time=self.mirror_times.current,
                 ),
             )
 

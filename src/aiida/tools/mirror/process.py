@@ -257,7 +257,7 @@ class ProcessMirror(BaseMirror):
                 store=workflow_store,
                 uuid=workflow_node.uuid,
                 entry=MirrorLog(
-                    path=output_path.resolve(), time=self.mirror_times.current()
+                    mirror_path=output_path.resolve(), mirror_time=self.mirror_times.current
                 ),
             )
 
@@ -302,7 +302,7 @@ class ProcessMirror(BaseMirror):
                 else:
                     try:
                         os.symlink(
-                            calculation_store.get_entry(child_node.uuid).path,
+                            calculation_store.get_entry(child_node.uuid).mirror_path,
                             child_output_path,
                         )
                     except FileExistsError:
@@ -387,8 +387,8 @@ class ProcessMirror(BaseMirror):
                 calculation_store.add_entry(
                     uuid=calculation_node.uuid,
                     entry=MirrorLog(
-                        path=output_path,
-                        time=self.mirror_times.current(),
+                        mirror_path=output_path,
+                        mirror_time=self.mirror_times.current,
                     ),
                 )
 

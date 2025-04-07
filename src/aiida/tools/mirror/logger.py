@@ -23,6 +23,8 @@ from aiida.tools.mirror.utils import NodeMirrorKeyMapper
 # NOTE: Could use MirrorLogger also as container for orm.Nodes, that should be mirrored
 # NOTE: Should MirrorLogger be not provided (None), or should it rather just be empty with no entries
 # NOTE: Is on `save_log` again the whole history being written to disk? Ideally, this would be incremental
+# NOTE: Shouldn't the logger have the `MirrorTimes` attached to it??
+# NOTE: Problem with general `node_mtime` is that `Group`s don't have an `mtime` attribute
 
 
 @dataclass
@@ -31,23 +33,20 @@ class MirrorLog:
 
     # TODO: Possibly add `node_type` or something similar here
 
-    path: Path
-    time: datetime = field(default_factory=lambda: datetime.now())
-    links: list[Path] = field(default_factory=list)
+    mirror_path: Path
+    mirror_time: datetime
 
     def to_dict(self) -> dict:
         return {
-            'path': str(self.path),
-            'time': self.time.isoformat(),
-            'links': [str(link) for link in self.links],
+            "mirror_path": str(self.mirror_path),
+            "mirror_time": self.mirror_time.isoformat(),
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'MirrorLog':
+    def from_dict(cls, data: dict) -> "MirrorLog":
         return cls(
-            path=Path(data['path']),
-            time=datetime.fromisoformat(data['time']),
-            links=[Path(link) for link in data.get('links', [])],
+            mirror_path=Path(data["mirror_path"]),
+            mirror_time=datetime.fromisoformat(data["mirror_time"]),
         )
 
 
@@ -95,9 +94,11 @@ class MirrorLogStore:
         return {uuid: entry.to_dict() for uuid, entry in self.entries.items()}
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'MirrorLogStore':
+    def from_dict(cls, data: dict) -> "MirrorLogStore":
         store = cls()
-        store.entries = {uuid: MirrorLog.from_dict(entry) for uuid, entry in data.items()}
+        store.entries = {
+            uuid: MirrorLog.from_dict(entry) for uuid, entry in data.items()
+        }
         return store
 
     def update_paths(self, old_str: str, new_str: str) -> None:
@@ -107,27 +108,17 @@ class MirrorLogStore:
             old_str: The string to be replaced in paths
             new_str: The replacement string
         """
-        count = 0
-        if not old_str.startswith('/'):
+        if not old_str.startswith("/"):
             old_str = f"/{old_str}"
-        if not new_str.startswith('/'):
+        if not new_str.startswith("/"):
             new_str = f"/{new_str}"
         for uuid, entry in self.entries.items():
             # Check if old_str exists in the path
-            path_str = str(entry.path)
+            path_str = str(entry.mirror_path)
             if old_str in path_str:
                 # Create a new path with the replaced string
                 new_path = Path(path_str.replace(old_str, new_str))
-                entry.path = new_path
-
-            # Also update any link paths
-            # for i, link_path in enumerate(entry.links):
-            #     link_path_str = str(link_path)
-            #     if old_str in link_path_str:
-            #         entry.links[i] = Path(link_path_str.replace(old_str, new_str))
-            #         count += 1
-
-        return count  # Return number of paths updated
+                entry.mirror_path = new_path
 
 
 @dataclass
@@ -140,18 +131,24 @@ class MirrorLogStoreCollection:
     data: MirrorLogStore
 
 
-# NOTE: Shouldn't the logger have the `MirrorTimes` attached to it??
 
 
 class MirrorLogger:
     """Main Logger class for data mirroring implemented as a Singleton."""
 
-    MIRROR_LOG_FILE: str = '.aiida_mirror_log.json'
+    MIRROR_LOG_FILE: str = ".aiida_mirror_log.json"
 
     # Class variable to store the singleton instance
     _instance = None
 
-    def __new__(cls, mirror_paths=None, calculations=None, workflows=None, groups=None, data=None):
+    def __new__(
+        cls,
+        mirror_paths=None,
+        calculations=None,
+        workflows=None,
+        groups=None,
+        data=None,
+    ):
         """Override __new__ to implement the singleton pattern."""
         if cls._instance is None:
             # Only create a new instance if one doesn't exist
@@ -169,7 +166,7 @@ class MirrorLogger:
         data: MirrorLogStore | None = None,
     ) -> None:
         # Only initialize once even if __init__ is called multiple times
-        if not getattr(self, '_initialized', False):
+        if not getattr(self, "_initialized", False):
             self.mirror_paths = mirror_paths
             self.calculations = calculations or MirrorLogStore()
             self.workflows = workflows or MirrorLogStore()
@@ -181,14 +178,16 @@ class MirrorLogger:
             self.mirror_paths = mirror_paths
 
     @property
-    def log_file_path(self) -> 'Path':
+    def log_file_path(self) -> Path:
         """Get the path to the mirror file."""
-        return self.mirror_paths.parent / self.mirror_paths.child / self.MIRROR_LOG_FILE
+        return self.mirror_paths.logger
 
     def add_entry(self, store: MirrorLogStore, uuid: str, entry: MirrorLog) -> None:
         store.add_entry(uuid, entry)
 
-    def add_entries(self, store: MirrorLogStore, uuids: list[str], entries: list[MirrorLog]) -> None:
+    def add_entries(
+        self, store: MirrorLogStore, uuids: list[str], entries: list[MirrorLog]
+    ) -> None:
         for uuid, entry in zip(uuids, entries):
             store.add_entry(uuid, entry)
 
@@ -196,7 +195,7 @@ class MirrorLogger:
         return store.del_entry(uuid)
 
     @property
-    def stores(self) -> 'MirrorLogStoreCollection':
+    def stores(self) -> MirrorLogStoreCollection:
         """Retrieve the current state of the log as a dataclass."""
         return MirrorLogStoreCollection(
             calculations=self.calculations,
@@ -213,24 +212,23 @@ class MirrorLogger:
             serialized = {}
             for uuid, entry in container.entries.items():
                 serialized[uuid] = {
-                    'path': str(entry.path),
-                    'time': entry.time.isoformat(),
-                    'links': [str(link) for link in entry.links],
+                    "mirror_path": str(entry.mirror_path),
+                    "mirror_time": entry.mirror_time.isoformat(),
                 }
             return serialized
 
         log_dict = {
-            'calculations': serialize_logs(self.calculations),
-            'workflows': serialize_logs(self.workflows),
-            'groups': serialize_logs(self.groups),
-            'data': serialize_logs(self.data),
+            "calculations": serialize_logs(self.calculations),
+            "workflows": serialize_logs(self.workflows),
+            "groups": serialize_logs(self.groups),
+            "data": serialize_logs(self.data),
         }
 
-        with self.log_file_path.open('w', encoding='utf-8') as f:
+        with self.log_file_path.open("w", encoding="utf-8") as f:
             json.dump(log_dict, f, indent=4)
 
     @classmethod
-    def from_file(cls, mirror_paths: 'MirrorPaths') -> 'MirrorLogger':
+    def from_file(cls, mirror_paths: "MirrorPaths") -> "MirrorLogger":
         """Alternative constructor to load from an existing JSON file."""
         import json
         from datetime import datetime
@@ -242,7 +240,7 @@ class MirrorLogger:
             return instance
 
         try:
-            with instance.log_file_path.open('r', encoding='utf-8') as f:
+            with instance.log_file_path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
 
             def deserialize_logs(category_data: dict) -> MirrorLogStore:
@@ -251,17 +249,16 @@ class MirrorLogger:
                     container.add_entry(
                         uuid,
                         MirrorLog(
-                            path=Path(entry['path']),
-                            time=datetime.fromisoformat(entry['time']),
-                            links=[Path(p) for p in entry['links']],
+                            mirror_path=Path(entry["mirror_path"]),
+                            mirror_time=datetime.fromisoformat(entry["mirror_time"]),
                         ),
                     )
 
                 return container
 
-            instance.calculations = deserialize_logs(data['calculations'])
-            instance.workflows = deserialize_logs(data['workflows'])
-            instance.groups = deserialize_logs(data['groups'])
+            instance.calculations = deserialize_logs(data["calculations"])
+            instance.workflows = deserialize_logs(data["workflows"])
+            instance.groups = deserialize_logs(data["groups"])
             # instance.data = deserialize_logs(data['data'])
 
         except (json.JSONDecodeError, OSError):
@@ -283,10 +280,10 @@ class MirrorLogger:
             if uuid in store.entries:
                 return store
 
-        msg = f'No corresponding `MirrorLogStore` found for UUID: `{uuid}`.'
+        msg = f"No corresponding `MirrorLogStore` found for UUID: `{uuid}`."
         raise NotExistent(msg)
 
-    def get_path_by_uuid(self, uuid: str) -> Path | None:
+    def get_mirror_path_by_uuid(self, uuid: str) -> Path | None:
         """Find the store that contains the given UUID."""
         # Iterate over the fields of the MirrorLogStoreCollection dataclass for generality
 
@@ -295,10 +292,10 @@ class MirrorLogger:
         except NotExistent as exc:
             raise NotExistent(exc.args[0]) from exc
         try:
-            path = current_store.entries[uuid].path
-            return path
+            mirror_path = current_store.entries[uuid].mirror_path
+            return mirror_path
         except KeyError as exc:
-            msg = f'UUID: `{uuid}` not contained in store `{current_store}`.'
+            msg = f"UUID: `{uuid}` not contained in store `{current_store}`."
             raise KeyError(msg) from exc
         except:
             # For debugging
@@ -317,10 +314,10 @@ class MirrorLogger:
             return container.to_dict()
 
         return {
-            'calculations': serialize_logs(self.calculations),
-            'workflows': serialize_logs(self.workflows),
-            'groups': serialize_logs(self.groups),
-            'data': serialize_logs(self.data),
+            "calculations": serialize_logs(self.calculations),
+            "workflows": serialize_logs(self.workflows),
+            "groups": serialize_logs(self.groups),
+            "data": serialize_logs(self.data),
         }
 
     def get_store_by_orm(self, orm_type) -> MirrorLogStore:
@@ -341,13 +338,15 @@ class MirrorLogger:
         """
 
         # Update each store
-        if not old_str.startswith('/'):
+        if not old_str.startswith("/"):
             old_str = f"/{old_str}"
-        if not new_str.startswith('/'):
+        if not new_str.startswith("/"):
             new_str = f"/{new_str}"
 
-        for store_name in ['calculations', 'workflows', 'groups', 'data']:
-            if store_name == 'calcluations':
-                import ipdb; ipdb.set_trace()
+        for store_name in ["calculations", "workflows", "groups", "data"]:
+            if store_name == "calcluations":
+                import ipdb
+
+                ipdb.set_trace()
             store: MirrorLogStore = getattr(self, store_name)
             _ = store.update_paths(old_str, new_str)

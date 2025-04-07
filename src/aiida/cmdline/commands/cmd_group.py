@@ -640,7 +640,7 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
 
 
 @verdi_group.command('mirror')
-@arguments.GROUPS()
+@arguments.GROUP()
 @options.PATH()
 # @options.DRY_RUN()
 @options.OVERWRITE()
@@ -659,7 +659,7 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
 @options.INCLUDE_EXTRAS()
 @options.FLAT()
 def group_mirror(
-    groups,
+    group,
     path,
     # dry_run,
     overwrite,
@@ -693,59 +693,58 @@ def group_mirror(
     # FIXME: If nodes not newly created since the last Mirroring, but only added to the group, those are not picked up
     # during the incremental mirroring
 
-    for group in groups:
-        mirror_paths = resolve_click_path_for_mirror(path=path, entity=group)
-        output_path = mirror_paths.parent / mirror_paths.child
+    mirror_paths = resolve_click_path_for_mirror(path=path, entity=group)
+    output_path = mirror_paths.parent / mirror_paths.child
 
-        msg = f'Mirroring data of group `{group.label}` at path `{output_path.name}`.'
-        echo.echo_report(msg)
+    msg = f'Mirroring data of group `{group.label}` at path `{output_path.name}`.'
+    echo.echo_report(msg)
 
-        if overwrite:
-            mirror_mode = MirrorMode.OVERWRITE
-        else:
-            mirror_mode = MirrorMode.INCREMENTAL
+    if overwrite:
+        mirror_mode = MirrorMode.OVERWRITE
+    else:
+        mirror_mode = MirrorMode.INCREMENTAL
 
-        node_collector_config = NodeCollectorConfig(
-            get_processes=mirror_processes,
-            get_data=mirror_data,
-            filter_by_last_mirror_time=filter_by_last_mirror_time,
-            only_top_level_calcs=only_top_level_calcs,
-            only_top_level_workflows=only_top_level_workflows
-        )
+    node_collector_config = NodeCollectorConfig(
+        get_processes=mirror_processes,
+        get_data=mirror_data,
+        filter_by_last_mirror_time=filter_by_last_mirror_time,
+        only_top_level_calcs=only_top_level_calcs,
+        only_top_level_workflows=only_top_level_workflows
+    )
 
-        process_mirror_config = ProcessMirrorConfig(
-            include_inputs=include_inputs,
-            include_outputs=include_outputs,
-            include_attributes=include_attributes,
-            include_extras=include_extras,
-            flat=flat,
-        )
+    process_mirror_config = ProcessMirrorConfig(
+        include_inputs=include_inputs,
+        include_outputs=include_outputs,
+        include_attributes=include_attributes,
+        include_extras=include_extras,
+        flat=flat,
+    )
 
-        group_mirror_config = GroupMirrorConfig(
-            symlink_calcs=symlink_calcs,
-            delete_missing=delete_missing,
-        )
+    group_mirror_config = GroupMirrorConfig(
+        symlink_calcs=symlink_calcs,
+        delete_missing=delete_missing,
+    )
 
-        group_mirror_inst = GroupMirror(
-            group=group,
-            mirror_mode=mirror_mode,
-            mirror_paths=mirror_paths,
-            node_collector_config=node_collector_config,
-            config=group_mirror_config,
-            process_mirror_config=process_mirror_config,
-        )
+    group_mirror_inst = GroupMirror(
+        group=group,
+        mirror_mode=mirror_mode,
+        mirror_paths=mirror_paths,
+        node_collector_config=node_collector_config,
+        config=group_mirror_config,
+        process_mirror_config=process_mirror_config,
+    )
 
-        try:
-            _ = group_mirror_inst.do_mirror(top_level_caller=True)
-            # _ = group_mirror_inst._generate_readme()
-            msg = f'Raw files for group `{group.label}` <{group.pk}> mirrored into folder `{output_path.name}`.'
-            echo.echo_success(msg)
-        except ExportValidationError as e:
-            echo.echo_critical(f'{e!s}')
-        except Exception as e:
-            import traceback
-            msg = f'Unexpected error while mirroring {group.label} <{group.pk}>:\n ({e!s}). \n'
-            echo.echo_critical(msg + traceback.format_exc())
+    try:
+        _ = group_mirror_inst.do_mirror(top_level_caller=True)
+        # _ = group_mirror_inst._generate_readme()
+        msg = f'Raw files for group `{group.label}` <{group.pk}> mirrored into folder `{output_path.name}`.'
+        echo.echo_success(msg)
+    except ExportValidationError as e:
+        echo.echo_critical(f'{e!s}')
+    except Exception as e:
+        import traceback
+        msg = f'Unexpected error while mirroring {group.label} <{group.pk}>:\n ({e!s}). \n'
+        echo.echo_critical(msg + traceback.format_exc())
 
         # TODO: This logic below should be in the `do_mirror` call
         # if delete_missing:
