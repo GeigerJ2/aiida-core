@@ -682,7 +682,7 @@ def group_mirror(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.mirror import GroupMirror
-    from aiida.tools.mirror.config import GroupMirrorConfig, MirrorMode, NodeCollectorConfig, ProcessMirrorConfig
+    from aiida.tools.mirror.config import GroupMirrorConfig, MirrorMode, MirrorCollectorConfig, ProcessMirrorConfig
     from aiida.tools.mirror.utils import resolve_click_path_for_mirror
 
     # FIXME: If nodes not newly created since the last Mirroring, but only added to the group, those are not picked up
@@ -699,7 +699,7 @@ def group_mirror(
     else:
         mirror_mode = MirrorMode.INCREMENTAL
 
-    node_collector_config = NodeCollectorConfig(
+    mirror_collector_config = MirrorCollectorConfig(
         get_processes=mirror_processes,
         get_data=mirror_data,
         filter_by_last_mirror_time=filter_by_last_mirror_time,
@@ -724,13 +724,13 @@ def group_mirror(
         group=group,
         mirror_mode=mirror_mode,
         mirror_paths=mirror_paths,
-        node_collector_config=node_collector_config,
+        mirror_collector_config=mirror_collector_config,
         config=group_mirror_config,
         process_mirror_config=process_mirror_config,
     )
 
     try:
-        _ = group_mirror_inst.do_mirror(top_level_caller=True)
+        _ = group_mirror_inst.mirror(top_level_caller=True)
         # _ = group_mirror_inst._generate_readme()
         msg = f'Raw files for group `{group.label}` <{group.pk}> mirrored into folder `{output_path.name}`.'
         echo.echo_success(msg)
@@ -741,21 +741,3 @@ def group_mirror(
 
         msg = f'Unexpected error while mirroring {group.label} <{group.pk}>:\n ({e!s}). \n'
         echo.echo_critical(msg + traceback.format_exc())
-
-        # TODO: This logic below should be in the `do_mirror` call
-        # if delete_missing:
-        #     if num_processes_to_delete == 0:
-        #         echo.echo_success('No processes to delete.')
-        #     else:
-        #         group_group_mirror.delete_processes()
-        #         echo.echo_success(f'Deleted {num_processes_to_delete} node directories.')
-
-        # if update_groups:
-        #     relabeled_paths = profile_group_mirror.update_groups()
-
-        #     msg = 'Mirrored directories and '
-        #     echo.echo_success(msg)
-        #     print(relabeled_paths)
-
-        # Write the logging json file to disk
-        # mirror_logger.save_log()

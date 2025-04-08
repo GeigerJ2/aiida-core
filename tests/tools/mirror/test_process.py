@@ -53,10 +53,10 @@ def test_mirror(generate_calculation_node_io, generate_workchain_node_io, tmp_pa
 
     # Raises if ProcessNode not sealed
     with pytest.raises(ExportValidationError):
-        return_path = process_mirror_inst.do_mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+        return_path = process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
 
     wc_node.seal()
-    return_path = process_mirror_inst.do_mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+    return_path = process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
 
     assert mirror_parent_path.is_dir()
     assert (mirror_parent_path / 'README.md').is_file()
@@ -117,7 +117,7 @@ def test_mirror_multiply_add(tmp_path, generate_workchain_multiply_add):
     mirror_parent_path = tmp_path / 'wc-mirror-test-multiply-add'
     process_mirror_inst = ProcessMirror()
     wc_node = generate_workchain_multiply_add()
-    process_mirror_inst.do_mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+    process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
 
     arithmetic_add_path = mirror_parent_path / '02-ArithmeticAddCalculation-8'
     multiply_path = mirror_parent_path / '01-multiply-6'
@@ -142,7 +142,7 @@ def test_mirror_multiply_add(tmp_path, generate_workchain_multiply_add):
     mirror_parent_path = tmp_path / 'wc-mirror-test-multiply-add-flat'
     process_mirror_config = ProcessMirrorConfig(flat=True)
     process_mirror_inst = ProcessMirror(config=process_mirror_config)
-    process_mirror_inst.do_mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+    process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
 
     multiply_file = mirror_parent_path / '01-multiply-6' / 'source_file'
     arithmetic_add_files = [

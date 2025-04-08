@@ -169,10 +169,10 @@ class ProcessMirror(BaseMirror):
         return node_label.replace('None-', '')
 
     # TODO: Make the ProcessNode an attribute of the class?
-    def do_mirror(
+    def mirror(
         self,
         io_mirror_paths: list[str | Path] | None = None,
-        top_level_caller: bool = False,
+        top_level_caller: bool = True,
     ) -> None:
         """Mirrors all data involved in a `ProcessNode`, including its outgoing links.
 
@@ -201,7 +201,14 @@ class ProcessMirror(BaseMirror):
         #     setattr(self, key, value)
 
         if top_level_caller:
-            self.pre_mirror(top_level_caller=top_level_caller)
+            _ = prepare_mirror_path(
+                path_to_validate=self.mirror_paths.absolute,
+                mirror_mode=self.mirror_mode,
+                safeguard_file=self.mirror_paths.safeguard,
+                top_level_caller=top_level_caller,
+            )
+
+            self.mirror_logger = self.set_mirror_logger(mirror_logger=self.mirror_logger)
 
         if isinstance(process_node, orm.CalculationNode):
             self._mirror_calculation(
@@ -218,7 +225,7 @@ class ProcessMirror(BaseMirror):
             )
 
         if top_level_caller:
-            self.post_mirror()
+            self.mirror_logger.save_log()
 
     def _mirror_workflow(
         self,
@@ -246,7 +253,7 @@ class ProcessMirror(BaseMirror):
             self.mirror_logger.add_entry(
                 store=workflow_store,
                 uuid=workflow_node.uuid,
-                entry=MirrorLog(mirror_path=output_path.resolve()),
+                entry=MirrorLog(path=output_path.resolve()),
             )
 
         called_links = workflow_node.base.links.get_outgoing(link_type=(LinkType.CALL_CALC, LinkType.CALL_WORK)).all()
@@ -269,7 +276,6 @@ class ProcessMirror(BaseMirror):
             elif isinstance(child_node, orm.CalculationNode):
                 calculation_store = self.mirror_logger.stores.calculations
 
-                # import ipdb; ipdb.set_trace()
                 if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
                     self._mirror_calculation(
                         calculation_node=child_node,
@@ -280,7 +286,7 @@ class ProcessMirror(BaseMirror):
                 else:
                     try:
                         os.symlink(
-                            calculation_store.get_entry(child_node.uuid).mirror_path,
+                            calculation_store.get_entry(child_node.uuid).path,
                             child_output_path,
                         )
                     except FileExistsError:
@@ -344,8 +350,6 @@ class ProcessMirror(BaseMirror):
                 link_triples=output_links,
             )
 
-        # TODO: Add store entry here
-        # import ipdb; ipdb.set_trace()
         if self.mirror_logger is not None:
             calculation_store = self.mirror_logger.stores.calculations
 
@@ -353,7 +357,7 @@ class ProcessMirror(BaseMirror):
                 calculation_store.add_entry(
                     uuid=calculation_node.uuid,
                     entry=MirrorLog(
-                        mirror_path=output_path,
+                        path=output_path,
                     ),
                 )
 

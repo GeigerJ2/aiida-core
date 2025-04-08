@@ -28,18 +28,16 @@ from aiida.manage.configuration.profile import Profile
 from aiida.tools.mirror.collection import BaseCollectionMirror
 from aiida.tools.mirror.config import (
     GroupMirrorConfig,
+    MirrorCollectorConfig,
     MirrorMode,
     MirrorPaths,
-    NodeCollectorConfig,
     NodeMirrorGroupScope,
     ProcessMirrorConfig,
     ProfileMirrorConfig,
 )
 from aiida.tools.mirror.group import GroupMirror
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
-from aiida.tools.mirror.utils import (
-    generate_profile_default_mirror_path,
-)
+from aiida.tools.mirror.utils import generate_profile_default_mirror_path, prepare_mirror_path
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.profile')
 
@@ -53,8 +51,9 @@ class ProfileMirror(BaseCollectionMirror):
         mirror_mode: MirrorMode = MirrorMode.INCREMENTAL,
         mirror_paths: MirrorPaths | None = None,
         mirror_logger: MirrorLogger | None = None,
+        # NOTE: Pass config here or instance
+        mirror_collector_config: MirrorCollectorConfig | None = None,
         config: ProfileMirrorConfig | None = None,
-        node_collector_config: NodeCollectorConfig | None = None,
         process_mirror_config: ProcessMirrorConfig | None = None,
         groups: list[str] | list[orm.Group] | None = None,
     ):
@@ -71,7 +70,6 @@ class ProfileMirror(BaseCollectionMirror):
         # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
         # before instantiation??
         # ! NOTE: THIS IS A HACK
-        # import ipdb; ipdb.set_trace()
         if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
             mirror_paths.log_path.unlink()
 
@@ -79,7 +77,7 @@ class ProfileMirror(BaseCollectionMirror):
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
             mirror_logger=mirror_logger,
-            node_collector_config=node_collector_config,
+            mirror_collector_config=mirror_collector_config,
         )
 
         if not isinstance(profile, Profile):
@@ -134,18 +132,21 @@ class ProfileMirror(BaseCollectionMirror):
                 process_mirror_config=self.process_mirror_config,
                 config=self.group_mirror_config,
                 mirror_logger=self.mirror_logger,
-                node_collector_config=self.node_collector_config,
+                mirror_collector_config=self.mirror_collector_config,
             )
 
             msg = f'Mirroring processes in group `{group.label}` for profile `{self.profile.name}`...'
             logger.report(msg)
 
-            group_mirror_inst.do_mirror()
+            group_mirror_inst.mirror(top_level_caller=False)
+            if mirror_paths_group.absolute.exists():
+                if not mirror_paths_group.safeguard.exists():
+                    mirror_paths_group.safeguard.touch()
 
             group_store.add_entry(
                 uuid=group.uuid,
                 entry=MirrorLog(
-                    mirror_path=mirror_paths_group.absolute,
+                    path=mirror_paths_group.absolute,
                 ),
             )
 
@@ -163,8 +164,8 @@ class ProfileMirror(BaseCollectionMirror):
         )
 
         # See here how to append to the parent and child of MirrorPaths
-        node_collector_config_no_group = copy.deepcopy(self.node_collector_config)
-        node_collector_config_no_group.group_scope = NodeMirrorGroupScope.NO_GROUP
+        mirror_collector_config_no_group = copy.deepcopy(self.mirror_collector_config)
+        mirror_collector_config_no_group.group_scope = NodeMirrorGroupScope.NO_GROUP
 
         no_group_mirror_inst = GroupMirror(
             mirror_paths=mirror_paths_no_group,
@@ -173,22 +174,35 @@ class ProfileMirror(BaseCollectionMirror):
             process_mirror_config=self.process_mirror_config,
             config=self.group_mirror_config,
             mirror_logger=self.mirror_logger,
-            node_collector_config=node_collector_config_no_group,
+            mirror_collector_config=mirror_collector_config_no_group,
         )
 
-        msg = f'Mirroring ungrouped processes for profile `{self.profile.name}`...'
-        logger.report(msg)
-        # import ipdb; ipdb.set_trace()
-        no_group_mirror_inst.do_mirror()
+        no_group_mirror_inst.mirror(top_level_caller=False)
+        if mirror_paths_no_group.absolute.exists():
+            if not mirror_paths_no_group.safeguard.exists():
+                mirror_paths_no_group.safeguard.touch()
 
-    def do_mirror(self, top_level_caller: bool = False):
+    def mirror(self, top_level_caller: bool = True):
         """_summary_
 
         :param
         """
 
+        self.mirror_logger = self.set_mirror_logger(mirror_logger=self.mirror_logger, top_level_caller=True)
+        self.mirror_collector = self.set_mirror_collector()
+
+        if self.config.delete_missing:
+            self.delete()
+            return
+
         if top_level_caller:
-            self.pre_mirror(top_level_caller=top_level_caller)
+            # self.pre_mirror(top_level_caller=top_level_caller)
+            _ = prepare_mirror_path(
+                path_to_validate=self.mirror_paths.absolute,
+                mirror_mode=self.mirror_mode,
+                safeguard_file=self.mirror_paths.safeguard,
+                top_level_caller=top_level_caller,
+            )
 
         if self.config.update_groups:
             self.update_groups()
@@ -206,53 +220,9 @@ class ProfileMirror(BaseCollectionMirror):
             if not self.config.only_groups:
                 self.mirror_not_in_any_group()
 
-        if self.config.delete_missing:
-            self.do_delete()
-
         if top_level_caller:
-            self.post_mirror()
-
-    def do_delete(self) -> None:
-        """Main method to handle deletion of groups and nodes.
-
-        This method orchestrates the deletion process by:
-        1. Deleting group entities first
-        2. Deleting individual marked nodes
-        3. Cleaning up any nodes that were part of deleted groups
-
-        :return: None
-        """
-        _ = self.set_delete_node_container()
-
-        # First, handle groups and collect deleted group labels
-        deleted_groups = self._delete_mirror_groups()
-
-        # Then handle direct node deletions
-        self._delete_mirror_nodes()
-
-        # Finally, clean up nodes that were part of deleted groups
-        if deleted_groups:
-            self._delete_mirror_group_subnodes(deleted_groups)
-
-    # NOTE: Probably the code below is not even necessary, as all stores are handled via `do_delete`
-
-    # def get_groups_to_delete(self) -> list[str]:
-
-    #     if not self.config.delete_missing:
-    #         return []
-
-    #     group_log = self.mirror_logger.stores.groups
-
-    #     # Cannot use QB here because, when node deleted, it's not in the DB anymore
-    #     mirrored_uuids = set(list(group_log.entries.keys()))
-
-    #     profile_uuids = set(
-    #         orm.QueryBuilder().append(orm.Group, project=["uuid"]).all(flat=True)
-    #     )
-
-    #     to_delete_uuids = list(mirrored_uuids - profile_uuids)
-
-    #     return to_delete_uuids
+            self.mirror_logger.save_log()
+            # self.post_mirror()
 
     # def delete_missing_groups(self):
     #     groups_to_delete_uuids = self.get_groups_to_delete()

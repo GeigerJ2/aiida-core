@@ -8,25 +8,34 @@
 ###########################################################################
 
 from __future__ import annotations
+
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
+from typing import Type
 
+from aiida import orm
 from aiida.common import timezone
 
 __all__ = (
-    "BaseCollectionMirrorConfig",
-    "GroupMirrorConfig",
-    "MirrorMode",
-    "MirrorPaths",
-    "MirrorTimes",
-    "NodeCollectorConfig",
-    "NodeMirrorGroupScope",
-    "ProcessMirrorConfig",
-    "ProfileMirrorConfig",
+    'BaseCollectionMirrorConfig',
+    'GroupMirrorConfig',
+    'MirrorMode',
+    'MirrorPaths',
+    'MirrorTimes',
+    'MirrorCollectorConfig',
+    'NodeMirrorGroupScope',
+    'ProcessMirrorConfig',
+    'ProfileMirrorConfig',
 )
+
+
+class MirrorMode(Enum):
+    OVERWRITE = auto()
+    INCREMENTAL = auto()
+    DRY_RUN = auto()
 
 
 class NodeMirrorGroupScope(Enum):
@@ -35,10 +44,54 @@ class NodeMirrorGroupScope(Enum):
     NO_GROUP = auto()
 
 
-class MirrorMode(Enum):
-    OVERWRITE = auto()
-    INCREMENTAL = auto()
-    DRY_RUN = auto()
+class MirrorStoreKeys(str, Enum):
+    CALCULATIONS = 'calculations'
+    WORKFLOWS = 'workflows'
+    GROUPS = 'groups'
+    DATA = 'data'
+
+    @classmethod
+    def from_instance(cls, node_inst: orm.Node) -> str:
+        match node_inst:
+            case orm.CalculationNode():
+                return cls.CALCULATIONS.value
+            case orm.WorkflowNode():
+                return cls.WORKFLOWS.value
+            case orm.Data():
+                return cls.DATA.value
+            case orm.Group():
+                return cls.GROUPS.value
+            case _:
+                msg = f'Mirroring not implemented yet for node type: {type(node_inst)}'
+                raise NotImplementedError(msg)
+
+    @classmethod
+    def from_class(cls, orm_class: Type) -> str:
+        if issubclass(orm_class, orm.CalculationNode):
+            return cls.CALCULATIONS.value
+        elif issubclass(orm_class, orm.WorkflowNode):
+            return cls.WORKFLOWS.value
+        elif issubclass(orm_class, orm.Data):
+            return cls.DATA.value
+        elif issubclass(orm_class, orm.Group):
+            return cls.GROUPS.value
+        else:
+            msg = f'Mirroring not implemented yet for node type: {orm_class}'
+            raise NotImplementedError(msg)
+
+    @classmethod
+    def to_class(cls, key: 'MirrorStoreKeys') -> Type[orm.Node]:
+        mapping = {
+            cls.CALCULATIONS: orm.CalculationNode,
+            cls.WORKFLOWS: orm.WorkflowNode,
+            cls.DATA: orm.Data,
+            cls.GROUPS: orm.Group,
+        }
+        if key in mapping:
+            return mapping[key]
+        else:
+            msg = f'No node type mapping exists for key: {key}'
+            raise ValueError(msg)
 
 
 @dataclass
@@ -64,13 +117,11 @@ class MirrorTimes:
         return self._current
 
     @classmethod
-    def from_file(cls, mirror_paths: "MirrorPaths") -> "MirrorTimes":
+    def from_file(cls, mirror_paths: 'MirrorPaths') -> 'MirrorTimes':
         try:
-            with mirror_paths.log_path.open("r", encoding="utf-8") as f:
+            with mirror_paths.log_path.open('r', encoding='utf-8') as f:
                 prev_mirror_data = json.load(f)
-                return cls(
-                    last=datetime.fromisoformat(prev_mirror_data["last_mirror_time"])
-                )
+                return cls(last=datetime.fromisoformat(prev_mirror_data['last_mirror_time']))
         except:
             raise
 
@@ -78,7 +129,7 @@ class MirrorTimes:
 @dataclass
 class MirrorPaths:
     parent: Path = Path.cwd
-    child: Path = Path("aiida-mirror")
+    child: Path = Path('aiida-mirror')
 
     @classmethod
     def from_path(cls, path: Path):
@@ -92,7 +143,7 @@ class MirrorPaths:
     @property
     def safeguard(self) -> Path:
         """Returns the path to a safeguard file."""
-        return self.absolute / ".aiida_mirror_safeguard"
+        return self.absolute / '.aiida_mirror_safeguard'
 
     @property
     def log_path(self) -> Path:
@@ -102,7 +153,7 @@ class MirrorPaths:
         return self.absolute / MirrorLogger.MIRROR_LOG_FILE
 
     # NOTE: Should this return a new instance?
-    def extend_paths(self, subdir: str) -> "MirrorPaths":
+    def extend_paths(self, subdir: str) -> 'MirrorPaths':
         """
         Creates a new MirrorPaths instance with an additional subdirectory.
 
@@ -116,7 +167,7 @@ class MirrorPaths:
 
 
 @dataclass
-class NodeCollectorConfig:
+class MirrorCollectorConfig:
     """Shared arguments for mirroring of collections of nodes."""
 
     get_processes: bool = True

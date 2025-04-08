@@ -322,7 +322,7 @@ def profile_mirror(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.mirror import ProfileMirror
-    from aiida.tools.mirror.config import MirrorMode, NodeCollectorConfig, ProcessMirrorConfig, ProfileMirrorConfig
+    from aiida.tools.mirror.config import MirrorMode, MirrorCollectorConfig, ProcessMirrorConfig, ProfileMirrorConfig
     from aiida.tools.mirror.utils import resolve_click_path_for_mirror
 
     profile = ctx.obj['profile']
@@ -350,7 +350,7 @@ def profile_mirror(
         echo.echo_critical(msg)
 
     # Create config options that hold the various settings for dumping data
-    node_collector_config = NodeCollectorConfig(
+    mirror_collector_config = MirrorCollectorConfig(
         get_processes=mirror_processes,
         get_data=mirror_data,
         filter_by_last_mirror_time=filter_by_last_mirror_time,
@@ -380,13 +380,12 @@ def profile_mirror(
         profile=profile,
         mirror_mode=mirror_mode,
         mirror_paths=mirror_paths,
-        node_collector_config=node_collector_config,
+        mirror_collector_config=mirror_collector_config,
         process_mirror_config=process_mirror_config,
         config=profile_mirror_config,
         groups=groups,
     )
 
-    # import ipdb; ipdb.set_trace()
 
     # # FIXME: This doesn't respect the -G --groups selection
     # if dry_run:
@@ -399,7 +398,7 @@ def profile_mirror(
     #     return
 
     try:
-        _ = profile_mirror_inst.do_mirror(top_level_caller=True)
+        _ = profile_mirror_inst.mirror()
         msg = f'Raw files for profile `{profile.name}` mirrored into folder `{mirror_paths.child}`.'
         echo.echo_success(msg)
     except ExportValidationError as e:

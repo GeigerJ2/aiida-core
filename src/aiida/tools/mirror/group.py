@@ -24,21 +24,22 @@ from aiida.common.progress_reporter import (
 from aiida.tools.mirror.collection import BaseCollectionMirror
 from aiida.tools.mirror.config import (
     GroupMirrorConfig,
+    MirrorCollectorConfig,
     MirrorMode,
     MirrorPaths,
-    MirrorTimes,
-    NodeCollectorConfig,
     ProcessMirrorConfig,
 )
-from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
+from aiida.tools.mirror.logger import MirrorLog, MirrorLogger, MirrorLogStore
 from aiida.tools.mirror.process import ProcessMirror
+from aiida.tools.mirror.store import MirrorNodeStore
 from aiida.tools.mirror.utils import (
-    NodeMirrorKeyMapper,
     generate_group_default_mirror_path,
     generate_process_default_mirror_path,
+    prepare_mirror_path,
 )
+from aiida.tools.mirror.config import MirrorStoreKeys
 
-logger = AIIDA_LOGGER.getChild("tools.mirror.group")
+logger = AIIDA_LOGGER.getChild('tools.mirror.group')
 
 # NOTE: `load_mirror_logger` could be put in general Parent cparent class
 # NOTE: Accessing via `group.nodes` might be nice, keep in mind
@@ -59,8 +60,8 @@ class GroupMirror(BaseCollectionMirror):
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
         mirror_logger: MirrorLogger | None = None,
-        node_collector_config: NodeCollectorConfig | None = None,
         config: GroupMirrorConfig | None = None,
+        mirror_collector_config: MirrorCollectorConfig | None = None,
         process_mirror_config: ProcessMirrorConfig | None = None,
     ):
         """Initialize the GroupMirror class."""
@@ -77,7 +78,7 @@ class GroupMirror(BaseCollectionMirror):
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
             mirror_logger=mirror_logger,
-            node_collector_config=node_collector_config,
+            mirror_collector_config=mirror_collector_config,
         )
 
         self.group = GroupMirror.load_given_group(group)
@@ -121,64 +122,16 @@ class GroupMirror(BaseCollectionMirror):
             return Path(group.label)
 
         group_entry_point_name = group_entry_point.name
-        if group_entry_point_name == "core":
-            return Path(f"{group.label}")
-        if group_entry_point_name == "core.import":
-            return Path("import") / f"{group.label}"
+        if group_entry_point_name == 'core':
+            return Path(f'{group.label}')
+        if group_entry_point_name == 'core.import':
+            return Path('import') / f'{group.label}'
 
-        group_subpath = Path(*group_entry_point_name.split("."))
+        group_subpath = Path(*group_entry_point_name.split('.'))
 
-        return group_subpath / f"{group.label}"
+        return group_subpath / f'{group.label}'
 
-    def mirror_processes(
-        self, processes: list[orm.CalculationNode] | list[orm.WorkflowNode]
-    ) -> None:
-        """Dump a list of AiiDA calculations or workflows to disk.
-
-        :param processes: List of AiiDA calculations or workflows from the ``ProcessesToMirrorContainer``.
-        """
-        # NOTE: In principle, a node can only be once in a group
-
-        if len(processes) == 0:
-            return
-
-        # Setup common resources needed for mirroring
-        process_type_path = (
-            self.mirror_paths.absolute
-            / NodeMirrorKeyMapper.get_key_from_instance(node_inst=processes[0])
-        )
-        process_type_path.mkdir(exist_ok=True, parents=True)
-
-        # NOTE: This seems a bit hacky. Can probably be improved
-        current_store_type = NodeMirrorKeyMapper.get_key_from_instance(
-            node_inst=next(iter(processes))
-        )
-        other_store_type = (
-            "calculations" if current_store_type == "workflows" else "workflows"
-        )
-
-        current_store = getattr(self.mirror_logger.stores, current_store_type)
-        other_store = getattr(self.mirror_logger.stores, other_store_type)
-        self.current_store = current_store
-        self.other_store = other_store
-        # import ipdb; ipdb.set_trace()
-
-        set_progress_bar_tqdm()
-
-        # Mirror each process with progress tracking
-        with get_progress_reporter()(
-            desc="Mirroring new processes", total=len(processes)
-        ) as progress:
-            for process in processes:
-                self._mirror_process(
-                    process=process,
-                    process_type_path=process_type_path,
-                )
-                progress.update()
-
-    def _create_symlink_from_store(
-        self, process_uuid: str, store_instance: Any, process_mirror_path: Path
-    ) -> bool:
+    def create_symlink_from_store(self, process_uuid: str, store_instance: Any, process_mirror_path: Path) -> bool:
         """Create a symlink from an existing entry in a store to a new path.
 
         :param process_uuid: The UUID of the process to link
@@ -203,7 +156,7 @@ class GroupMirror(BaseCollectionMirror):
 
         return True
 
-    def _mirror_process(
+    def mirror_process(
         self,
         process: orm.CalculationNode | orm.WorkflowNode,
         process_type_path: Path,
@@ -231,15 +184,13 @@ class GroupMirror(BaseCollectionMirror):
             mirror_logger=self.mirror_logger,
         )
 
-        # import ipdb; ipdb.set_trace()
         if not self.config.symlink_calcs:
             # Case: symlink_duplicates is disabled
-            process_mirror_inst.do_mirror()
+            process_mirror_inst.mirror(top_level_caller=False)
 
         else:
             # Try to create symlink from current_store first
-            # import ipdb; ipdb.set_trace()
-            symlinked = self._create_symlink_from_store(
+            symlinked = self.create_symlink_from_store(
                 process_uuid=process.uuid,
                 store_instance=self.current_store,
                 process_mirror_path=process_mirror_path,
@@ -247,8 +198,7 @@ class GroupMirror(BaseCollectionMirror):
 
             # If not found in current_store, try other_store
             if not symlinked:
-                # import ipdb; ipdb.set_trace()
-                symlinked = self._create_symlink_from_store(
+                symlinked = self.create_symlink_from_store(
                     process_uuid=process.uuid,
                     store_instance=self.other_store,
                     process_mirror_path=process_mirror_path,
@@ -256,45 +206,94 @@ class GroupMirror(BaseCollectionMirror):
 
             # If not found in either store, create a new mirror
             if not symlinked:
-                # import ipdb; ipdb.set_trace()
-                process_mirror_inst.do_mirror()
+                process_mirror_inst.mirror(top_level_caller=False)
 
         # This happens regardless of which case was executed
-        # import ipdb; ipdb.set_trace()
-        self.current_store.add_entry(
-            uuid=process.uuid, entry=MirrorLog(mirror_path=process_mirror_path)
-        )
+        self.current_store.add_entry(uuid=process.uuid, entry=MirrorLog(path=process_mirror_path))
 
-    def _mirror_process_collections(self) -> None:
+    def mirror_processes(self, processes: list[orm.CalculationNode] | list[orm.WorkflowNode]) -> None:
+        """Dump a list of AiiDA calculations or workflows to disk.
+
+        :param processes: List of AiiDA calculations or workflows from the ``ProcessesToMirrorContainer``.
+        """
+
+        if len(processes) == 0:
+            return
+
+        # Setup common resources needed for mirroring
+        process_type_path = self.mirror_paths.absolute / MirrorStoreKeys.from_instance(
+            node_inst=processes[0]
+        )
+        process_type_path.mkdir(exist_ok=True, parents=True)
+
+        # NOTE: This seems a bit hacky. Can probably be improved
+        current_store_key = MirrorStoreKeys.from_instance(node_inst=next(iter(processes)))
+        other_store_key = 'calculations' if current_store_key == 'workflows' else 'workflows'
+
+        current_store = self.mirror_logger.get_store_by_key(key=current_store_key)
+        other_store = self.mirror_logger.get_store_by_key(key=other_store_key)
+
+        self.current_store: MirrorLogStore = current_store
+        self.other_store: MirrorLogStore = other_store
+
+        set_progress_bar_tqdm()
+
+        # Mirror each process with progress tracking
+        with get_progress_reporter()(desc='Mirroring new processes', total=len(processes)) as progress:
+            for process in processes:
+                self.mirror_process(
+                    process=process,
+                    process_type_path=process_type_path,
+                )
+                progress.update()
+
+    def process_store_mirror(self, mirror_store: MirrorNodeStore) -> None:
         """Handle mirroring of different process collections."""
 
         # First, mirror calculations and then workflows, as sub-calculations of workflows can be symlinked
-        for process_type in ("calculations", "workflows"):
-            processes = getattr(self.mirror_node_container, process_type)
-            # import ipdb; ipdb.set_trace()
+        for process_type in ('calculations', 'workflows'):
+            processes = getattr(mirror_store, process_type)
             if len(processes) > 0:
-                msg = f"Mirroring {len(processes)} {process_type}..."
+                msg = f'Mirroring {len(processes)} {process_type}...'
                 logger.report(msg)
                 self.mirror_processes(processes=processes)
             else:
                 if self.group:
-                    msg = f"No (new) {process_type} to mirror in group `{self.group.label}`."
+                    msg = f'No (new) {process_type} to mirror in group `{self.group.label}`.'
                 else:
-                    msg = f"No (new) ungrouped {process_type} to mirror."
+                    msg = f'No (new) ungrouped {process_type} to mirror.'
                 logger.report(msg)
 
-    def do_mirror(self, top_level_caller: bool = False) -> None:
+    def mirror(self, top_level_caller: bool = True) -> None:
         """Top-level method that actually performs the mirroring of the AiiDA data for the collection.
 
         :return: None
         """
 
+        self.mirror_logger = self.set_mirror_logger(mirror_logger=self.mirror_logger)
+        self.mirror_collector = self.set_mirror_collector()
+
+        if self.config.delete_missing:
+            self.delete()
+            # Don't write log, as to not update the `last_mirror_time`
+            # If we delete, we don't mirror any other nodes, we _only_ delete
+            return
+
+        # NOTE: The problem here is that I want to set the `mirror_logger` on instantiation, but then I only clean the
+        # previous directory in the `pre_mirror` step
+        # self.pre_mirror(top_level_caller=top_level_caller)
         if top_level_caller:
-            self.pre_mirror(top_level_caller=top_level_caller)
+            # self.pre_mirror(top_level_caller=top_level_caller)
+            _ = prepare_mirror_path(
+                path_to_validate=self.mirror_paths.absolute,
+                mirror_mode=self.mirror_mode,
+                safeguard_file=self.mirror_paths.safeguard,
+                top_level_caller=top_level_caller,
+            )
 
-        _ = self.set_mirror_node_container(group=self.group)
+        mirror_node_store: MirrorNodeStore = self.mirror_collector.collect_to_mirror(group=self.group)
 
-        self._mirror_process_collections()
+        _ = self.process_store_mirror(mirror_store=mirror_node_store)
 
         # FIXME: This is a small hack to only write an entry into the logger for actual groups
         # and not the `no-group` container
@@ -302,62 +301,9 @@ class GroupMirror(BaseCollectionMirror):
             self.mirror_logger.stores.groups.add_entry(
                 uuid=self.group.uuid,
                 entry=MirrorLog(
-                    mirror_path=self.mirror_paths.absolute,
+                    path=self.mirror_paths.absolute,
                 ),
             )
 
-        if self.config.delete_missing:
-            self.do_delete()
-
-        if top_level_caller:  #  and self.group
-            self.post_mirror()
-
-    # for process_type in ('calculations', 'workflows'):
-
-    # @cached_property
-    # def processes_to_delete(self) -> NodeContainer:
-    #     """Get the processes to mirror from the collection of nodes.
-
-    #     Only re-evaluates the processes, if not already set.
-
-    #     :return: Instance of a ``ProcessesToMirrorContainer``, that holds the selected calculations and workflows.
-    #     """
-    #     if not self.group_mirror_config.delete_missing:
-    #         return NodeContainer(calculations=[], workflows=[])
-    #     return self._get_processes_to_delete()
-
-    # def _get_processes_to_delete(self) -> NodeContainer:
-    #     mirror_logger = self.mirror_logger
-    #     log = mirror_logger.log
-
-    #     # Cannot use QB here because, when node deleted, it's not in the DB anymore
-    #     mirrored_uuids = set(list(log.calculations.entries.keys()) + list(log.workflows.entries.keys()))
-
-    #     # One could possibly filter here since last mirror time, however
-    #     # it is highly likely that the last mirror command with deletion was run a while ago
-    #     # So I cannot filter by last mirror time, but should probably take the whole set
-
-    #     # This should not be needed anymore...
-    #     # if self.group:
-    #     #     qb = orm.QueryBuilder()
-    #     #     qb.append(orm.Group, filters={'uuid': self.group.uuid}, tag='group')
-    #     #     qb.append(orm.ProcessNode, with_group='group', project=['uuid'])
-    #     #     group_nodes = cast(set[str], set(qb.all(flat=True)))
-    #     # else:
-
-    #     assert self.group_nodes is not None
-    #     group_nodes = set(self.group_nodes)
-
-    #     # Don't restrict here to only top-level processes, as all file paths, also for sub-processes are actually
-    #     # created and stored in the log
-    #     # profile_uuids = set([process.uuid for process in profile_processes if process.caller is None])
-    #     to_delete_uuids = list(mirrored_uuids - group_nodes)
-
-    #     # TODO: Return ProcessContainer here -> For this, need to load ORM entities (again...) and
-    #     # categorize by workflow or calculation...
-    #     # Re-use code from _get_processes_to_mirror, move into function
-    #     # to_delete_orms =
-
-    #     return to_delete_uuids
-
-    #     # TODO: Add also logging for node/path deletion?
+        if top_level_caller:
+            self.mirror_logger.save_log()

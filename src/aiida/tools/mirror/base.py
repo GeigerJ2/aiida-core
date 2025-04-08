@@ -12,13 +12,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 
-from aiida.tools.mirror.config import MirrorMode, MirrorPaths, MirrorTimes
+from aiida.tools.mirror.collector import MirrorCollector
+from aiida.tools.mirror.config import MirrorCollectorConfig, MirrorMode, MirrorPaths, MirrorTimes
 from aiida.tools.mirror.logger import MirrorLogger
-from aiida.tools.mirror.utils import (
-    prepare_mirror_path,
-)
 
 
 class BaseMirror:
@@ -27,22 +24,40 @@ class BaseMirror:
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
         mirror_logger: MirrorLogger | None = None,
+        mirror_collector_config: MirrorCollectorConfig | None = None,
     ):
         self.mirror_mode = mirror_mode or MirrorMode.INCREMENTAL
         self.mirror_paths = mirror_paths or MirrorPaths()
-        self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger)
+        self.mirror_logger = mirror_logger
+        self.mirror_collector_config = mirror_collector_config or MirrorCollectorConfig()
 
-    def set_mirror_logger(self, mirror_logger: MirrorLogger | None = None):
+    # ! This shouldn't be here, because the `mirror_collector` only is required for collections of nodes
+    def set_mirror_collector(self):
+        # NOTE: This might not be required, if I always only pass the config object
+        # if mirror_collector is not None:
+        #     return mirror_collector
+
+        mirror_collector = MirrorCollector(
+            mirror_logger=self.mirror_logger,
+            config=self.mirror_collector_config,
+        )
+        return mirror_collector
+
+    def set_mirror_logger(self, mirror_logger: MirrorLogger | None = None, top_level_caller: bool = False):
         """If in loading from file fails, e.g., due to ``overwrite``, create a new instance
 
         :param mirror_logger: Optional existing logger instance to use
         :return: The appropriate MirrorLogger instance
         """
 
+        # FIXME: Rather than having the `top_level_caller` argument everywhere, do this as part of the `mirror` operation
+        # of the derived classes, rather than here in the base class
+
         # If in OVERWRITE mode, create a new instance
         # ! NOTE: This breaks the symlinking...
-        # if self.mirror_mode == MirrorMode.OVERWRITE:
-        #     return MirrorLogger(mirror_paths=self.mirror_paths)
+        # import ipdb; ipdb.set_trace()
+        if self.mirror_mode == MirrorMode.OVERWRITE and top_level_caller:
+            return MirrorLogger(mirror_paths=self.mirror_paths, mirror_times=MirrorTimes())
 
         # Use provided mirror_logger if one is passed in
         if mirror_logger is not None:
@@ -50,24 +65,8 @@ class BaseMirror:
 
         # Try to load from file, fall back to new instance on failure
         # NOTE: When in overwrite mode, this file will not exist, so a new instance will be created
+        # import ipdb; ipdb.set_trace()
         try:
-            # import ipdb; ipdb.set_trace()
             return MirrorLogger.from_file(mirror_paths=self.mirror_paths)
         except (json.JSONDecodeError, OSError):
             return MirrorLogger(mirror_paths=self.mirror_paths)
-
-    def pre_mirror(self, top_level_caller: bool = False) -> None:
-        """Prepare for mirroring operation."""
-
-        _ = prepare_mirror_path(
-            path_to_validate=self.mirror_paths.absolute,
-            mirror_mode=self.mirror_mode,
-            safeguard_file=self.mirror_paths.safeguard,
-            top_level_caller=top_level_caller,
-        )
-
-    def post_mirror(self) -> None:
-        """Post-processing after mirroring operation."""
-         
-        # Save the log file with updated information
-        self.mirror_logger.save_log()

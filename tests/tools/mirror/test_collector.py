@@ -14,11 +14,11 @@ import pytest
 from aiida import orm
 from aiida.common import timezone
 from aiida.tools.graph.deletions import delete_nodes
-from aiida.tools.mirror.collector import MirrorNodeCollector
+from aiida.tools.mirror.collector import MirrorCollector
 from aiida.tools.mirror.config import (
     MirrorPaths,
     MirrorTimes,
-    NodeCollectorConfig,
+    MirrorCollectorConfig,
     NodeMirrorGroupScope,
 )
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
@@ -44,18 +44,18 @@ class TestMirrorNodeCollector:
         #     _ = mirror_node_collector._resolve_filters(orm_class=orm_class)
 
         # No filter by time applied
-        mirror_node_collector = MirrorNodeCollector(
+        mirror_node_collector = MirrorCollector(
             mirror_logger=mirror_logger,
-            config=NodeCollectorConfig(filter_by_last_mirror_time=False),
+            config=MirrorCollectorConfig(filter_by_last_mirror_time=False),
             mirror_times=mirror_times,
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm_class)
         assert filters == {}
 
         # Filter by time applied
-        mirror_node_collector = MirrorNodeCollector(
+        mirror_node_collector = MirrorCollector(
             mirror_logger=mirror_logger,
-            config=NodeCollectorConfig(),
+            config=MirrorCollectorConfig(),
             mirror_times=mirror_times,
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
@@ -65,7 +65,7 @@ class TestMirrorNodeCollector:
         calc.store()
         mirror_logger.stores.calculations.add_entry(
             uuid=calc.uuid,
-            entry=MirrorLog(mirror_path=tmp_path / 'calc'),
+            entry=MirrorLog(path=tmp_path / 'calc'),
         )
 
         # WorkflowNode shouldn't appear in calculation store and filters
@@ -73,26 +73,25 @@ class TestMirrorNodeCollector:
         wf.store()
         mirror_logger.stores.workflows.add_entry(
             uuid=wf.uuid,
-            entry=MirrorLog(mirror_path=tmp_path / 'wf'),
+            entry=MirrorLog(path=tmp_path / 'wf'),
         )
 
-        mirror_node_collector = MirrorNodeCollector(
+        mirror_node_collector = MirrorCollector(
             mirror_logger=mirror_logger,
-            config=NodeCollectorConfig(filter_by_last_mirror_time=False),
+            config=MirrorCollectorConfig(filter_by_last_mirror_time=False),
             mirror_times=mirror_times,
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
         assert filters == {'uuid': {'!in': [calc.uuid]}}
 
-        mirror_node_collector = MirrorNodeCollector(
-            mirror_logger=mirror_logger, config=NodeCollectorConfig(), mirror_times=mirror_times
+        mirror_node_collector = MirrorCollector(
+            mirror_logger=mirror_logger, config=MirrorCollectorConfig(), mirror_times=mirror_times
         )
         filters = mirror_node_collector._resolve_filters(orm_class=orm.CalculationNode)
         assert filters == {'mtime': {'>=': mirror_times.last}, 'uuid': {'!in': [calc.uuid]}}
 
         # import ipdb
 
-        # ipdb.set_trace()
 
         # include_processes: bool = True
         # include_data: bool = False
@@ -117,13 +116,13 @@ class TestMirrorNodeCollector:
             mirror_logger.add_entries(
                 store,
                 uuids=[c.uuid for c in processes],
-                entries=[MirrorLog(mirror_path=(tmp_path / f'-{proc.__class__.__name__[:4]}')) for proc in processes],
+                entries=[MirrorLog(path=(tmp_path / f'-{proc.__class__.__name__[:4]}')) for proc in processes],
             )
 
-        node_collector_config = NodeCollectorConfig(group_scope=NodeMirrorGroupScope.NO_GROUP)
+        mirror_collector_config = MirrorCollectorConfig(group_scope=NodeMirrorGroupScope.NO_GROUP)
 
-        mirror_node_collector = MirrorNodeCollector(
-            config=node_collector_config, mirror_logger=empty_mirror_logger, mirror_times=mirror_times
+        mirror_node_collector = MirrorCollector(
+            config=mirror_collector_config, mirror_logger=empty_mirror_logger, mirror_times=mirror_times
         )
 
         mirror_container = mirror_node_collector.collect_to_mirror()
@@ -141,6 +140,5 @@ class TestMirrorNodeCollector:
 
         import ipdb
 
-        # ipdb.set_trace()
 
         pass

@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from aiida import load_profile, orm
 from aiida.common.log import AIIDA_LOGGER
@@ -23,65 +23,22 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    'NodeMirrorKeyMapper',
     'prepare_mirror_path',
     'safe_delete_dir',
+    'generate_process_default_mirror_path',
+    'generate_profile_default_mirror_path',
+    'generate_group_default_mirror_path',
+    'resolve_click_path_for_mirror',
+    'delete_missing_node_dir'
 )
 
 MirrorEntityType = orm.CalculationNode | orm.WorkflowNode | orm.Data
+StoreKeyType = Literal['calculations', 'workflows', 'groups', 'data']
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.utils')
 
-
-# TODO: Properly implement this throughout
-class NodeMirrorKeyMapper:
-    calculation_key: str = 'calculations'
-    workflow_key: str = 'workflows'
-    data_key: str = 'data'
-    group_key: str = 'groups'
-
-    @classmethod
-    def get_key_from_instance(cls, node_inst: orm.Node) -> str:
-        match node_inst:
-            case orm.CalculationNode():
-                return cls.calculation_key
-            case orm.WorkflowNode():
-                return cls.workflow_key
-            case orm.Data():
-                return cls.data_key
-            case orm.Group():
-                return cls.group_key
-            case _:
-                msg = f'Mirroring not implemented yet for node type: {type(node_inst)}'
-                raise NotImplementedError(msg)
-
-    @classmethod
-    def get_key_from_class(cls, orm_class: type) -> str:
-        if issubclass(orm_class, orm.CalculationNode):
-            return cls.calculation_key
-        elif issubclass(orm_class, orm.WorkflowNode):
-            return cls.workflow_key
-        elif issubclass(orm_class, orm.Data):
-            return cls.data_key
-        elif issubclass(orm_class, orm.Group):
-            return cls.group_key
-        else:
-            msg = f'Mirroring not implemented yet for node type: {orm_class}'
-            raise NotImplementedError(msg)
-
-    @classmethod
-    def get_class_from_key(cls, key: str) -> type:
-        if key == cls.calculation_key:
-            return orm.CalculationNode
-        elif key == cls.workflow_key:
-            return orm.WorkflowNode
-        elif key == cls.data_key:
-            return orm.Data
-        elif key == cls.group_key:
-            return orm.Group
-        else:
-            msg = f'No node type mapping exists for key: {key}'
-            raise ValueError(msg)
+from enum import Enum
+from typing import Type
 
 
 # NOTE: Could move to BaseMirror class
@@ -89,7 +46,7 @@ def prepare_mirror_path(
     path_to_validate: Path,
     mirror_mode: MirrorMode,
     safeguard_file: str,
-    top_level_caller: bool = False,
+    top_level_caller: bool = True,
 ) -> None:
     """Create default mirroring directory for a given process node and return it as absolute path.
 
@@ -189,20 +146,20 @@ def _delete_dir_recursive(path):
             except OSError:  # sub-folder is not empty
                 _delete_dir_recursive(f)  # recurse the current sub-folder
             except Exception as exception:  # capture other exception
-                print(f'exception name: {exception.__class__.__name__}')
-                print(f'exception msg: {exception}')
+                msg = (f'exception name: {exception.__class__.__name__}\nexception msg: {exception}')
+                logger.critical(msg)
 
     try:
         path.rmdir()  # time to delete an empty folder
     except NotADirectoryError:
         path.unlink()  # delete folder even if it is a symlink, linux
     except Exception as exception:
-        print(f'exception name: {exception.__class__.__name__}')
-        print(f'exception msg: {exception}')
+        msg = (f'exception name: {exception.__class__.__name__}\nexception msg: {exception}')
+        logger.critical(msg)
 
 
 def generate_process_default_mirror_path(
-    process_node: orm.ProcessNode, prefix: str | None = 'mirror', append_pk: bool = True
+    process_node: orm.ProcessNode, prefix: str | None = None, append_pk: bool = True
 ) -> Path:
     """Simple helper function to generate the default parent-mirroring directory if none given.
 

@@ -32,6 +32,7 @@ from aiida import get_profile
 from aiida.common.folders import Folder
 from aiida.common.links import LinkType
 from aiida.manage.configuration import Profile, get_config, load_profile
+from aiida import orm
 
 if t.TYPE_CHECKING:
     from aiida.manage.configuration.config import Config
@@ -1173,9 +1174,6 @@ def generate_workchain_node_io():
         return wc_node
 
     return _generate_workchain_node_io
-
-
-from aiida import orm
 
 
 @pytest.fixture()

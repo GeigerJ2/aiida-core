@@ -16,17 +16,18 @@ from pathlib import Path
 
 from aiida import orm
 from aiida.tools.mirror.base import BaseMirror
-from aiida.tools.mirror.collector import MirrorNodeCollector
+from aiida.tools.mirror.collector import MirrorCollector
 from aiida.tools.mirror.config import (
+    MirrorCollectorConfig,
     MirrorMode,
     MirrorPaths,
-    MirrorTimes,
-    NodeCollectorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLogger
-
-# from aiida.tools.mirror.group import GroupMirror
+from aiida.tools.mirror.store import MirrorNodeStore
 from aiida.tools.mirror.utils import safe_delete_dir
+from aiida.common.log import AIIDA_LOGGER
+
+logger = AIIDA_LOGGER.getChild('tools.mirror.group')
 
 
 class BaseCollectionMirror(BaseMirror):
@@ -35,7 +36,7 @@ class BaseCollectionMirror(BaseMirror):
         mirror_mode: MirrorMode,
         mirror_paths: MirrorPaths,
         mirror_logger: MirrorLogger,
-        node_collector_config: NodeCollectorConfig | None = None,
+        mirror_collector_config: MirrorCollectorConfig | None = None,
     ):
         super().__init__(
             mirror_mode=mirror_mode,
@@ -43,38 +44,15 @@ class BaseCollectionMirror(BaseMirror):
             mirror_logger=mirror_logger,
         )
 
-        self.node_collector_config = node_collector_config or NodeCollectorConfig()
+        self.mirror_collector_config = mirror_collector_config or MirrorCollectorConfig()
+        # if not mirror_collector_config:
+        #     mirror_collector_config = MirrorCollectorConfig()
 
-    def set_mirror_node_container(self, group: orm.Group | None = None) -> None:
-        """
-        Returns a NodeContainer by collecting nodes using the NodeDumpCollector.
-
-        Returns:
-            NodeContainer: The collected node container
-        """
-        node_collector = MirrorNodeCollector(
-            mirror_logger=self.mirror_logger,
-            config=self.node_collector_config
-        )
-
-        self.mirror_node_container = node_collector.collect_to_mirror(group=group)
-
-    def set_delete_node_container(self) -> None:
-        """
-        Returns a NodeContainer by collecting nodes using the NodeDumpCollector.
-
-        Returns:
-            NodeContainer: The collected node container
-        """
-        node_collector = MirrorNodeCollector(
-            config=self.node_collector_config,
-            mirror_logger=self.mirror_logger,
-        )
-
-        self.delete_node_container = node_collector.collect_to_delete()
+        # self.mirror_collector_config = mirror_collector_config
+        # self.mirror_collector = MirrorCollector(mirror_logger=self.mirror_logger, config=self.mirror_collector_config)
 
     # Implement this here, as for the deletion, we don't care about the group
-    def do_delete(self) -> None:
+    def delete(self) -> None:
         """Main method to handle deletion of groups and nodes.
 
         This method orchestrates the deletion process by:
@@ -84,19 +62,23 @@ class BaseCollectionMirror(BaseMirror):
 
         :return: None
         """
-        _ = self.set_delete_node_container()
+
+        msg = "`--delete-missing` option selected. Will delete missing node directories and log entries."
+        logger.report(msg)
+
+        delete_store: MirrorNodeStore = self.mirror_collector.collect_to_delete()
 
         # First, handle groups and collect deleted group labels
-        deleted_groups = self._delete_mirror_groups()
+        deleted_groups = self.group_store_delete(delete_store=delete_store)
 
         # Then handle direct node deletions
-        self._delete_mirror_nodes()
+        self.process_store_delete(delete_store=delete_store)
 
         # Finally, clean up nodes that were part of deleted groups
         if deleted_groups:
-            self._delete_mirror_group_subnodes(deleted_groups)
+            self.group_store_subnodes_delete(deleted_groups)
 
-    def _delete_mirror_groups(self) -> list:
+    def group_store_delete(self, delete_store: MirrorNodeStore) -> list:
         """Delete groups and return a list of their labels for further processing.
 
         Deletes all groups marked for deletion in the delete_node_container
@@ -105,25 +87,31 @@ class BaseCollectionMirror(BaseMirror):
         :return: Labels of deleted groups
         """
 
-        to_delete_groups = getattr(self.delete_node_container, 'groups')
-        group_store = self.mirror_logger.groups
+        to_delete_groups: list[orm.Group] = getattr(delete_store, 'groups')
+        log_group_store = self.mirror_logger.groups
         deleted_groups = []
 
+        # Early return if no groups in the delete_store
+        if not to_delete_groups:
+            return []
+
         # First collect the group labels
-        if len(to_delete_groups) > 0:
-            for to_delete_group in to_delete_groups:
-                group_label = group_store.get_entry(uuid=to_delete_group).mirror_path.name
-                deleted_groups.append(group_label)
+        for to_delete_group in to_delete_groups:
+            group_label = log_group_store.get_entry(uuid=to_delete_group).path.name
+            deleted_groups.append(group_label)
 
         # Then delete the groups
         for to_delete_group in to_delete_groups:
-            path = group_store.get_entry(to_delete_group).mirror_path
+            path = log_group_store.get_entry(to_delete_group).path
             _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
-            self.mirror_logger.del_entry(store=group_store, uuid=to_delete_group)
+            self.mirror_logger.del_entry(store=log_group_store, uuid=to_delete_group)
+
+        msg = f"Deleted the groups: {deleted_groups}"
+        logger.report(msg)
 
         return deleted_groups
 
-    def _delete_mirror_nodes(self) -> None:
+    def process_store_delete(self, delete_store: MirrorNodeStore) -> None:
         """Delete individual nodes marked for deletion.
 
         Processes workflows, calculations, and data entities that were
@@ -131,8 +119,8 @@ class BaseCollectionMirror(BaseMirror):
 
         :return: None
         """
-        for store_name in ('workflows', 'calculations', 'data'):
-            to_delete_uuids = getattr(self.delete_node_container, store_name)
+        for store_name in ('workflows', 'calculations'):  # , 'data'):
+            to_delete_uuids = getattr(delete_store, store_name)
             log_store = getattr(self.mirror_logger, store_name)
 
             for to_delete_uuid in to_delete_uuids:
@@ -140,7 +128,11 @@ class BaseCollectionMirror(BaseMirror):
                 _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
                 self.mirror_logger.del_entry(store=log_store, uuid=to_delete_uuid)
 
-    def _delete_mirror_group_subnodes(self, deleted_groups: list) -> None:
+            msg = f"Deleted {len(to_delete_uuids)} {store_name}"
+            logger.report(msg)
+
+
+    def group_store_subnodes_delete(self, deleted_groups: list[orm.Group]) -> None:
         """Delete nodes that were part of deleted groups but not explicitly marked for deletion.
 
         After groups are deleted, this method cleans up any nodes that belonged
@@ -178,7 +170,7 @@ class BaseCollectionMirror(BaseMirror):
         old_mapping: dict[str, Path] = dict(
             zip(
                 mirrored_group_uuids,
-                [p.mirror_path for p in mirror_logger.groups.entries.values()],
+                [p.path for p in mirror_logger.groups.entries.values()],
             )
         )
 

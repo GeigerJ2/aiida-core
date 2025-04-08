@@ -13,41 +13,47 @@ from typing import Any, Dict
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.config import (
-    NodeCollectorConfig,
+    MirrorStoreKeys,
+    MirrorCollectorConfig,
     NodeMirrorGroupScope,
 )
-from aiida.tools.mirror.container import MirrorNodeContainer
+from aiida.tools.mirror.store import MirrorNodeStore
 from aiida.tools.mirror.logger import MirrorLogger
-from aiida.tools.mirror.utils import MirrorEntityType, NodeMirrorKeyMapper
+from aiida.tools.mirror.utils import MirrorEntityType
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.collector')
 
 # TODO: Limit to only sealed nodes
 
 
-__all__ = ('MirrorNodeCollector',)
+__all__ = ('MirrorCollector',)
 
 
-class MirrorNodeCollector:
+class MirrorCollector:
     def __init__(
         self,
         mirror_logger: MirrorLogger,
-        config: NodeCollectorConfig | None = None,
+        config: MirrorCollectorConfig | None = None,
     ):
         self.mirror_logger = mirror_logger
-        self.config = config or NodeCollectorConfig()
-        # import ipdb; ipdb.set_trace()
+        self.config = config or MirrorCollectorConfig()
 
-    def collect_to_mirror(self, group: orm.Group | None = None, filters: dict | None = None) -> MirrorNodeContainer:
+    def collect_to_mirror(self, group: orm.Group | None = None, filters: dict | None = None) -> MirrorNodeStore:
         if group:
-            msg = f'Collecting nodes from the database for group `{group.label}`. For the first mirror, this can take a while.'
+            msg = f'Collecting nodes from the database for group `{group.label}`.'
         else:
-            msg = 'Collecting ungrouped nodes from the database. For the first mirror, this can take a while.'
-            
+            msg = 'Collecting ungrouped nodes from the database.'
 
         logger.report(msg)
 
-        container = MirrorNodeContainer()
+        # import traceback
+        # traceback.print_stack()
+        mirror_times = self.mirror_logger.mirror_times
+        if mirror_times is None or (mirror_times is not None and mirror_times.last is None):
+            msg = 'For the first mirror, this can take a while.'
+            logger.report(msg)
+
+        node_store = MirrorNodeStore()
 
         if self.config.get_processes:
             # Get workflow nodes
@@ -57,7 +63,7 @@ class MirrorNodeCollector:
                 top_level_only=self.config.only_top_level_workflows,
                 filters=filters,
             )
-            container.workflows = workflows
+            node_store.workflows = workflows
 
             # Get calculation nodes
             calculations = self.get_nodes(
@@ -73,22 +79,22 @@ class MirrorNodeCollector:
                 # Combine and remove duplicates
                 calculations = list(set(calculations + descendant_calcs))
 
-            container.calculations = calculations
+            node_store.calculations = calculations
 
         if self.config.get_data:
             msg = 'Mirroring of data nodes not implemented yet.'
             raise NotImplementedError(msg)
 
-        self.mirror_container = container
+        # import ipdb; ipdb.set_trace()
 
-        return container
+        return node_store
 
-    def collect_to_delete(self) -> MirrorNodeContainer:
+    def collect_to_delete(self) -> MirrorNodeStore:
         """ """
-        delete_node_container = MirrorNodeContainer()
+        delete_node_container = MirrorNodeStore()
 
         for orm_type in (orm.CalculationNode, orm.WorkflowNode, orm.Data, orm.Group):
-            store_name = NodeMirrorKeyMapper.get_key_from_class(orm_class=orm_type)
+            store_name = MirrorStoreKeys.from_class(orm_class=orm_type)
             mirror_store = getattr(self.mirror_logger, store_name)
             mirrored_uuids = set(mirror_store.entries.keys())
             qb = orm.QueryBuilder()
@@ -108,7 +114,7 @@ class MirrorNodeCollector:
 
     def _resolve_filters(self, orm_class: MirrorEntityType) -> Dict[str, Any]:
         filters = {}
-        orm_key = NodeMirrorKeyMapper.get_key_from_class(orm_class=orm_class)
+        orm_key = MirrorStoreKeys.from_class(orm_class=orm_class)
 
         # This might be too annoying to log always, and raising here would require manually setting
         # `filter-by-last-mirror-time` to False for the first mirror
@@ -124,7 +130,6 @@ class MirrorNodeCollector:
         # NOTE: Move this outside and make it depend on the passing of the store???
         # if self.mirror_logger and hasattr(self.mirror_logger, orm_key):
         store = getattr(self.mirror_logger, orm_key)
-        # import ipdb; ipdb.set_trace()
         if len(store) > 0:
             filters['uuid'] = {'!in': list(store.entries.keys())}
 
@@ -138,11 +143,7 @@ class MirrorNodeCollector:
         filters: dict | None = None,
     ) -> list[orm.Node]:
         # Basic filters for the query
-        
-        # if group:
-        #     if group.label == 'multiply-add-group':
-        #         import ipdb; ipdb.set_trace()
-        
+
         if not filters:
             filters = self._resolve_filters(orm_type)
 
@@ -157,10 +158,9 @@ class MirrorNodeCollector:
                 descendant_nodes = []
                 for node in nodes:
                     if isinstance(node, orm.WorkflowNode):
-                        descendant_nodes.extend(
+                        descendant_nodes.add_entries(
                             [n for n in node.called_descendants if isinstance(n, orm.CalculationNode)]
                         )
-                # import ipdb; ipdb.set_trace()
                 nodes += descendant_nodes
 
             # Extend "group" nodes to descendants
@@ -187,9 +187,7 @@ class MirrorNodeCollector:
 
         return nodes
 
-    def _query_group_nodes(
-        self, orm_class: orm.Node, group: orm.Group, filters: Dict[str, Any] = {}
-    ) -> list[orm.Node]:
+    def _query_group_nodes(self, orm_class: orm.Node, group: orm.Group, filters: Dict[str, Any] = {}) -> list[orm.Node]:
         qb = orm.QueryBuilder()
         qb.append(orm.Group, filters={'id': group.id}, tag='group')
         qb.append(orm_class, filters=filters, with_group='group', tag='node')

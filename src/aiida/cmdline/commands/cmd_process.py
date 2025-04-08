@@ -630,7 +630,7 @@ def process_mirror(
     )
 
     try:
-        _ = process_mirror_inst.do_mirror(top_level_caller=True)
+        _ = process_mirror_inst.mirror(top_level_caller=True)
         _ = process_mirror_inst._generate_readme()
         msg = f'Raw files for {process.__class__.__name__} <{process.pk}> mirrored into folder `{output_path.name}`.'
         echo.echo_success(msg)
