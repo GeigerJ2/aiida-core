@@ -45,7 +45,7 @@ from typing import Type
 def prepare_mirror_path(
     path_to_validate: Path,
     mirror_mode: MirrorMode,
-    safeguard_file: str,
+    safeguard_file: str = MirrorPaths.safeguard_filename,
     top_level_caller: bool = True,
 ) -> None:
     """Create default mirroring directory for a given process node and return it as absolute path.

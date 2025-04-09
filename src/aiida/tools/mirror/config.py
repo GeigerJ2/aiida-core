@@ -92,6 +92,7 @@ class MirrorStoreKeys(str, Enum):
             msg = f'No node type mapping exists for key: {key}'
             raise ValueError(msg)
 
+# NOTE: Should this be a singleton?
 @dataclass
 class MirrorTimes:
     _instance = None
@@ -129,6 +130,8 @@ class MirrorPaths:
     parent: Path = Path.cwd
     child: Path = Path('aiida-mirror')
 
+    safeguard_filename = '.aiida_mirror_safeguard'
+
     @classmethod
     def from_path(cls, path: Path):
         return cls(parent=path.parent, child=path.name)
@@ -141,7 +144,7 @@ class MirrorPaths:
     @property
     def safeguard(self) -> Path:
         """Returns the path to a safeguard file."""
-        return self.absolute / '.aiida_mirror_safeguard'
+        return self.absolute / self.safeguard_filename
 
     @property
     def log_path(self) -> Path:

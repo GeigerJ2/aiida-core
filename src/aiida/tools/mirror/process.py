@@ -274,25 +274,32 @@ class ProcessMirror(BaseMirror):
 
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
-                calculation_store = self.mirror_logger.stores.calculations
+                if self.mirror_logger:
+                    calculation_store = self.mirror_logger.stores.calculations
 
-                if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
-                    self._mirror_calculation(
-                        calculation_node=child_node,
-                        output_path=child_output_path,
-                        io_mirror_paths=io_mirror_paths,
-                    )
-
-                else:
-                    try:
-                        os.symlink(
-                            calculation_store.get_entry(child_node.uuid).path,
-                            child_output_path,
+                    if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
+                        self._mirror_calculation(
+                            calculation_node=child_node,
+                            output_path=child_output_path,
+                            io_mirror_paths=io_mirror_paths,
                         )
-                    except FileExistsError:
-                        # For debugging
-                        raise
-                        pass
+
+                    else:
+                        try:
+                            os.symlink(
+                                calculation_store.get_entry(child_node.uuid).path,
+                                child_output_path,
+                            )
+                        except FileExistsError:
+                            # For debugging
+                            raise
+                            pass
+                else:
+                        self._mirror_calculation(
+                            calculation_node=child_node,
+                            output_path=child_output_path,
+                            io_mirror_paths=io_mirror_paths,
+                        )
 
     def _mirror_calculation(
         self,
@@ -317,7 +324,7 @@ class ProcessMirror(BaseMirror):
 
         self._write_node_yaml(process_node=calculation_node, output_path=output_path)
 
-        io_mirror_mapping = self._generate_calculation_io_mapping(io_mirror_paths=io_mirror_paths)
+        io_mirror_mapping = self._generate_calculation_io_mapping(io_mirror_paths=io_mirror_paths, flat=self.config.flat)
 
         # Mirror the repository contents of the node
         calculation_node.base.repository.copy_tree(output_path.resolve() / io_mirror_mapping.repository)
@@ -383,7 +390,8 @@ class ProcessMirror(BaseMirror):
 
             link_triple.node.base.repository.copy_tree(linked_node_path.resolve())
 
-    def _generate_calculation_io_mapping(self, io_mirror_paths: list[str | Path] | None = None) -> SimpleNamespace:
+    @staticmethod
+    def _generate_calculation_io_mapping(io_mirror_paths: list[str | Path] | None = None, flat: bool = False) -> SimpleNamespace:
         """Helper function to generate mapping for entities dumped for each `CalculationNode`.
 
         This is to avoid exposing AiiDA terminology, like `repository` to the user, while keeping track of which
@@ -406,7 +414,7 @@ class ProcessMirror(BaseMirror):
             'node_inputs',
             'node_outputs',
         ]
-        if self.config.flat and io_mirror_paths is None:
+        if flat and io_mirror_paths is None:
             logger.info(
                 'Flat set to True and no `io_mirror_paths`. Mirroring in a flat directory, files might be overwritten.'
             )
@@ -414,14 +422,14 @@ class ProcessMirror(BaseMirror):
 
             return SimpleNamespace(**dict(zip(aiida_entities_to_mirror, empty_calculation_io_mirror_paths)))
 
-        if not self.config.flat and io_mirror_paths is None:
+        if not flat and io_mirror_paths is None:
             logger.info(
                 'Flat set to False but no `io_mirror_paths` provided. '
                 + f'Will use the defaults {default_calculation_io_mirror_paths}.'
             )
             io_mirror_paths = default_calculation_io_mirror_paths
 
-        elif self.config.flat:
+        elif flat:
             logger.info('Flat set to True but `io_mirror_paths` provided. These will be used, but `inputs` not nested.')
         else:
             logger.info(

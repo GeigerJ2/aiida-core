@@ -65,6 +65,7 @@ tree_multiply_add_group = {
 
 # @pytest.mark.usefixtures('aiida_profile_clean_class')
 class TestGroupMirror:
+    pass
     # @pytest.mark.usefixtures('aiida_profile_clean')
     # def test_should_dump_processes(self, setup_no_process_group, setup_add_group):
     #     """"""

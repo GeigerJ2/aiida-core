@@ -15,10 +15,13 @@ from pathlib import Path
 
 import pytest
 
-from aiida.tools.mirror.config import MirrorMode, ProcessMirrorConfig
+from aiida.tools.mirror.config import MirrorMode, ProcessMirrorConfig, MirrorPaths
 from aiida.tools.mirror.process import ProcessMirror
+from .utils import compare_tree
 
 # TODO: Use `compare_tree` function here, as well
+# NOTE: Currently, `_mirror_workflow` requires a ProcessNode argument, but so does the `ProcessMirror` constructor.
+# Only problems with the recursive nature of the function. Fix eventually.
 
 # Non-AiiDA variables
 filename = 'file.txt'
@@ -45,32 +48,73 @@ node_metadata_file = '.aiida_node_metadata.yaml'
 def test_mirror(generate_calculation_node_io, generate_workchain_node_io, tmp_path):
     from aiida.tools.archive.exceptions import ExportValidationError
 
-    mirror_parent_path = tmp_path / 'wc-mirror-test-io'
-    process_mirror_inst = ProcessMirror()
+    tree_ = {
+        'wc-mirror-test-io': [
+            '.aiida_mirror_log.json',
+            '.aiida_mirror_safeguard',
+            '.aiida_node_metadata.yaml',
+            {
+                '01-sub_workflow-8': [
+                    '.aiida_node_metadata.yaml',
+                    {
+                        '01-calculation-9': [
+                            '.aiida_node_metadata.yaml',
+                            {'inputs': ['file.txt']},
+                            {
+                                'node_inputs': [
+                                    {'arraydata': ['default.npy']},
+                                    {'folderdata': [{'relative_path': ['file.txt']}]},
+                                    {'singlefile': ['file.txt']},
+                                ]
+                            },
+                        ]
+                    },
+                    {
+                        '02-calculation-10': [
+                            '.aiida_node_metadata.yaml',
+                            {'inputs': ['file.txt']},
+                            {
+                                'node_inputs': [
+                                    {'arraydata': ['default.npy']},
+                                    {'folderdata': [{'relative_path': ['file.txt']}]},
+                                    {'singlefile': ['file.txt']},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            },
+        ]
+    }
+
+    sub_path = Path('wc-mirror-test-io')
+    mirror_parent_path = tmp_path / sub_path
+    mirror_paths = MirrorPaths.from_path(mirror_parent_path)
     # Don't attach outputs, as it would require storing the calculation_node and then it cannot be used in the workchain
     cj_nodes = [generate_calculation_node_io(attach_outputs=False), generate_calculation_node_io(attach_outputs=False)]
     wc_node = generate_workchain_node_io(cj_nodes=cj_nodes)
+    process_mirror_inst = ProcessMirror(process_node=wc_node, mirror_paths=mirror_paths)
 
     # Raises if ProcessNode not sealed
     with pytest.raises(ExportValidationError):
-        return_path = process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+        _ = process_mirror_inst.mirror()
 
     wc_node.seal()
-    return_path = process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+    process_mirror_inst.mirror_mode = MirrorMode.OVERWRITE
+    _ = process_mirror_inst.mirror()
 
+    compare_tree(expected=tree_, base_path=tmp_path)
     assert mirror_parent_path.is_dir()
-    assert (mirror_parent_path / 'README.md').is_file()
-    assert return_path == mirror_parent_path
 
 
 @pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_workflow(generate_calculation_node_io, generate_workchain_node_io, tmp_path):
     # Need to generate parent path for mirroring, as I don't want the sub-workchains to be mirrored directly into `tmp_path`
     mirror_parent_path = tmp_path / 'wc-workflow_mirror-test-io'
-    process_mirror_inst = ProcessMirror()
     # Don't attach outputs, as it would require storing the calculation_node and then it cannot be used in the workchain
     cj_nodes = [generate_calculation_node_io(attach_outputs=False), generate_calculation_node_io(attach_outputs=False)]
     wc_node = generate_workchain_node_io(cj_nodes=cj_nodes)
+    process_mirror_inst = ProcessMirror(process_node=wc_node, mirror_paths=MirrorPaths.from_path(mirror_parent_path))
     process_mirror_inst._mirror_workflow(workflow_node=wc_node, output_path=mirror_parent_path)
 
     base_path = Path('01-sub_workflow-8/01-calculation-9')
@@ -93,7 +137,7 @@ def test_mirror_workflow(generate_calculation_node_io, generate_workchain_node_i
     # Flat mirroring
     mirror_parent_path = tmp_path / 'wc-mirror-test-io-flat'
     process_mirror_config = ProcessMirrorConfig(flat=True)
-    process_mirror_inst = ProcessMirror(config=process_mirror_config)
+    process_mirror_inst = ProcessMirror(config=process_mirror_config, process_node=wc_node)
     process_mirror_inst._mirror_workflow(workflow_node=wc_node, output_path=mirror_parent_path)
 
     input_path = base_path / 'file.txt'
@@ -115,9 +159,10 @@ def test_mirror_workflow(generate_calculation_node_io, generate_workchain_node_i
 @pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_multiply_add(tmp_path, generate_workchain_multiply_add):
     mirror_parent_path = tmp_path / 'wc-mirror-test-multiply-add'
-    process_mirror_inst = ProcessMirror()
+    mirror_paths = MirrorPaths.from_path(mirror_parent_path)
     wc_node = generate_workchain_multiply_add()
-    process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+    process_mirror_inst = ProcessMirror(mirror_paths=mirror_paths, process_node=wc_node)
+    process_mirror_inst.mirror()
 
     arithmetic_add_path = mirror_parent_path / '02-ArithmeticAddCalculation-8'
     multiply_path = mirror_parent_path / '01-multiply-6'
@@ -140,9 +185,12 @@ def test_mirror_multiply_add(tmp_path, generate_workchain_multiply_add):
 
     # Flat mirroring
     mirror_parent_path = tmp_path / 'wc-mirror-test-multiply-add-flat'
+    mirror_paths_flat = MirrorPaths.from_path(mirror_parent_path)
     process_mirror_config = ProcessMirrorConfig(flat=True)
-    process_mirror_inst = ProcessMirror(config=process_mirror_config)
-    process_mirror_inst.mirror(process_node=wc_node, custom_output_path=mirror_parent_path)
+    process_mirror_inst = ProcessMirror(
+        mirror_paths=mirror_paths_flat, config=process_mirror_config, process_node=wc_node
+    )
+    process_mirror_inst.mirror()
 
     multiply_file = mirror_parent_path / '01-multiply-6' / 'source_file'
     arithmetic_add_files = [
@@ -169,9 +217,12 @@ def test_mirror_calculation_node(tmp_path, generate_calculation_node_io):
 
     # Normal mirroring -> node_inputs and not flat; no paths provided
     mirror_parent_path = tmp_path / 'cj-mirror-test-io'
+    mirror_paths = MirrorPaths.from_path(mirror_parent_path)
     process_mirror_config = ProcessMirrorConfig(include_outputs=True)
-    process_mirror_inst = ProcessMirror(config=process_mirror_config)
     calculation_node = generate_calculation_node_io()
+    process_mirror_inst = ProcessMirror(
+        mirror_paths=mirror_paths, config=process_mirror_config, process_node=calculation_node
+    )
     process_mirror_inst._mirror_calculation(calculation_node=calculation_node, output_path=mirror_parent_path)
 
     assert (mirror_parent_path / inputs_relpath / filename).is_file()
@@ -199,9 +250,12 @@ def test_mirror_calculation_flat(tmp_path, generate_calculation_node_io):
     # Flat mirroring -> no paths provided -> Default paths should not be existent.
     # Internal FolderData structure retained.
     mirror_parent_path = tmp_path / 'cj-mirror-test-custom'
+    mirror_paths = MirrorPaths.from_path(mirror_parent_path)
     process_mirror_config = ProcessMirrorConfig(flat=True)
-    process_mirror_inst = ProcessMirror(config=process_mirror_config)
     calculation_node = generate_calculation_node_io()
+    process_mirror_inst = ProcessMirror(
+        mirror_paths=mirror_paths, process_node=calculation_node, config=process_mirror_config
+    )
     process_mirror_inst._mirror_calculation(calculation_node=calculation_node, output_path=mirror_parent_path)
 
     # Here, the same file will be written by inputs and node_outputs and node_inputs
@@ -218,19 +272,19 @@ def test_mirror_calculation_flat(tmp_path, generate_calculation_node_io):
 def test_mirror_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
     """Tests the Processmirror_inst for the overwrite and incremental option."""
     mirror_parent_path = tmp_path / 'cj-mirror-test-overwrite'
-    base_mirror_config = MirrorMode(overwrite=False, incremental=False)
-    process_mirror_inst = ProcessMirror(base_mirror_config=base_mirror_config)
+    mirror_paths = MirrorPaths.from_path(mirror_parent_path)
+    # base_mirror_config = MirrorMode(overwrite=False, incremental=False)
     calculation_node = generate_calculation_node_io()
     calculation_node.seal()
+    process_mirror_inst = ProcessMirror(mirror_paths=mirror_paths, process_node=calculation_node)
     # Create safeguard file to mock existing mirror directory
     mirror_parent_path.mkdir()
     # we create safeguard file so the mirroring works
-    (mirror_parent_path / '.aiida_node_metadata.yaml').touch()
-    with pytest.raises(FileExistsError):
-        process_mirror_inst._mirror_calculation(calculation_node=calculation_node, output_path=mirror_parent_path)
+    (mirror_parent_path / '.aiida_mirror_safeguard').touch()
     # With overwrite option true no error is raised and the mirroring can run through.
-    base_mirror_config = MirrorMode(overwrite=True, incremental=False)
-    process_mirror_inst = ProcessMirror(base_mirror_config=base_mirror_config)
+    process_mirror_inst = ProcessMirror(
+        mirror_mode=MirrorMode.OVERWRITE, mirror_paths=mirror_paths, process_node=calculation_node
+    )
     process_mirror_inst._mirror_calculation(calculation_node=calculation_node, output_path=mirror_parent_path)
     assert (mirror_parent_path / inputs_relpath / filename).is_file()
 
@@ -238,9 +292,8 @@ def test_mirror_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
 
     # Incremental also does work
     mirror_parent_path.mkdir()
-    (mirror_parent_path / '.aiida_node_metadata.yaml').touch()
-    base_mirror_config = MirrorMode(overwrite=False, incremental=True)
-    process_mirror_inst = ProcessMirror(base_mirror_config=base_mirror_config)
+    (mirror_parent_path / '.aiida_mirror_safeguard').touch()
+    process_mirror_inst = ProcessMirror(mirror_paths=mirror_paths, process_node=calculation_node)
     process_mirror_inst._mirror_calculation(calculation_node=calculation_node, output_path=mirror_parent_path)
     assert (mirror_parent_path / inputs_relpath / filename).is_file()
 
@@ -248,9 +301,10 @@ def test_mirror_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
 # With both inputs and outputs being mirrored is the standard test case above, so only test without inputs here
 def test_mirror_calculation_no_inputs(tmp_path, generate_calculation_node_io):
     mirror_parent_path = tmp_path / 'cj-mirror-test-noinputs'
-    process_mirror_config = ProcessMirrorConfig(include_inputs=False)
-    process_mirror_inst = ProcessMirror(config=process_mirror_config)
+    mirror_paths = MirrorPaths.from_path(mirror_parent_path)
+    config = ProcessMirrorConfig(include_inputs=False)
     calculation_node = generate_calculation_node_io()
+    process_mirror_inst = ProcessMirror(config=config, mirror_paths=mirror_paths, process_node=calculation_node)
     process_mirror_inst._mirror_calculation(calculation_node=calculation_node, output_path=mirror_parent_path)
     assert not (mirror_parent_path / node_inputs_relpath).is_dir()
 
@@ -258,9 +312,10 @@ def test_mirror_calculation_no_inputs(tmp_path, generate_calculation_node_io):
 @pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_calculation_add(tmp_path, generate_calculation_node_add):
     mirror_parent_path = tmp_path / 'cj-mirror-test-add'
+    mirror_paths = MirrorPaths.from_path(mirror_parent_path)
 
-    process_mirror_inst = ProcessMirror()
     calculation_node_add = generate_calculation_node_add()
+    process_mirror_inst = ProcessMirror(mirror_paths=mirror_paths, process_node=calculation_node_add)
     process_mirror_inst._mirror_calculation(calculation_node=calculation_node_add, output_path=mirror_parent_path)
 
     input_files = ['_aiidasubmit.sh', 'aiida.in', '.aiida/job_tmpl.json', '.aiida/calcinfo.json']
@@ -273,14 +328,13 @@ def test_mirror_calculation_add(tmp_path, generate_calculation_node_add):
 
 
 def test_generate_calculation_io_mapping():
-    process_mirror_inst = ProcessMirror()
-    calculation_io_mapping = process_mirror_inst._generate_calculation_io_mapping()
+    calculation_io_mapping = ProcessMirror._generate_calculation_io_mapping()
     assert calculation_io_mapping.repository == 'inputs'
     assert calculation_io_mapping.retrieved == 'outputs'
     assert calculation_io_mapping.inputs == 'node_inputs'
     assert calculation_io_mapping.outputs == 'node_outputs'
 
-    calculation_io_mapping = process_mirror_inst._generate_calculation_io_mapping(io_mirror_paths=custom_mirror_paths)
+    calculation_io_mapping = ProcessMirror._generate_calculation_io_mapping(io_mirror_paths=custom_mirror_paths)
     assert calculation_io_mapping.repository == 'inputs_'
     assert calculation_io_mapping.retrieved == 'outputs_'
     assert calculation_io_mapping.inputs == 'node_inputs_'
@@ -301,11 +355,10 @@ def test_generate_child_node_label(
     # Sort by mtime here, not ctime, as I'm actually creating the CalculationNode first.
     output_triples = sorted(output_triples, key=lambda link_triple: link_triple.node.mtime)
 
-    process_mirror_inst = ProcessMirror()
 
     output_paths = sorted(
         [
-            process_mirror_inst._generate_child_node_label(index, output_node)
+            ProcessMirror._generate_child_node_label(index, output_node)
             for index, output_node in enumerate(output_triples)
         ]
     )
@@ -317,22 +370,26 @@ def test_generate_child_node_label(
     # Sort by ctime here, not mtime, as I'm generating the WorkChain normally
     output_triples = sorted(output_triples, key=lambda link_triple: link_triple.node.ctime)
     output_paths = sorted(
-        [process_mirror_inst._generate_child_node_label(_, output_node) for _, output_node in enumerate(output_triples)]
+        [ProcessMirror._generate_child_node_label(_, output_node) for _, output_node in enumerate(output_triples)]
     )
     print(output_paths)
     assert output_paths == ['00-multiply-12', '01-ArithmeticAddCalculation-14', '02-result-17']
 
 
-def test_mirror_node_yaml(generate_calculation_node_io, tmp_path, generate_workchain_multiply_add):
-    process_mirror_inst = ProcessMirror()
+def test_write_node_yaml(generate_calculation_node_io, tmp_path, generate_workchain_multiply_add):
+    sub_path = 'add'
     cj_node = generate_calculation_node_io(attach_outputs=False)
-    process_mirror_inst._mirror_node_yaml(process_node=cj_node, output_path=tmp_path)
+    process_mirror_inst = ProcessMirror(process_node=cj_node, mirror_paths=MirrorPaths(parent=tmp_path, child=sub_path))
+    process_mirror_inst._write_node_yaml(process_node=cj_node, output_path=tmp_path)
 
     assert (tmp_path / node_metadata_file).is_file()
 
     # Test with multiply_add
+    sub_path = 'multiply-add'
     wc_node = generate_workchain_multiply_add()
-    process_mirror_inst._mirror_node_yaml(process_node=wc_node, output_path=tmp_path)
+    mirror_paths = MirrorPaths(parent=tmp_path, child=sub_path)
+    process_mirror_inst = ProcessMirror(process_node=wc_node, mirror_paths=mirror_paths)
+    process_mirror_inst._write_node_yaml(process_node=wc_node, output_path=tmp_path)
 
     assert (tmp_path / node_metadata_file).is_file()
 
@@ -348,11 +405,11 @@ def test_mirror_node_yaml(generate_calculation_node_io, tmp_path, generate_workc
     assert 'Node attributes:' in contents
     assert 'Node extras:' in contents
 
-    process_mirror_config = ProcessMirrorConfig(include_attributes=False, include_extras=False)
-    process_mirror_inst = ProcessMirror(config=process_mirror_config)
+    config = ProcessMirrorConfig(include_attributes=False, include_extras=False)
+    process_mirror_inst = ProcessMirror(process_node=wc_node, mirror_paths=mirror_paths, config=config)
 
     (tmp_path / node_metadata_file).unlink()
-    process_mirror_inst._mirror_node_yaml(process_node=wc_node, output_path=tmp_path)
+    process_mirror_inst._write_node_yaml(process_node=wc_node, output_path=tmp_path)
 
     # Open the mirrored YAML file and read its contents
     with open(tmp_path / node_metadata_file, 'r') as mirrored_file:
@@ -369,13 +426,15 @@ def test_mirror_node_yaml(generate_calculation_node_io, tmp_path, generate_workc
 
 def test_generate_parent_readme(tmp_path, generate_workchain_multiply_add):
     wc_node = generate_workchain_multiply_add()
-    process_mirror_inst = ProcessMirror()
+    sub_path = 'readme'
+    process_mirror_inst = ProcessMirror(mirror_paths=MirrorPaths(parent=tmp_path, child=sub_path), process_node=wc_node)
 
-    process_mirror_inst._generate_readme(process_node=wc_node, output_path=tmp_path)
+    (tmp_path / sub_path).mkdir(parents=True, exist_ok=True)
+    process_mirror_inst._generate_readme()
 
-    assert (tmp_path / 'README.md').is_file()
+    assert (tmp_path / sub_path / 'README.md').is_file()
 
-    with open(tmp_path / 'README.md', 'r') as mirrored_file:
+    with open(tmp_path / sub_path / 'README.md', 'r') as mirrored_file:
         contents = mirrored_file.read()
 
     assert 'This directory contains' in contents
