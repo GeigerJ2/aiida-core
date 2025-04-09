@@ -113,7 +113,21 @@ class GroupMirror(BaseCollectionMirror):
         else:
             return None
 
-    # staticmethod so I can use it before instantiation of the GroupDumper, as that will need the subpath already
+    @staticmethod
+    def load_given_groups(groups: list[orm.Group | str]) -> list[orm.Group]:
+        """"""
+
+        return_groups: list[orm.Group] = []
+        for group in groups:
+            loaded_group = GroupMirror.load_given_group(group=group)
+            if loaded_group is None:
+                msg = 'Cannot be None'
+                raise ValueError(msg)
+            else:
+                return_groups.append(loaded_group)
+
+        return return_groups
+
     @staticmethod
     def get_group_subpath(group) -> Path:
         group_entry_point = group.entry_point
@@ -236,8 +250,8 @@ class GroupMirror(BaseCollectionMirror):
         )
 
         # Now use the enum members with your get_store_by_key method
-        current_store = self.mirror_logger.get_store_by_key(key=current_store_key.value)
-        other_store = self.mirror_logger.get_store_by_key(key=other_store_key.value)
+        current_store = self.mirror_logger.get_store_by_name(name=current_store_key.value)
+        other_store = self.mirror_logger.get_store_by_name(name=other_store_key.value)
 
         self.current_store: MirrorLogStore = current_store
         self.other_store: MirrorLogStore = other_store

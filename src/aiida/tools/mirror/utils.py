@@ -33,7 +33,7 @@ __all__ = (
 )
 
 MirrorEntityType = Union[orm.CalculationNode, orm.WorkflowNode, orm.Data]
-StoreKeyType = Literal['calculations', 'workflows', 'groups', 'data']
+StoreNameType = Literal['calculations', 'workflows', 'groups', 'data']
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.utils')
 

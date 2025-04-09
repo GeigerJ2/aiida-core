@@ -15,6 +15,7 @@ from typing import Any
 
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.config import MirrorStoreKeys
+from aiida.tools.mirror.utils import StoreNameType
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.collector')
 
@@ -41,10 +42,10 @@ class MirrorNodeStore:
     def stores(self) -> dict:
         """Retrieve the current state of the container as a dataclass."""
         return {
-            'calculations': self.calculations,
-            'workflows': self.workflows,
-            'data': self.data,
-            'groups': self.groups,
+            MirrorStoreKeys.CALCULATIONS.value: self.calculations,
+            MirrorStoreKeys.WORKFLOWS.value: self.workflows,
+            MirrorStoreKeys.DATA.value: self.data,
+            MirrorStoreKeys.GROUPS.value: self.groups,
         }
 
     @property
@@ -106,3 +107,20 @@ class MirrorNodeStore:
 
         attr = MirrorStoreKeys.from_class(node_type)
         return getattr(self, attr)
+
+    def get_store_by_name(self, name: StoreNameType) -> list:
+        """Get the appropriate store based on node_type.
+
+        Args:
+            node_type: The type of nodes (can be a class or a string identifier)
+
+        Returns:
+            The corresponding store list
+        """
+
+        store_names = list(self.stores.keys())
+        if name not in store_names:
+            msg = f'Wrong key <{name}> selected. Choose one of {store_names}.'
+            raise ValueError(msg)
+
+        return getattr(self.stores, name)

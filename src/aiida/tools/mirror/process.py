@@ -289,32 +289,32 @@ class ProcessMirror(BaseMirror):
 
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
-                if self.mirror_logger is not None:
-                    calculation_store = self.mirror_logger.stores.calculations
+                calculation_store = self.mirror_logger.stores.calculations
 
-                    if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
-                        self._mirror_calculation(
-                            calculation_node=child_node,
-                            output_path=child_output_path,
-                            io_mirror_paths=io_mirror_paths,
-                        )
-
-                    else:
-                        try:
-                            if (store_entry := calculation_store.get_entry(child_node.uuid)) is not None:
-                                os.symlink(
-                                    store_entry.path,
-                                    child_output_path,
-                                )
-                        except FileExistsError:
-                            # For debugging
-                            raise
-                else:
+                # TODO: Could add a `uuid_in_store` or similarly named method
+                if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
                     self._mirror_calculation(
                         calculation_node=child_node,
                         output_path=child_output_path,
                         io_mirror_paths=io_mirror_paths,
                     )
+
+                else:
+                    try:
+                        if (store_entry := calculation_store.get_entry(child_node.uuid)) is not None:
+                            os.symlink(
+                                store_entry.path,
+                                child_output_path,
+                            )
+                    except FileExistsError:
+                        # For debugging
+                        raise
+                # else:
+                #     self._mirror_calculation(
+                #         calculation_node=child_node,
+                #         output_path=child_output_path,
+                #         io_mirror_paths=io_mirror_paths,
+                #     )
 
     def _mirror_calculation(
         self,

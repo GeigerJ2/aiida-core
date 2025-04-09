@@ -15,14 +15,10 @@ from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.base import BaseMirror
 from aiida.tools.mirror.collector import MirrorCollector
-from aiida.tools.mirror.config import (
-    MirrorCollectorConfig,
-    MirrorMode,
-    MirrorPaths,
-)
-from aiida.tools.mirror.logger import MirrorLogger
+from aiida.tools.mirror.config import MirrorCollectorConfig, MirrorMode, MirrorPaths, MirrorStoreKeys
+from aiida.tools.mirror.logger import MirrorLogger, MirrorLogStore
 from aiida.tools.mirror.store import MirrorNodeStore
-from aiida.tools.mirror.utils import safe_delete_dir
+from aiida.tools.mirror.utils import StoreNameType, safe_delete_dir
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.group')
 
@@ -54,6 +50,9 @@ class BaseCollectionMirror(BaseMirror):
 
         self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger, top_level_caller=True)
 
+        # Initialize mirror_collector as None - it will be properly set by child classes
+        self.mirror_collector: MirrorCollector | None = None
+
     # ! This shouldn't be here, because the `mirror_collector` only is required for collections of nodes
     def set_mirror_collector(self, mirror_logger: MirrorLogger) -> MirrorCollector:
         mirror_collector = MirrorCollector(
@@ -76,6 +75,10 @@ class BaseCollectionMirror(BaseMirror):
 
         msg = '`--delete-missing` option selected. Will delete missing node directories and log entries.'
         logger.report(msg)
+
+        if self.mirror_collector is None:
+            msg = 'mirror_collector is not set. This should be initialized in a child class.'
+            raise AttributeError(msg)
 
         delete_store: MirrorNodeStore = self.mirror_collector.collect_to_delete()
 
@@ -100,24 +103,29 @@ class BaseCollectionMirror(BaseMirror):
         :return: Labels of deleted groups
         """
 
-        to_delete_groups: list[orm.Group] = getattr(delete_store, 'groups')
+        to_delete_group_uuids: list[str] = getattr(delete_store, 'groups')
         log_group_store = self.mirror_logger.groups
         deleted_groups = []
 
         # Early return if no groups in the delete_store
-        if not to_delete_groups:
+        if not to_delete_group_uuids:
             return []
 
         # First collect the group labels
-        for to_delete_group in to_delete_groups:
-            group_label = log_group_store.get_entry(uuid=to_delete_group).path.name
+        for to_delete_group_uuid in to_delete_group_uuids:
+            entry = log_group_store.get_entry(to_delete_group_uuid)
+            assert entry is not None, f'Group with UUID {to_delete_group_uuid} should exist but was not found'
+            # Need to work with log entries here, as data not in AiiDA's DB anymore
+            group_label = entry.path.name
             deleted_groups.append(group_label)
 
         # Then delete the groups
-        for to_delete_group in to_delete_groups:
-            path = log_group_store.get_entry(to_delete_group).path
+        for to_delete_group_uuid in to_delete_group_uuids:
+            entry = log_group_store.get_entry(to_delete_group_uuid)
+            assert entry is not None, f'Group with UUID {to_delete_group_uuid} should exist but was not found'
+            path = entry.path
             safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
-            self.mirror_logger.del_entry(store=log_group_store, uuid=to_delete_group)
+            self.mirror_logger.del_entry(store=log_group_store, uuid=to_delete_group_uuid)
 
         msg = f'Deleted the groups: {deleted_groups}'
         logger.report(msg)
@@ -154,19 +162,26 @@ class BaseCollectionMirror(BaseMirror):
         :type deleted_groups: list
         :return: None
         """
-        for store_name in ('workflows', 'calculations', 'data'):
-            log_store = getattr(self.mirror_logger, store_name)
+        store_names: list[StoreNameType] = [
+            MirrorStoreKeys.WORKFLOWS.value,
+            MirrorStoreKeys.CALCULATIONS.value,
+            MirrorStoreKeys.DATA.value,
+        ]
+        for store_entry in store_names:
+            log_store: MirrorLogStore = self.mirror_logger.get_store_by_name(store_entry)
             additional_delete_nodes = []
 
             # Find all nodes that belong to deleted groups
             for deleted_group in deleted_groups:
                 for entry_uuid, entry in log_store.entries.items():
                     path_str = str(entry.path)
-                    if deleted_group in path_str:
+                    if deleted_group.label in path_str:
                         additional_delete_nodes.append(entry_uuid)
 
             # Delete the identified nodes
             for additional_delete_node in additional_delete_nodes:
-                path = log_store.get_entry(additional_delete_node).path
+                entry = log_store.get_entry(additional_delete_node)  # type: ignore[assignment]
+                assert entry is not None, f'Entry with UUID {additional_delete_node} should exist but was not found'
+                path = entry.path
                 safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
                 self.mirror_logger.del_entry(store=log_store, uuid=additional_delete_node)

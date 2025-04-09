@@ -79,7 +79,7 @@ class MirrorStoreKeys(str, Enum):
             raise NotImplementedError(msg)
 
     @classmethod
-    def to_class(cls, key: 'MirrorStoreKeys') -> Type[orm.Node]:
+    def to_class(cls, key: 'MirrorStoreKeys') -> Type:
         mapping = {
             cls.CALCULATIONS: orm.CalculationNode,
             cls.WORKFLOWS: orm.WorkflowNode,

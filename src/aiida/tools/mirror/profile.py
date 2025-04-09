@@ -56,7 +56,7 @@ class ProfileMirror(BaseCollectionMirror):
         mirror_collector_config: MirrorCollectorConfig | None = None,
         config: ProfileMirrorConfig | None = None,
         process_mirror_config: ProcessMirrorConfig | None = None,
-        groups: list[str] | list[orm.Group] | None = None,
+        groups: list[str | orm.Group] | None = None,
     ):
         """Initialize the ProfileMirror."""
 
@@ -86,7 +86,7 @@ class ProfileMirror(BaseCollectionMirror):
         )
 
         if groups is not None:
-            self.groups = [GroupMirror.load_given_group(group=g) for g in groups]
+            self.groups = GroupMirror.load_given_groups(groups=groups)
         else:
             self.groups = []
 

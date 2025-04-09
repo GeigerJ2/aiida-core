@@ -17,7 +17,7 @@ from pathlib import Path
 
 from aiida.common.exceptions import NotExistent
 from aiida.tools.mirror.config import MirrorPaths, MirrorStoreKeys, MirrorTimes
-from aiida.tools.mirror.utils import StoreKeyType
+from aiida.tools.mirror.utils import StoreNameType
 
 # TODO: Possibly mirror hierarchy of mirrored directory inside json file
 # TODO: Currently, json file has only top-level "groups", "workflows", and "calculations"
@@ -142,6 +142,7 @@ class MirrorLogger:
         workflows: MirrorLogStore | None = None,
         groups: MirrorLogStore | None = None,
         data: MirrorLogStore | None = None,
+        last_mirror_time: datetime | None = None,
     ) -> None:
         self.mirror_paths = mirror_paths
         self.mirror_times = mirror_times
@@ -149,6 +150,7 @@ class MirrorLogger:
         self.workflows = workflows or MirrorLogStore()
         self.groups = groups or MirrorLogStore()
         self.data = data or MirrorLogStore()
+        self.last_mirror_time = last_mirror_time
 
     def add_entry(self, store: MirrorLogStore, uuid: str, entry: MirrorLog) -> None:
         store.add_entry(uuid, entry)
@@ -245,16 +247,15 @@ class MirrorLogger:
         msg = f'No corresponding `MirrorLogStore` found for UUID: `{uuid}`.'
         raise NotExistent(msg)
 
-    # FIXME: HERE
-    def get_store_by_key(self, key: StoreKeyType) -> MirrorLogStore:
+    def get_store_by_name(self, name: StoreNameType) -> MirrorLogStore:
         """Get the store by its string literal."""
 
         store_names = [field.name for field in fields(self.stores)]
-        if key not in store_names:
-            msg = f'Wrong key <{key}> selected. Choose one of {store_names}.'
+        if name not in store_names:
+            msg = f'Wrong key <{name}> selected. Choose one of {store_names}.'
             raise ValueError(msg)
 
-        return getattr(self.stores, key)
+        return getattr(self.stores, name)
 
     def get_mirror_path_by_uuid(self, uuid: str) -> Path | None:
         """Find the store that contains the given UUID."""
@@ -293,7 +294,7 @@ class MirrorLogger:
     def get_store_by_orm(self, orm_type) -> MirrorLogStore:
         return getattr(self, MirrorStoreKeys.from_class(orm_type))
 
-    def update_paths(self, old_str: str, new_str: str) -> dict[str, int]:
+    def update_paths(self, old_str: str, new_str: str):
         """Update all paths across all stores by replacing exact occurrences of old_str with new_str.
 
         This method iterates through all stores (calculations, workflows, groups, data)
@@ -315,4 +316,4 @@ class MirrorLogger:
 
         for store_name in ['calculations', 'workflows', 'groups', 'data']:
             store: MirrorLogStore = getattr(self, store_name)
-            _ = store.update_paths(old_str, new_str)
+            store.update_paths(old_str, new_str)

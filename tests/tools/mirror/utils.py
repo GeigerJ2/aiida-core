@@ -66,8 +66,10 @@ from pathlib import Path
 #     for dir_name, content_list in expected.items():
 #         dir_path = base_path / relative_path / dir_name
 
+
 #         assert dir_path.exists(), f"Path does not exist: {dir_path}"
 #         assert dir_path.is_dir(), f"Path is not a directory: {dir_path}"
+
 
 #         for item in content_list:
 #             if isinstance(item, str):  # It's a file
@@ -149,6 +151,8 @@ def compare_tree_only_dirs(expected: dict, base_path: Path, relative_path: Path 
 
         assert not unexpected_dirs, f'Unexpected directories found in {dir_path}: {unexpected_dirs}'
 
+        assert not unexpected_dirs, f'Unexpected directories found in {dir_path}: {unexpected_dirs}'
+
         # Recursively check the expected subdirectories
         for subdir_name, subdir_content in expected_dirs.items():
-            compare_directory_structure(subdir_content, base_path, relative_path / dir_name)
+            compare_tree_only_dirs(subdir_content, base_path, relative_path / dir_name)
