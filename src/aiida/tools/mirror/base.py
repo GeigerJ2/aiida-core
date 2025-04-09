@@ -7,7 +7,7 @@
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
 
-"""Base class for collection mirror."""
+"""Base class for mirror classes."""
 
 from __future__ import annotations
 

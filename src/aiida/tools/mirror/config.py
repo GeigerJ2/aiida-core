@@ -52,18 +52,17 @@ class MirrorStoreKeys(str, Enum):
 
     @classmethod
     def from_instance(cls, node_inst: orm.Node) -> str:
-        match node_inst:
-            case orm.CalculationNode():
-                return cls.CALCULATIONS.value
-            case orm.WorkflowNode():
-                return cls.WORKFLOWS.value
-            case orm.Data():
-                return cls.DATA.value
-            case orm.Group():
-                return cls.GROUPS.value
-            case _:
-                msg = f'Mirroring not implemented yet for node type: {type(node_inst)}'
-                raise NotImplementedError(msg)
+        if isinstance(node_inst, orm.CalculationNode):
+            return cls.CALCULATIONS.value
+        elif isinstance(node_inst, orm.WorkflowNode):
+            return cls.WORKFLOWS.value
+        elif isinstance(node_inst, orm.Data):
+            return cls.DATA.value
+        elif isinstance(node_inst, orm.Group):
+            return cls.GROUPS.value
+        else:
+            msg = f'Mirroring not implemented yet for node type: {type(node_inst)}'
+            raise NotImplementedError(msg)
 
     @classmethod
     def from_class(cls, orm_class: Type) -> str:
@@ -92,7 +91,6 @@ class MirrorStoreKeys(str, Enum):
         else:
             msg = f'No node type mapping exists for key: {key}'
             raise ValueError(msg)
-
 
 @dataclass
 class MirrorTimes:

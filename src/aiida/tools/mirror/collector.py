@@ -8,6 +8,8 @@
 ###########################################################################
 """Class to collect nodes for mirror feature."""
 
+from __future__ import annotations
+
 from typing import Any, Dict
 
 from aiida import orm

@@ -8,6 +8,8 @@
 ###########################################################################
 """Class to collect nodes for mirror feature."""
 
+from __future__ import annotations
+
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
@@ -40,10 +42,10 @@ class MirrorNodeStore:
     def stores(self) -> dict:
         """Retrieve the current state of the container as a dataclass."""
         return {
-            "calculations": self.calculations,
-            "workflows": self.workflows,
-            "data": self.data,
-            "groups": self.groups,
+            'calculations': self.calculations,
+            'workflows': self.workflows,
+            'data': self.data,
+            'groups': self.groups,
         }
 
     @property
@@ -105,4 +107,3 @@ class MirrorNodeStore:
 
         attr = MirrorStoreKeys.from_class(node_type)
         return getattr(self, attr)
-

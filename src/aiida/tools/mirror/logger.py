@@ -7,6 +7,8 @@
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
 
+from __future__ import annotations
+
 import json
 from collections.abc import Collection
 from dataclasses import dataclass, field, fields

@@ -170,24 +170,24 @@ def generate_process_default_mirror_path(
     :return: The absolute default parent mirror path.
     """
 
-    entities_to_mirror = []
+    path_entities = []
 
     # No '' and None
     if prefix is not None:
-        entities_to_mirror += [prefix]
+        path_entities += [prefix]
 
     try:
         if process_node.process_label is not None:
-            entities_to_mirror.append(process_node.process_label)
+            path_entities.append(process_node.process_label)
     except AttributeError:
         # This case came up during testing, not sure how relevant it actually is
         if process_node.process_type is not None:
-            entities_to_mirror.append(process_node.process_type)
+            path_entities.append(process_node.process_type)
 
     if append_pk:
-        entities_to_mirror += [str(process_node.pk)]
+        path_entities += [str(process_node.pk)]
 
-    return Path('-'.join(entities_to_mirror))
+    return Path('-'.join(path_entities))
 
 
 def generate_profile_default_mirror_path(
