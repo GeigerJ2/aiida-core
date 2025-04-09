@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Any, Literal, Type, Union
 
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
@@ -33,6 +33,7 @@ __all__ = (
 )
 
 MirrorEntityType = Union[orm.CalculationNode, orm.WorkflowNode, orm.Data]
+QbMirrorEntityType = Union[Type[orm.CalculationNode], Type[orm.WorkflowNode], Type[orm.Data]]
 StoreNameType = Literal['calculations', 'workflows', 'groups', 'data']
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.utils')

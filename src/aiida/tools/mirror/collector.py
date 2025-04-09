@@ -21,11 +21,12 @@ from aiida.tools.mirror.config import (
 )
 from aiida.tools.mirror.logger import MirrorLogger
 from aiida.tools.mirror.store import MirrorNodeStore
-from aiida.tools.mirror.utils import MirrorEntityType
+from aiida.tools.mirror.utils import QbMirrorEntityType
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.collector')
 
-# TODO: Limit to only sealed nodes
+# TODO: Limit to only sealed nodes. This option is currently accessible for `verdi process mirror`, but it is not a
+# generally exposed option
 
 
 __all__ = ('MirrorCollector',)
@@ -51,7 +52,7 @@ class MirrorCollector:
         # import traceback
         # traceback.print_stack()
         mirror_times = self.mirror_logger.mirror_times
-        if mirror_times is None or (mirror_times is not None and mirror_times.last is None):
+        if mirror_times.last is None:
             msg = 'For the first mirror, this can take a while.'
             logger.report(msg)
 
@@ -77,7 +78,7 @@ class MirrorCollector:
 
             # If not using top-level-only filter, add descendant calculations from workflows
             if not workflows and self.config.only_top_level_calcs:
-                descendant_calcs = self._get_workflow_descendants(workflows)
+                descendant_calcs = self._get_workflow_descendant_calcs(workflows)
                 # Combine and remove duplicates
                 calculations = list(set(calculations + descendant_calcs))
 
@@ -114,14 +115,15 @@ class MirrorCollector:
 
         return delete_node_container
 
-    def _resolve_filters(self, orm_class: MirrorEntityType) -> Dict[str, Any]:
-        filters = {}
+    def _resolve_filters(self, orm_class: QbMirrorEntityType) -> Dict[str, Any]:
+        filters: Dict[str, Any] = {}
         orm_key = MirrorStoreKeys.from_class(orm_class=orm_class)
 
-        # Only nodes with an `mtime` up to the current mirror time are selected.
-        # This is to avoid unpredictable behavior on multiple runs of the command.
-        # The current mirror time thus serves as a cutoff for the node selection
-        filters['mtime'] = {'<=': self.mirror_logger.mirror_times.current.astimezone()}
+        # Initialize mtime filter as a dictionary
+        mtime_filter: Dict[str, Any] = {}
+
+        # Add current mirror time as upper bound
+        mtime_filter['<='] = self.mirror_logger.mirror_times.current.astimezone()
 
         # This might be too annoying to log always, and raising here would require manually setting
         # `filter-by-last-mirror-time` to False for the first mirror
@@ -129,54 +131,94 @@ class MirrorCollector:
             msg = 'Cannot filter by last mirror time if no last mirror time available. Will not filter nodes by time.'
             logger.debug(msg)
 
-        # Filter by last_mirror time
+        # Add last mirror time as lower bound if available and configured
         elif self.config.filter_by_last_mirror_time and self.mirror_logger.mirror_times.last:
-            filters['mtime'] = {'>=': self.mirror_logger.mirror_times.last.astimezone()}
+            mtime_filter['>='] = self.mirror_logger.mirror_times.last.astimezone()
+
+        # Add the mtime filter to the main filters dictionary
+        filters['mtime'] = mtime_filter
 
         # Filter out already logged nodes if mirror_logger is available
-        # NOTE: Move this outside and make it depend on the passing of the store???
-        # if self.mirror_logger and hasattr(self.mirror_logger, orm_key):
         store = getattr(self.mirror_logger, orm_key)
         if len(store) > 0:
             filters['uuid'] = {'!in': list(store.entries.keys())}
 
         return filters
 
+    # def _resolve_filters(self, orm_class: QbMirrorEntityType) -> Dict[str, Any]:
+
+    #     filters = {}
+    #     orm_key = MirrorStoreKeys.from_class(orm_class=orm_class)
+
+    #     # Only nodes with an `mtime` up to the current mirror time are selected.
+    #     # This is to avoid unpredictable behavior on multiple runs of the command.
+    #     # The current mirror time thus serves as a cutoff for the node selection
+    #     filters['mtime'] = {'<=': self.mirror_logger.mirror_times.current.astimezone()}
+
+    #     # This might be too annoying to log always, and raising here would require manually setting
+    #     # `filter-by-last-mirror-time` to False for the first mirror
+    #     if self.config.filter_by_last_mirror_time and not self.mirror_logger.mirror_times.last:
+    #         msg = 'Cannot filter by last mirror time if no last mirror time available. Will not filter nodes by time.'
+    #         logger.debug(msg)
+
+    #     # Filter by last_mirror time
+    #     elif self.config.filter_by_last_mirror_time and self.mirror_logger.mirror_times.last:
+    #         filters['mtime'] = {'>=': self.mirror_logger.mirror_times.last.astimezone()}
+
+    #     # Filter out already logged nodes if mirror_logger is available
+    #     # NOTE: Move this outside and make it depend on the passing of the store???
+    #     # if self.mirror_logger and hasattr(self.mirror_logger, orm_key):
+    #     store = getattr(self.mirror_logger, orm_key)
+    #     if len(store) > 0:
+    #         filters['uuid'] = {'!in': list(store.entries.keys())}
+
+    #     return filters
+
     def get_nodes(
         self,
-        orm_type: orm.Node,
-        group: orm.Group = None,
+        orm_type: QbMirrorEntityType,
+        group: orm.Group | None = None,
         top_level_only: bool = False,
         filters: dict | None = None,
-    ) -> list[orm.Node]:
+    ) -> list[Any]:
         # Basic filters for the query
 
         if not filters:
             filters = self._resolve_filters(orm_type)
 
+        if self.config.group_scope not in (
+            NodeMirrorGroupScope.IN_GROUP,
+            NodeMirrorGroupScope.ANY,
+            NodeMirrorGroupScope.NO_GROUP,
+        ):
+            msg = f'Unknown scope: {self.config.group_scope}'
+            raise ValueError(msg)
+
         # Build query based on scope
         if self.config.group_scope == NodeMirrorGroupScope.IN_GROUP:
             if group is None:
-                raise ValueError('Group must be provided when scope is IN_GROUP')
-            nodes = self._query_group_nodes(orm_type, group, filters)
+                msg = 'Group must be provided when scope is IN_GROUP'
+                raise ValueError(msg)
+
+            nodes: list[Any] = self._query_group_nodes(orm_type, group, filters)
 
             # Extend "group" nodes to descendants
             if not self.config.only_top_level_calcs:
-                descendant_nodes = []
+                descendant_calcs: list[orm.CalculationNode] = []
                 for node in nodes:
                     if isinstance(node, orm.WorkflowNode):
-                        descendant_nodes.add_entries(
+                        descendant_calcs.extend(
                             [n for n in node.called_descendants if isinstance(n, orm.CalculationNode)]
                         )
-                nodes += descendant_nodes
+                nodes += descendant_calcs
 
             # Extend "group" nodes to descendants
             if not self.config.only_top_level_workflows:
-                descendant_nodes = []
+                descendant_wfs: list[orm.WorkflowNode] = []
                 for node in nodes:
                     if isinstance(node, orm.ProcessNode):
-                        descendant_nodes.extend([n for n in node.called_descendants if isinstance(n, orm.WorkflowNode)])
-                nodes += descendant_nodes
+                        descendant_wfs.extend([n for n in node.called_descendants if isinstance(n, orm.WorkflowNode)])
+                nodes += descendant_wfs
 
         elif self.config.group_scope == NodeMirrorGroupScope.ANY:
             nodes = self._query_all_nodes(orm_type, filters)
@@ -184,28 +226,26 @@ class MirrorCollector:
         elif self.config.group_scope == NodeMirrorGroupScope.NO_GROUP:
             nodes = self._query_no_group_nodes(orm_type, filters)
 
-        else:
-            msg = 'Unknown scope'
-            raise ValueError(msg)
-
         # Apply top-level filtering if requested
         if top_level_only:
             nodes = [node for node in nodes if node.caller is None]
 
         return nodes
 
-    def _query_group_nodes(self, orm_class: orm.Node, group: orm.Group, filters: Dict[str, Any] = {}) -> list[orm.Node]:
+    def _query_group_nodes(
+        self, orm_class: QbMirrorEntityType, group: orm.Group, filters: Dict[str, Any] = {}
+    ) -> list[Any]:
         qb = orm.QueryBuilder()
         qb.append(orm.Group, filters={'id': group.id}, tag='group')
         qb.append(orm_class, filters=filters, with_group='group', tag='node')
         return qb.all(flat=True)
 
-    def _query_all_nodes(self, orm_class: orm.Node, filters: Dict[str, Any]) -> list[orm.Node]:
+    def _query_all_nodes(self, orm_class: QbMirrorEntityType, filters: Dict[str, Any]) -> list[Any]:
         qb = orm.QueryBuilder()
         qb.append(orm_class, filters=filters, tag='node')
         return qb.all(flat=True)
 
-    def _query_no_group_nodes(self, orm_class: orm.Node, filters: Dict[str, Any]) -> list[orm.Node]:
+    def _query_no_group_nodes(self, orm_class: QbMirrorEntityType, filters: Dict[str, Any]) -> list[Any]:
         # First get all nodes
         all_nodes = self._query_all_nodes(orm_class, filters)
 
@@ -227,8 +267,9 @@ class MirrorCollector:
         # Return only nodes that are not in any group
         return [node for node in all_nodes if node not in all_grouped_nodes]
 
-    def _get_workflow_descendants(self, workflows: list[orm.WorkflowNode]) -> list[orm.Node]:
-        descendants = []
+    # NOTE: Should this method be specific to sub-calculations, or should it also include workflows??
+    def _get_workflow_descendant_calcs(self, workflows: list[orm.WorkflowNode]) -> list[orm.CalculationNode]:
+        descendants: list[orm.CalculationNode] = []
         for workflow in workflows:
             for node in workflow.called_descendants:
                 if isinstance(node, orm.CalculationNode):

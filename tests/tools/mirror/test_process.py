@@ -336,6 +336,7 @@ def test_mirror_calculation_add(tmp_path, generate_calculation_node_add):
     assert all([output_file.is_file() for output_file in output_files])
 
 
+@pytest.mark.usefixtures('aiida_profile_clean')
 def test_generate_calculation_io_mapping():
     calculation_io_mapping = ProcessMirror._generate_calculation_io_mapping()
     assert calculation_io_mapping.repository == 'inputs'
