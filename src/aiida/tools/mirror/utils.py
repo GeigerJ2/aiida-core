@@ -11,9 +11,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal, Union
 
-from aiida import load_profile, orm
+from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration import Profile
 from aiida.tools.mirror.config import MirrorMode, MirrorPaths
@@ -23,29 +23,26 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    'prepare_mirror_path',
-    'safe_delete_dir',
+    'delete_missing_node_dir',
+    'generate_group_default_mirror_path',
     'generate_process_default_mirror_path',
     'generate_profile_default_mirror_path',
-    'generate_group_default_mirror_path',
+    'prepare_mirror_path',
     'resolve_click_path_for_mirror',
-    'delete_missing_node_dir'
+    'safe_delete_dir',
 )
 
-MirrorEntityType = orm.CalculationNode | orm.WorkflowNode | orm.Data
+MirrorEntityType = Union[orm.CalculationNode, orm.WorkflowNode, orm.Data]
 StoreKeyType = Literal['calculations', 'workflows', 'groups', 'data']
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.utils')
-
-from enum import Enum
-from typing import Type
 
 
 # NOTE: Could move to BaseMirror class
 def prepare_mirror_path(
     path_to_validate: Path,
     mirror_mode: MirrorMode,
-    safeguard_file: str = MirrorPaths.safeguard_filename,
+    safeguard_file: str = MirrorPaths.safeguard_file,
     top_level_caller: bool = True,
 ) -> None:
     """Create default mirroring directory for a given process node and return it as absolute path.
@@ -146,7 +143,7 @@ def _delete_dir_recursive(path):
             except OSError:  # sub-folder is not empty
                 _delete_dir_recursive(f)  # recurse the current sub-folder
             except Exception as exception:  # capture other exception
-                msg = (f'exception name: {exception.__class__.__name__}\nexception msg: {exception}')
+                msg = f'exception name: {exception.__class__.__name__}\nexception msg: {exception}'
                 logger.critical(msg)
 
     try:
@@ -154,7 +151,7 @@ def _delete_dir_recursive(path):
     except NotADirectoryError:
         path.unlink()  # delete folder even if it is a symlink, linux
     except Exception as exception:
-        msg = (f'exception name: {exception.__class__.__name__}\nexception msg: {exception}')
+        msg = f'exception name: {exception.__class__.__name__}\nexception msg: {exception}'
         logger.critical(msg)
 
 
@@ -190,9 +187,7 @@ def generate_process_default_mirror_path(
     return Path('-'.join(path_entities))
 
 
-def generate_profile_default_mirror_path(
-    profile: Profile = load_profile(), prefix: str = 'profile', appendix: str = 'mirror'
-) -> Path:
+def generate_profile_default_mirror_path(profile: Profile, prefix: str = 'profile', appendix: str = 'mirror') -> Path:
     return Path(f'{prefix}-{profile.name}-{appendix}')
 
 
@@ -229,36 +224,37 @@ def generate_group_default_mirror_path(
     return Path('-'.join(label_elements))
 
 
-def resolve_click_path_for_mirror(
-    path: Path | None | str, entity: orm.ProcessNode | orm.Group | Profile
-) -> MirrorPaths:
-    _entity_mirror_functions = {
-        orm.ProcessNode: generate_process_default_mirror_path,
-        orm.Group: generate_group_default_mirror_path,
-        Profile: generate_profile_default_mirror_path,
-    }
+# entity: orm.ProcessNode | orm.Group | Profile
+def resolve_click_path_for_mirror(path: Path | None | str, entity: Any) -> MirrorPaths:
+    # First check if the entity is of a supported type
+    if not isinstance(entity, (orm.ProcessNode, orm.Group, Profile)):
+        supported_types = 'ProcessNode, Group, Profile'
+        msg = f"Unsupported entity type '{type(entity).__name__}'. Supported types: {supported_types}."
+        raise ValueError(msg)
 
-    for entity_class, mirror_path_generator in _entity_mirror_functions.items():
-        if isinstance(entity, entity_class):
-            if path:
-                path = Path(path)
-                if path.is_absolute():
-                    mirror_sub_path = Path(path.name)
-                    mirror_parent_path = path.parent
-                else:
-                    mirror_sub_path = path
-                    mirror_parent_path = Path.cwd()
-            else:
-                mirror_sub_path = mirror_path_generator(entity)
-                mirror_parent_path = Path.cwd()
+    if path:
+        path = Path(path)
+        if path.is_absolute():
+            mirror_sub_path = Path(path.name)
+            mirror_parent_path = path.parent
+        else:
+            mirror_sub_path = path
+            mirror_parent_path = Path.cwd()
+    else:
+        # Use direct isinstance checks to determine which generator to use
+        if isinstance(entity, orm.ProcessNode):
+            mirror_sub_path = generate_process_default_mirror_path(entity)
+        elif isinstance(entity, orm.Group):
+            mirror_sub_path = generate_group_default_mirror_path(entity)
+        elif isinstance(entity, Profile):
+            mirror_sub_path = generate_profile_default_mirror_path(entity)
 
-            return MirrorPaths(
-                parent=mirror_parent_path,
-                child=mirror_sub_path,
-            )
+        mirror_parent_path = Path.cwd()
 
-    supported_types = ', '.join(cls.__name__ for cls in _entity_mirror_functions)
-    raise ValueError(f"Unsupported entity type '{type(entity).__name__}'. Supported types: {supported_types}.")
+    return MirrorPaths(
+        parent=mirror_parent_path,
+        child=mirror_sub_path,
+    )
 
 
 def delete_missing_node_dir(mirror_logger: MirrorLogger, to_delete_uuid: str) -> None:
@@ -277,7 +273,6 @@ def delete_missing_node_dir(mirror_logger: MirrorLogger, to_delete_uuid: str) ->
             safe_delete_dir(
                 path=path_to_delete,
                 safeguard_file='.aiida_node_metadata.yaml',
-                verbose=False,
             )
             current_store.del_entry(uuid=to_delete_uuid)
         except:

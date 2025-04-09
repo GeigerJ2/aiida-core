@@ -22,10 +22,10 @@ from aiida.common import timezone
 __all__ = (
     'BaseCollectionMirrorConfig',
     'GroupMirrorConfig',
+    'MirrorCollectorConfig',
     'MirrorMode',
     'MirrorPaths',
     'MirrorTimes',
-    'MirrorCollectorConfig',
     'NodeMirrorGroupScope',
     'ProcessMirrorConfig',
     'ProfileMirrorConfig',
@@ -51,7 +51,7 @@ class MirrorStoreKeys(str, Enum):
     DATA = 'data'
 
     @classmethod
-    def from_instance(cls, node_inst: orm.Node) -> str:
+    def from_instance(cls, node_inst: orm.Node | orm.Group) -> str:
         if isinstance(node_inst, orm.CalculationNode):
             return cls.CALCULATIONS.value
         elif isinstance(node_inst, orm.WorkflowNode):
@@ -92,6 +92,7 @@ class MirrorStoreKeys(str, Enum):
             msg = f'No node type mapping exists for key: {key}'
             raise ValueError(msg)
 
+
 # NOTE: Should this be a singleton?
 @dataclass
 class MirrorTimes:
@@ -127,14 +128,14 @@ class MirrorTimes:
 
 @dataclass
 class MirrorPaths:
-    parent: Path = Path.cwd
-    child: Path = Path('aiida-mirror')
+    parent: Path = field(default_factory=Path.cwd)
+    child: Path = field(default_factory=lambda: Path('aiida-mirror'))
 
-    safeguard_filename = '.aiida_mirror_safeguard'
+    safeguard_file = '.aiida_mirror_safeguard'
 
     @classmethod
     def from_path(cls, path: Path):
-        return cls(parent=path.parent, child=path.name)
+        return cls(parent=path.parent, child=Path(path.name))
 
     @property
     def absolute(self) -> Path:
@@ -142,9 +143,9 @@ class MirrorPaths:
         return self.parent / self.child
 
     @property
-    def safeguard(self) -> Path:
+    def safeguard_path(self) -> Path:
         """Returns the path to a safeguard file."""
-        return self.absolute / self.safeguard_filename
+        return self.absolute / self.safeguard_file
 
     @property
     def log_path(self) -> Path:

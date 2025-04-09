@@ -11,12 +11,9 @@
 
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
-
 from aiida import orm
+from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.base import BaseMirror
-from aiida.tools.mirror.collector import MirrorCollector
 from aiida.tools.mirror.config import (
     MirrorCollectorConfig,
     MirrorMode,
@@ -25,7 +22,6 @@ from aiida.tools.mirror.config import (
 from aiida.tools.mirror.logger import MirrorLogger
 from aiida.tools.mirror.store import MirrorNodeStore
 from aiida.tools.mirror.utils import safe_delete_dir
-from aiida.common.log import AIIDA_LOGGER
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.group')
 
@@ -63,7 +59,7 @@ class BaseCollectionMirror(BaseMirror):
         :return: None
         """
 
-        msg = "`--delete-missing` option selected. Will delete missing node directories and log entries."
+        msg = '`--delete-missing` option selected. Will delete missing node directories and log entries.'
         logger.report(msg)
 
         delete_store: MirrorNodeStore = self.mirror_collector.collect_to_delete()
@@ -77,7 +73,7 @@ class BaseCollectionMirror(BaseMirror):
         # Finally, clean up nodes that were part of deleted groups
         if deleted_groups:
             self.group_store_subnodes_delete(deleted_groups)
-        
+
         # TODO: Verify if the log is properly updated here (via the test)
 
     def group_store_delete(self, delete_store: MirrorNodeStore) -> list:
@@ -105,10 +101,10 @@ class BaseCollectionMirror(BaseMirror):
         # Then delete the groups
         for to_delete_group in to_delete_groups:
             path = log_group_store.get_entry(to_delete_group).path
-            _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
+            _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
             self.mirror_logger.del_entry(store=log_group_store, uuid=to_delete_group)
 
-        msg = f"Deleted the groups: {deleted_groups}"
+        msg = f'Deleted the groups: {deleted_groups}'
         logger.report(msg)
 
         return deleted_groups
@@ -127,12 +123,11 @@ class BaseCollectionMirror(BaseMirror):
 
             for to_delete_uuid in to_delete_uuids:
                 path = log_store.get_entry(to_delete_uuid).path
-                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
+                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
                 self.mirror_logger.del_entry(store=log_store, uuid=to_delete_uuid)
 
-            msg = f"Deleted {len(to_delete_uuids)} {store_name}"
+            msg = f'Deleted {len(to_delete_uuids)} {store_name}'
             logger.report(msg)
-
 
     def group_store_subnodes_delete(self, deleted_groups: list[orm.Group]) -> None:
         """Delete nodes that were part of deleted groups but not explicitly marked for deletion.
@@ -158,5 +153,5 @@ class BaseCollectionMirror(BaseMirror):
             # Delete the identified nodes
             for additional_delete_node in additional_delete_nodes:
                 path = log_store.get_entry(additional_delete_node).path
-                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
+                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
                 self.mirror_logger.del_entry(store=log_store, uuid=additional_delete_node)

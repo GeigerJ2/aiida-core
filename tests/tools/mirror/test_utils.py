@@ -12,12 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from aiida.tools.mirror.utils import generate_process_default_mirror_path
 from aiida.tools.mirror.config import MirrorMode, MirrorPaths
-
+from aiida.tools.mirror.utils import generate_process_default_mirror_path
 
 filename = 'file.txt'
-safeguard_file = MirrorPaths.safeguard_filename
+safeguard_file = MirrorPaths.safeguard_file
 
 
 @pytest.mark.usefixtures('aiida_profile_clean')
@@ -78,3 +77,8 @@ def test_prepare_mirror_path(tmp_path):
     prepare_mirror_path(path_to_validate=test_dir, mirror_mode=MirrorMode.INCREMENTAL)
     assert safeguard_file_path.is_file()
     assert test_file.is_file()
+
+
+def test_resolve_click_path_for_mirror(tmp_path):
+    # from aiida.tools.mirror.utils import resolve_click_path_for_mirror
+    pass

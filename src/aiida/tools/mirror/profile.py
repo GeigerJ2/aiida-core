@@ -141,8 +141,8 @@ class ProfileMirror(BaseCollectionMirror):
 
             group_mirror_inst.mirror(top_level_caller=False)
             if mirror_paths_group.absolute.exists():
-                if not mirror_paths_group.safeguard.exists():
-                    mirror_paths_group.safeguard.touch()
+                if not mirror_paths_group.safeguard_path.exists():
+                    mirror_paths_group.safeguard_path.touch()
 
             group_store.add_entry(
                 uuid=group.uuid,
@@ -180,8 +180,8 @@ class ProfileMirror(BaseCollectionMirror):
 
         no_group_mirror_inst.mirror(top_level_caller=False)
         if mirror_paths_no_group.absolute.exists():
-            if not mirror_paths_no_group.safeguard.exists():
-                mirror_paths_no_group.safeguard.touch()
+            if not mirror_paths_no_group.safeguard_path.exists():
+                mirror_paths_no_group.safeguard_path.touch()
 
     def mirror(self, top_level_caller: bool = True):
         """_summary_
@@ -202,13 +202,12 @@ class ProfileMirror(BaseCollectionMirror):
 
         if top_level_caller:
             # self.pre_mirror(top_level_caller=top_level_caller)
-            _ = prepare_mirror_path(
+            prepare_mirror_path(
                 path_to_validate=self.mirror_paths.absolute,
                 mirror_mode=self.mirror_mode,
-                safeguard_file=self.mirror_paths.safeguard,
+                safeguard_file=self.mirror_paths.safeguard_path,
                 top_level_caller=top_level_caller,
             )
-
 
         # If `groups` given on construction, mirror only data within those groups
         if self.groups:
@@ -225,7 +224,6 @@ class ProfileMirror(BaseCollectionMirror):
 
         if top_level_caller:
             self.mirror_logger.save_log()
-
 
     def update_groups(self):
         mirror_logger = self.mirror_logger
@@ -270,7 +268,8 @@ class ProfileMirror(BaseCollectionMirror):
                         moved_paths.append(old_path)
 
                         # Update original dictionary to reflect the moves already done
-                        # This works because the `store_dict`s are just references to parts of the original `mirror_logger_dict`
+                        # This works because the `store_dict`s are just references to parts of the original
+                        # `mirror_logger_dict`
                         old_store_dict[uuid]['path'] = new_path
 
                     except FileNotFoundError:
@@ -285,13 +284,12 @@ class ProfileMirror(BaseCollectionMirror):
                         # Because the group directory had already been renamed.
                         # TODO: Fix better in the future...
                         continue
-                        
+
         self.mirror_logger.save_log()
         for old_label, new_label in zip([*[p.name for p in old_mapping.values()]], [*new_mapping.values()]):
             if old_label != new_label:
-                msg = f"Applied group relabelling `{old_label}` -> `{new_label}` in mirror directory and log."
+                msg = f'Applied group relabelling `{old_label}` -> `{new_label}` in mirror directory and log.'
                 logger.report(msg)
-
 
     # def delete_missing_groups(self):
     #     groups_to_delete_uuids = self.get_groups_to_delete()

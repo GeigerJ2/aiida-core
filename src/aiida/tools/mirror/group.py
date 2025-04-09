@@ -27,6 +27,7 @@ from aiida.tools.mirror.config import (
     MirrorCollectorConfig,
     MirrorMode,
     MirrorPaths,
+    MirrorStoreKeys,
     ProcessMirrorConfig,
 )
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger, MirrorLogStore
@@ -37,7 +38,6 @@ from aiida.tools.mirror.utils import (
     generate_process_default_mirror_path,
     prepare_mirror_path,
 )
-from aiida.tools.mirror.config import MirrorStoreKeys
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.group')
 
@@ -221,9 +221,7 @@ class GroupMirror(BaseCollectionMirror):
             return
 
         # Setup common resources needed for mirroring
-        process_type_path = self.mirror_paths.absolute / MirrorStoreKeys.from_instance(
-            node_inst=processes[0]
-        )
+        process_type_path = self.mirror_paths.absolute / MirrorStoreKeys.from_instance(node_inst=processes[0])
         process_type_path.mkdir(exist_ok=True, parents=True)
 
         # NOTE: This seems a bit hacky. Can probably be improved
@@ -284,10 +282,10 @@ class GroupMirror(BaseCollectionMirror):
         # self.pre_mirror(top_level_caller=top_level_caller)
         if top_level_caller:
             # self.pre_mirror(top_level_caller=top_level_caller)
-            _ = prepare_mirror_path(
+            prepare_mirror_path(
                 path_to_validate=self.mirror_paths.absolute,
                 mirror_mode=self.mirror_mode,
-                safeguard_file=self.mirror_paths.safeguard,
+                safeguard_file=self.mirror_paths.safeguard_path,
                 top_level_caller=top_level_caller,
             )
 

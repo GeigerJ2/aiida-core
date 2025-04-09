@@ -189,8 +189,9 @@ class ProcessMirror(BaseMirror):
         process_node = self.process_node
 
         if not process_node.is_sealed and not self.config.mirror_unsealed:
+            pk = process_node.pk
             raise ExportValidationError(
-                f'Process `{process_node.pk}` must be sealed before it can be dumped, or `--mirror-unsealed` set to True.'
+                f'Process `{pk}` must be sealed before it can be dumped, or `--mirror-unsealed` set to True.'
             )
 
         # This here is mainly for `include_attributes` and `include_extras`.
@@ -201,10 +202,10 @@ class ProcessMirror(BaseMirror):
         #     setattr(self, key, value)
 
         if top_level_caller:
-            _ = prepare_mirror_path(
+            prepare_mirror_path(
                 path_to_validate=self.mirror_paths.absolute,
                 mirror_mode=self.mirror_mode,
-                safeguard_file=self.mirror_paths.safeguard,
+                safeguard_file=self.mirror_paths.safeguard_file,
                 top_level_caller=top_level_caller,
             )
 
@@ -225,6 +226,8 @@ class ProcessMirror(BaseMirror):
             )
 
         if top_level_caller:
+            # When should the logger ever be None?
+            assert self.mirror_logger is not None
             self.mirror_logger.save_log()
 
     def _mirror_workflow(
@@ -286,20 +289,21 @@ class ProcessMirror(BaseMirror):
 
                     else:
                         try:
-                            os.symlink(
-                                calculation_store.get_entry(child_node.uuid).path,
-                                child_output_path,
-                            )
+                            store_entry: MirrorLog | None = calculation_store.get_entry(child_node.uuid)
+                            if store_entry:
+                                os.symlink(
+                                    store_entry.path,
+                                    child_output_path,
+                                )
                         except FileExistsError:
                             # For debugging
                             raise
-                            pass
                 else:
-                        self._mirror_calculation(
-                            calculation_node=child_node,
-                            output_path=child_output_path,
-                            io_mirror_paths=io_mirror_paths,
-                        )
+                    self._mirror_calculation(
+                        calculation_node=child_node,
+                        output_path=child_output_path,
+                        io_mirror_paths=io_mirror_paths,
+                    )
 
     def _mirror_calculation(
         self,
@@ -318,13 +322,15 @@ class ProcessMirror(BaseMirror):
         prepare_mirror_path(
             path_to_validate=output_path,
             mirror_mode=self.mirror_mode,
-            safeguard_file=self.mirror_paths.safeguard,
+            safeguard_file=self.mirror_paths.safeguard_file,
             top_level_caller=False,
         )
 
         self._write_node_yaml(process_node=calculation_node, output_path=output_path)
 
-        io_mirror_mapping = self._generate_calculation_io_mapping(io_mirror_paths=io_mirror_paths, flat=self.config.flat)
+        io_mirror_mapping = self._generate_calculation_io_mapping(
+            io_mirror_paths=io_mirror_paths, flat=self.config.flat
+        )
 
         # Mirror the repository contents of the node
         calculation_node.base.repository.copy_tree(output_path.resolve() / io_mirror_mapping.repository)
@@ -391,7 +397,9 @@ class ProcessMirror(BaseMirror):
             link_triple.node.base.repository.copy_tree(linked_node_path.resolve())
 
     @staticmethod
-    def _generate_calculation_io_mapping(io_mirror_paths: list[str | Path] | None = None, flat: bool = False) -> SimpleNamespace:
+    def _generate_calculation_io_mapping(
+        io_mirror_paths: list[str | Path] | None = None, flat: bool = False
+    ) -> SimpleNamespace:
         """Helper function to generate mapping for entities dumped for each `CalculationNode`.
 
         This is to avoid exposing AiiDA terminology, like `repository` to the user, while keeping track of which

@@ -10,46 +10,41 @@
 # TODO: Test that de-duplication also works for calculations
 # TODO: Test incremental dumping
 
-from datetime import datetime
-from pathlib import Path
-
-import pytest
-
-from aiida import orm
-from aiida.tools.mirror import GroupMirror
-
-from .utils import compare_tree
-
 tree_multiply_add_group = {
-    "multiply-add-group-mirror": [
-        ".aiida_mirror_log.json",
-        ".aiida_mirror_safeguard",
-        {"workflows": [
-            {"MultiplyAddWorkChain-5": [
-                ".aiida_mirror_safeguard",
-                ".aiida_node_metadata.yaml",
-                {"01-multiply-6": [
-                    ".aiida_node_metadata.yaml",
-                    {"inputs": ["source_file"]},
-                    {"node_inputs": []}
-                ]},
-                {"02-ArithmeticAddCalculation-8": [
-                    ".aiida_node_metadata.yaml",
-                    {"inputs": [
-                        "_aiidasubmit.sh",
-                        "aiida.in",
-                        {".aiida": ["calcinfo.json", "job_tmpl.json"]}
-                    ]},
-                    {
-                        "node_inputs": []},
-                    {"outputs": [
-                        "_scheduler-stderr.txt",
-                        "_scheduler-stdout.txt",
-                        "aiida.out"
-                    ]}
-                ]}
-            ]}
-        ]}
+    'multiply-add-group-mirror': [
+        '.aiida_mirror_log.json',
+        '.aiida_mirror_safeguard',
+        {
+            'workflows': [
+                {
+                    'MultiplyAddWorkChain-5': [
+                        '.aiida_mirror_safeguard',
+                        '.aiida_node_metadata.yaml',
+                        {
+                            '01-multiply-6': [
+                                '.aiida_node_metadata.yaml',
+                                {'inputs': ['source_file']},
+                                {'node_inputs': []},
+                            ]
+                        },
+                        {
+                            '02-ArithmeticAddCalculation-8': [
+                                '.aiida_node_metadata.yaml',
+                                {
+                                    'inputs': [
+                                        '_aiidasubmit.sh',
+                                        'aiida.in',
+                                        {'.aiida': ['calcinfo.json', 'job_tmpl.json']},
+                                    ]
+                                },
+                                {'node_inputs': []},
+                                {'outputs': ['_scheduler-stderr.txt', '_scheduler-stdout.txt', 'aiida.out']},
+                            ]
+                        },
+                    ]
+                }
+            ]
+        },
     ]
 }
 
@@ -62,6 +57,7 @@ tree_multiply_add_group = {
 
 
 # @pytest.mark.usefixtures('aiida_profile_clean')
+
 
 # @pytest.mark.usefixtures('aiida_profile_clean_class')
 class TestGroupMirror:
@@ -208,9 +204,11 @@ class TestGroupMirror:
     #         }
     #     }
 
-    #     compare_tree(expected=expected_tree_no_dedup, base_path=tmp_path, relative_path=Path(multiply_add_group_label))
-
-
+    # compare_tree(
+    #     expected=expected_tree_no_dedup,
+    #     base_path=tmp_path,
+    #     relative_path=Path(multiply_add_group_label)
+    # )
 
     # def test_dump_workflows(self):
     #     pass

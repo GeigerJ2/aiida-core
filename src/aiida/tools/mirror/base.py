@@ -36,6 +36,7 @@ class BaseMirror:
         # NOTE: This might not be required, if I always only pass the config object
         # if mirror_collector is not None:
         #     return mirror_collector
+        assert self.mirror_logger is not None
 
         mirror_collector = MirrorCollector(
             mirror_logger=self.mirror_logger,
@@ -50,8 +51,8 @@ class BaseMirror:
         :return: The appropriate MirrorLogger instance
         """
 
-        # FIXME: Rather than having the `top_level_caller` argument everywhere, do this as part of the `mirror` operation
-        # of the derived classes, rather than here in the base class
+        # FIXME: Rather than having the `top_level_caller` argument everywhere, do this as part of the `mirror`
+        # operation of the derived classes, rather than here in the base class
 
         # If in OVERWRITE mode, create a new instance
         # ! NOTE: This breaks the symlinking...
@@ -69,4 +70,4 @@ class BaseMirror:
         try:
             return MirrorLogger.from_file(mirror_paths=self.mirror_paths)
         except (json.JSONDecodeError, OSError):
-            return MirrorLogger(mirror_paths=self.mirror_paths)
+            return MirrorLogger(mirror_paths=self.mirror_paths, mirror_times=MirrorTimes())

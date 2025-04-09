@@ -15,8 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from aiida.tools.mirror.config import MirrorMode, ProcessMirrorConfig, MirrorPaths
+from aiida.tools.mirror.config import MirrorMode, MirrorPaths, ProcessMirrorConfig
 from aiida.tools.mirror.process import ProcessMirror
+
 from .utils import compare_tree
 
 # TODO: Use `compare_tree` function here, as well
@@ -109,7 +110,8 @@ def test_mirror(generate_calculation_node_io, generate_workchain_node_io, tmp_pa
 
 @pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_workflow(generate_calculation_node_io, generate_workchain_node_io, tmp_path):
-    # Need to generate parent path for mirroring, as I don't want the sub-workchains to be mirrored directly into `tmp_path`
+    # Need to generate parent path for mirroring,
+    # as I don't want the sub-workchains to be mirrored directly into `tmp_path`
     mirror_parent_path = tmp_path / 'wc-workflow_mirror-test-io'
     # Don't attach outputs, as it would require storing the calculation_node and then it cannot be used in the workchain
     cj_nodes = [generate_calculation_node_io(attach_outputs=False), generate_calculation_node_io(attach_outputs=False)]
@@ -212,6 +214,7 @@ def test_mirror_multiply_add(tmp_path, generate_workchain_multiply_add):
 
 
 # Tests for mirror_calculation method
+@pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_calculation_node(tmp_path, generate_calculation_node_io):
     # Checking the actual content should be handled by `test_copy_tree`
 
@@ -246,6 +249,7 @@ def test_mirror_calculation_node(tmp_path, generate_calculation_node_io):
         assert handle.read() == filecontent
 
 
+@pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_calculation_flat(tmp_path, generate_calculation_node_io):
     # Flat mirroring -> no paths provided -> Default paths should not be existent.
     # Internal FolderData structure retained.
@@ -269,6 +273,7 @@ def test_mirror_calculation_flat(tmp_path, generate_calculation_node_io):
 
 
 # Here, in principle, test only non-default arguments, as defaults tested above
+@pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
     """Tests the Processmirror_inst for the overwrite and incremental option."""
     mirror_parent_path = tmp_path / 'cj-mirror-test-overwrite'
@@ -299,6 +304,7 @@ def test_mirror_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
 
 
 # With both inputs and outputs being mirrored is the standard test case above, so only test without inputs here
+@pytest.mark.usefixtures('aiida_profile_clean')
 def test_mirror_calculation_no_inputs(tmp_path, generate_calculation_node_io):
     mirror_parent_path = tmp_path / 'cj-mirror-test-noinputs'
     mirror_paths = MirrorPaths.from_path(mirror_parent_path)
@@ -354,7 +360,6 @@ def test_generate_child_node_label(
     output_triples = wc_output_triples + sub_wc_node.base.links.get_outgoing().all()
     # Sort by mtime here, not ctime, as I'm actually creating the CalculationNode first.
     output_triples = sorted(output_triples, key=lambda link_triple: link_triple.node.mtime)
-
 
     output_paths = sorted(
         [
