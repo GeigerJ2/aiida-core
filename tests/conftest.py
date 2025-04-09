@@ -28,11 +28,10 @@ from pathlib import Path
 import click
 import pytest
 
-from aiida import get_profile
+from aiida import get_profile, orm
 from aiida.common.folders import Folder
 from aiida.common.links import LinkType
 from aiida.manage.configuration import Profile, get_config, load_profile
-from aiida import orm
 
 if t.TYPE_CHECKING:
     from aiida.manage.configuration.config import Config

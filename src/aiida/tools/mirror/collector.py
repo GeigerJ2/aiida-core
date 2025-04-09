@@ -15,12 +15,12 @@ from typing import Any, Dict
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.config import (
-    MirrorStoreKeys,
     MirrorCollectorConfig,
+    MirrorStoreKeys,
     NodeMirrorGroupScope,
 )
-from aiida.tools.mirror.store import MirrorNodeStore
 from aiida.tools.mirror.logger import MirrorLogger
+from aiida.tools.mirror.store import MirrorNodeStore
 from aiida.tools.mirror.utils import MirrorEntityType
 
 logger = AIIDA_LOGGER.getChild('tools.mirror.collector')

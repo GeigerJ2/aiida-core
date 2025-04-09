@@ -16,9 +16,9 @@ from aiida.common import timezone
 from aiida.tools.graph.deletions import delete_nodes
 from aiida.tools.mirror.collector import MirrorCollector
 from aiida.tools.mirror.config import (
+    MirrorCollectorConfig,
     MirrorPaths,
     MirrorTimes,
-    MirrorCollectorConfig,
     NodeMirrorGroupScope,
 )
 from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
@@ -118,9 +118,7 @@ class TestMirrorNodeCollector:
 
         mirror_collector_config = MirrorCollectorConfig(group_scope=NodeMirrorGroupScope.NO_GROUP)
 
-        mirror_node_collector = MirrorCollector(
-            config=mirror_collector_config, mirror_logger=empty_mirror_logger
-        )
+        mirror_node_collector = MirrorCollector(config=mirror_collector_config, mirror_logger=empty_mirror_logger)
 
         mirror_container = mirror_node_collector.collect_to_mirror()
 

@@ -678,7 +678,7 @@ def group_mirror(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.mirror import GroupMirror
-    from aiida.tools.mirror.config import GroupMirrorConfig, MirrorMode, MirrorCollectorConfig, ProcessMirrorConfig
+    from aiida.tools.mirror.config import GroupMirrorConfig, MirrorCollectorConfig, MirrorMode, ProcessMirrorConfig
     from aiida.tools.mirror.utils import resolve_click_path_for_mirror
 
     # FIXME: If nodes not newly created since the last Mirroring, but only added to the group, those are not picked up

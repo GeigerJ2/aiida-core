@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 from aiida.common.exceptions import NotExistent
-from aiida.tools.mirror.config import MirrorPaths, MirrorTimes, MirrorStoreKeys
+from aiida.tools.mirror.config import MirrorPaths, MirrorStoreKeys, MirrorTimes
 from aiida.tools.mirror.utils import StoreKeyType
 
 # TODO: Possibly mirror hierarchy of mirrored directory inside json file

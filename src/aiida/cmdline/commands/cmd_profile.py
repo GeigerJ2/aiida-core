@@ -322,7 +322,7 @@ def profile_mirror(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.mirror import ProfileMirror
-    from aiida.tools.mirror.config import MirrorMode, MirrorCollectorConfig, ProcessMirrorConfig, ProfileMirrorConfig
+    from aiida.tools.mirror.config import MirrorCollectorConfig, MirrorMode, ProcessMirrorConfig, ProfileMirrorConfig
     from aiida.tools.mirror.utils import resolve_click_path_for_mirror
 
     profile = ctx.obj['profile']
@@ -385,7 +385,6 @@ def profile_mirror(
         config=profile_mirror_config,
         groups=groups,
     )
-
 
     # # FIXME: This doesn't respect the -G --groups selection
     # if dry_run:
