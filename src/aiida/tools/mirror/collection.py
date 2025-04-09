@@ -14,6 +14,7 @@ from __future__ import annotations
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.base import BaseMirror
+from aiida.tools.mirror.collector import MirrorCollector
 from aiida.tools.mirror.config import (
     MirrorCollectorConfig,
     MirrorMode,
@@ -31,21 +32,35 @@ class BaseCollectionMirror(BaseMirror):
         self,
         mirror_mode: MirrorMode,
         mirror_paths: MirrorPaths,
-        mirror_logger: MirrorLogger,
+        mirror_logger: MirrorLogger | None = None,
         mirror_collector_config: MirrorCollectorConfig | None = None,
     ):
         super().__init__(
             mirror_mode=mirror_mode,
             mirror_paths=mirror_paths,
-            mirror_logger=mirror_logger,
+            # mirror_logger=mirror_logger,
         )
 
         self.mirror_collector_config = mirror_collector_config or MirrorCollectorConfig()
-        # if not mirror_collector_config:
-        #     mirror_collector_config = MirrorCollectorConfig()
 
-        # self.mirror_collector_config = mirror_collector_config
-        # self.mirror_collector = MirrorCollector(mirror_logger=self.mirror_logger, config=self.mirror_collector_config)
+        # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
+        # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
+        # However, the pre_mirror is done before instantiation, so running the mirror with `overwrite` still has the
+        # `dump_logger` from the JSON file of the previous run attached...
+        # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
+        # before instantiation??
+        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
+            mirror_paths.log_path.unlink()
+
+        self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger, top_level_caller=True)
+
+    # ! This shouldn't be here, because the `mirror_collector` only is required for collections of nodes
+    def set_mirror_collector(self, mirror_logger: MirrorLogger) -> MirrorCollector:
+        mirror_collector = MirrorCollector(
+            mirror_logger=mirror_logger,
+            config=self.mirror_collector_config,
+        )
+        return mirror_collector
 
     # Implement this here, as for the deletion, we don't care about the group
     def delete(self) -> None:
@@ -101,7 +116,7 @@ class BaseCollectionMirror(BaseMirror):
         # Then delete the groups
         for to_delete_group in to_delete_groups:
             path = log_group_store.get_entry(to_delete_group).path
-            _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
+            safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
             self.mirror_logger.del_entry(store=log_group_store, uuid=to_delete_group)
 
         msg = f'Deleted the groups: {deleted_groups}'
@@ -123,7 +138,7 @@ class BaseCollectionMirror(BaseMirror):
 
             for to_delete_uuid in to_delete_uuids:
                 path = log_store.get_entry(to_delete_uuid).path
-                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
+                safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
                 self.mirror_logger.del_entry(store=log_store, uuid=to_delete_uuid)
 
             msg = f'Deleted {len(to_delete_uuids)} {store_name}'
@@ -153,5 +168,5 @@ class BaseCollectionMirror(BaseMirror):
             # Delete the identified nodes
             for additional_delete_node in additional_delete_nodes:
                 path = log_store.get_entry(additional_delete_node).path
-                _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
+                safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
                 self.mirror_logger.del_entry(store=log_store, uuid=additional_delete_node)

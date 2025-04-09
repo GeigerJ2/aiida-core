@@ -27,6 +27,7 @@ __all__ = (
     'ALL',
     'ALL_STATES',
     'ALL_USERS',
+    'ALSO_UNGROUPED',
     'APPEND_TEXT',
     'ARCHIVE_FORMAT',
     'BROKER_HOST',
@@ -88,7 +89,6 @@ __all__ = (
     'NODES',
     'NON_INTERACTIVE',
     'OLDER_THAN',
-    'ONLY_GROUPS',
     'ONLY_TOP_LEVEL_CALCS',
     'ONLY_TOP_LEVEL_WORKFLOWS',
     'ORDER_BY',
@@ -883,11 +883,11 @@ DELETE_MISSING = OverridableOption(
     help="If a previously mirrored node is deleted from AiiDA's DB, also delete the corresponding mirror directory.",
 )
 
-ONLY_GROUPS = OverridableOption(
-    '--only-groups/--no-only-groups',
+ALSO_UNGROUPED = OverridableOption(
+    '--also-ungrouped/--no-also-ungrouped',
     default=False,
     show_default=True,
-    help='Mirror only data of nodes which are already organized in groups.',
+    help='Mirror also data of nodes that are not part of any group.',
 )
 
 ONLY_TOP_LEVEL_CALCS = OverridableOption(

@@ -60,19 +60,23 @@ class ProfileMirror(BaseCollectionMirror):
     ):
         """Initialize the ProfileMirror."""
 
-        if mirror_paths is None:
-            default_mirror_path = generate_profile_default_mirror_path()
-            mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
+        if isinstance(profile, str):
+            loaded_profile = load_profile(profile=profile, allow_switch=True)
+        elif isinstance(profile, Profile):
+            loaded_profile = profile
+            pass
+        else:
+            from aiida.manage import get_manager
 
-        # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
-        # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
-        # However, the pre_mirror is done before instantiation, so running the mirror with `overwrite` still has the
-        # `dump_logger` from the JSON file of the previous run attached...
-        # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
-        # before instantiation??
-        # ! NOTE: THIS IS A HACK
-        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
-            mirror_paths.log_path.unlink()
+            manager = get_manager()
+            loaded_profile = cast(Profile, manager.get_profile())
+
+        assert loaded_profile is not None
+        self.profile: Profile = loaded_profile
+
+        if mirror_paths is None:
+            default_mirror_path = generate_profile_default_mirror_path(self.profile)
+            mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
 
         super().__init__(
             mirror_mode=mirror_mode,
@@ -81,14 +85,12 @@ class ProfileMirror(BaseCollectionMirror):
             mirror_collector_config=mirror_collector_config,
         )
 
-        if not isinstance(profile, Profile):
-            profile: Profile = load_profile(profile=profile, allow_switch=True)
-        self.profile = profile
-
         if groups is not None:
             self.groups = [GroupMirror.load_given_group(group=g) for g in groups]
         else:
             self.groups = []
+
+        # import ipdb; ipdb.set_trace()
 
         self.process_mirror_config = process_mirror_config or ProcessMirrorConfig()
         self.config = config or ProfileMirrorConfig()
@@ -102,13 +104,7 @@ class ProfileMirror(BaseCollectionMirror):
             }
         )
 
-        # Unpack arguments for easier access
-        # self.symlink_duplicates = self.config.symlink_calcs
-        # self.delete_missing = self.config.delete_missing
-        # self.organize_by_groups = self.config.organize_by_groups
-        # self.only_groups = self.config.only_groups
-
-        # self.group_container_mapping: dict[orm.Group, MirrorNodeContainer] = {}
+        assert self.mirror_logger is not None
 
     def mirror_per_group(self, groups: list[orm.Group]) -> None:
         """Iterate through a list of groups and mirror the contained processes in their dedicated directories.
@@ -116,6 +112,7 @@ class ProfileMirror(BaseCollectionMirror):
         :param groups: List of ``orm.Group`` entities.
         """
 
+        assert self.mirror_logger is not None
         group_store = self.mirror_logger.groups
 
         for group in groups:
@@ -132,7 +129,7 @@ class ProfileMirror(BaseCollectionMirror):
                 mirror_mode=self.mirror_mode,
                 process_mirror_config=self.process_mirror_config,
                 config=self.group_mirror_config,
-                mirror_logger=self.mirror_logger,
+                # mirror_logger=self.mirror_logger,
                 mirror_collector_config=self.mirror_collector_config,
             )
 
@@ -189,8 +186,8 @@ class ProfileMirror(BaseCollectionMirror):
         :param
         """
 
-        self.mirror_logger = self.set_mirror_logger(mirror_logger=self.mirror_logger, top_level_caller=True)
-        self.mirror_collector = self.set_mirror_collector()
+        # self.mirror_logger = self.set_mirror_logger(mirror_logger=self.mirror_logger, top_level_caller=True)
+        self.mirror_collector = self.set_mirror_collector(mirror_logger=self.mirror_logger)
 
         if self.config.delete_missing:
             self.delete()
@@ -205,12 +202,12 @@ class ProfileMirror(BaseCollectionMirror):
             prepare_mirror_path(
                 path_to_validate=self.mirror_paths.absolute,
                 mirror_mode=self.mirror_mode,
-                safeguard_file=self.mirror_paths.safeguard_path,
+                safeguard_file=self.mirror_paths.safeguard_file,
                 top_level_caller=top_level_caller,
             )
 
         # If `groups` given on construction, mirror only data within those groups
-        if self.groups:
+        if len(self.groups) > 0:
             self.mirror_per_group(groups=self.groups)
 
         # Without selecting groups, by default, all profile data should be mirrored
@@ -219,7 +216,7 @@ class ProfileMirror(BaseCollectionMirror):
             profile_groups = cast(list[orm.Group], orm.QueryBuilder().append(orm.Group).all(flat=True))
             self.mirror_per_group(groups=profile_groups)
 
-            if not self.config.only_groups:
+            if self.config.also_ungrouped:
                 self.mirror_not_in_any_group()
 
         if top_level_caller:
@@ -227,69 +224,125 @@ class ProfileMirror(BaseCollectionMirror):
 
     def update_groups(self):
         mirror_logger = self.mirror_logger
-        old_mirror_logger_dict = self.mirror_logger.to_dict()
+        assert mirror_logger is not None
 
-        # Order is the same as in the mirroring log file -> Not using a profile QB here
-        # Also, if the group is new (and contains new nodes), it will be mirrored anyway
+        old_mirror_logger_dict = mirror_logger.to_dict()
+
+        # Get the list of mirrored group UUIDs
         mirrored_group_uuids = list(mirror_logger.groups.entries.keys())
 
-        old_mapping: dict[str, Path] = dict(
-            zip(
-                mirrored_group_uuids,
-                [p.path for p in mirror_logger.groups.entries.values()],
-            )
-        )
+        # Create mappings of group UUIDs to old paths and new labels
+        old_paths = [entry.path for entry in mirror_logger.groups.entries.values()]
+        new_labels = [orm.load_group(uuid=uuid).label for uuid in mirrored_group_uuids]
 
-        new_mapping: dict[str, Path] = dict(
-            zip(
-                mirrored_group_uuids,
-                [orm.load_group(uuid=uuid).label for uuid in mirrored_group_uuids],
-            )
-        )
-
-        for old_label, new_label in zip([*[p.name for p in old_mapping.values()]], [*new_mapping.values()]):
+        # Update paths in mirror logger for changed labels
+        for old_path, new_label in zip(old_paths, new_labels):
+            old_label = old_path.name
             if old_label != new_label:
-                self.mirror_logger.update_paths(old_str=old_label, new_str=new_label)
+                mirror_logger.update_paths(old_str=old_label, new_str=new_label)
+                logger.report(f'Applied group relabelling `{old_label}` -> `{new_label}` in mirror directory and log.')
 
-        new_mirror_logger_dict = self.mirror_logger.to_dict()
+        # Get updated paths
+        new_mirror_logger_dict = mirror_logger.to_dict()
 
-        moved_paths = []
-        for entity in ('groups', 'workflows', 'calculations', 'data'):
-            old_store_dict = old_mirror_logger_dict[entity]
-            new_store_dict = new_mirror_logger_dict[entity]
+        # Track paths that have already been moved to avoid duplicate moves
+        moved_paths = set()
 
-            for uuid, entry in old_store_dict.items():
+        # Move files for all entity types
+        for entity_type in ('groups', 'workflows', 'calculations', 'data'):
+            old_store = old_mirror_logger_dict[entity_type]
+            new_store = new_mirror_logger_dict[entity_type]
+
+            for uuid, entry in old_store.items():
                 old_path = entry['path']
-                new_path = new_store_dict[uuid]['path']
+                new_path = new_store[uuid]['path']
 
                 if old_path != new_path and old_path not in moved_paths:
+                    parent_dir = Path(new_path).parent
+
+                    # Create parent directory if it doesn't exist
+                    if not parent_dir.exists():
+                        parent_dir.mkdir(parents=True, exist_ok=True)
+
                     try:
                         shutil.move(str(old_path), str(new_path))
-                        moved_paths.append(old_path)
+                        moved_paths.add(old_path)
 
-                        # Update original dictionary to reflect the moves already done
-                        # This works because the `store_dict`s are just references to parts of the original
-                        # `mirror_logger_dict`
-                        old_store_dict[uuid]['path'] = new_path
-
+                        # Update the old store to reflect the completed move
+                        old_store[uuid]['path'] = new_path
                     except FileNotFoundError:
-                        # This could be handled better, the origin of this problem is that if I move the following:
-                        # profile-readme-mirror/groups/add-group
-                        # to
-                        # profile-readme-mirror/groups/xadd-group
-                        # The following move operation will fail:
-                        # profile-readme-mirror/groups/add-group/calculations/ArithmeticAddCalculation-4
-                        # to
-                        # profile-readme-mirror/groups/xadd-group/calculations/ArithmeticAddCalculation-4
-                        # Because the group directory had already been renamed.
-                        # TODO: Fix better in the future...
+                        # Path might have been implicitly moved when a parent directory was moved
                         continue
 
-        self.mirror_logger.save_log()
-        for old_label, new_label in zip([*[p.name for p in old_mapping.values()]], [*new_mapping.values()]):
-            if old_label != new_label:
-                msg = f'Applied group relabelling `{old_label}` -> `{new_label}` in mirror directory and log.'
-                logger.report(msg)
+        # Save the updated log
+        mirror_logger.save_log()
+
+    # def update_groups(self):
+    #     mirror_logger = self.mirror_logger
+    #     old_mirror_logger_dict = self.mirror_logger.to_dict()
+
+    #     # Order is the same as in the mirroring log file -> Not using a profile QB here
+    #     # Also, if the group is new (and contains new nodes), it will be mirrored anyway
+    #     mirrored_group_uuids = list(mirror_logger.groups.entries.keys())
+    #     import ipdb; ipdb.set_trace()
+
+    #     old_mapping: dict[str, Path] = dict(
+    #         zip(
+    #             mirrored_group_uuids,
+    #             [p.path for p in mirror_logger.groups.entries.values()],
+    #         )
+    #     )
+
+    #     new_mapping: dict[str, Path] = dict(
+    #         zip(
+    #             mirrored_group_uuids,
+    #             [orm.load_group(uuid=uuid).label for uuid in mirrored_group_uuids],
+    #         )
+    #     )
+
+    #     for old_label, new_label in zip([*[p.name for p in old_mapping.values()]], [*new_mapping.values()]):
+    #         if old_label != new_label:
+    #             self.mirror_logger.update_paths(old_str=old_label, new_str=new_label)
+
+    #     new_mirror_logger_dict = self.mirror_logger.to_dict()
+
+    #     moved_paths = []
+    #     for entity in ('groups', 'workflows', 'calculations', 'data'):
+    #         old_store_dict = old_mirror_logger_dict[entity]
+    #         new_store_dict = new_mirror_logger_dict[entity]
+
+    #         for uuid, entry in old_store_dict.items():
+    #             old_path = entry['path']
+    #             new_path = new_store_dict[uuid]['path']
+
+    #             if old_path != new_path and old_path not in moved_paths:
+    #                 try:
+    #                     shutil.move(str(old_path), str(new_path))
+    #                     moved_paths.append(old_path)
+
+    #                     # Update original dictionary to reflect the moves already done
+    #                     # This works because the `store_dict`s are just references to parts of the original
+    #                     # `mirror_logger_dict`
+    #                     old_store_dict[uuid]['path'] = new_path
+
+    #                 except FileNotFoundError:
+    #                     # This could be handled better, the origin of this problem is that if I move the following:
+    #                     # profile-readme-mirror/groups/add-group
+    #                     # to
+    #                     # profile-readme-mirror/groups/xadd-group
+    #                     # The following move operation will fail:
+    #                     # profile-readme-mirror/groups/add-group/calculations/ArithmeticAddCalculation-4
+    #                     # to
+    #                     # profile-readme-mirror/groups/xadd-group/calculations/ArithmeticAddCalculation-4
+    #                     # Because the group directory had already been renamed.
+    #                     # TODO: Fix better in the future...
+    #                     continue
+
+    #     self.mirror_logger.save_log()
+    #     for old_label, new_label in zip([*[p.name for p in old_mapping.values()]], [*new_mapping.values()]):
+    #         if old_label != new_label:
+    #             msg = f'Applied group relabelling `{old_label}` -> `{new_label}` in mirror directory and log.'
+    #             logger.report(msg)
 
     # def delete_missing_groups(self):
     #     groups_to_delete_uuids = self.get_groups_to_delete()

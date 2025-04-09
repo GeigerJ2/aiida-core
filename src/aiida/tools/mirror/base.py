@@ -13,8 +13,7 @@ from __future__ import annotations
 
 import json
 
-from aiida.tools.mirror.collector import MirrorCollector
-from aiida.tools.mirror.config import MirrorCollectorConfig, MirrorMode, MirrorPaths, MirrorTimes
+from aiida.tools.mirror.config import MirrorMode, MirrorPaths, MirrorTimes
 from aiida.tools.mirror.logger import MirrorLogger
 
 
@@ -23,28 +22,17 @@ class BaseMirror:
         self,
         mirror_mode: MirrorMode | None = None,
         mirror_paths: MirrorPaths | None = None,
-        mirror_logger: MirrorLogger | None = None,
-        mirror_collector_config: MirrorCollectorConfig | None = None,
+        # mirror_logger: MirrorLogger | None = None,
+        # mirror_collector_config: MirrorCollectorConfig | None = None,
     ):
         self.mirror_mode = mirror_mode or MirrorMode.INCREMENTAL
         self.mirror_paths = mirror_paths or MirrorPaths()
-        self.mirror_logger = mirror_logger
-        self.mirror_collector_config = mirror_collector_config or MirrorCollectorConfig()
+        # self.mirror_logger = mirror_logger
+        # self.mirror_collector_config = mirror_collector_config or MirrorCollectorConfig()
 
-    # ! This shouldn't be here, because the `mirror_collector` only is required for collections of nodes
-    def set_mirror_collector(self):
-        # NOTE: This might not be required, if I always only pass the config object
-        # if mirror_collector is not None:
-        #     return mirror_collector
-        assert self.mirror_logger is not None
-
-        mirror_collector = MirrorCollector(
-            mirror_logger=self.mirror_logger,
-            config=self.mirror_collector_config,
-        )
-        return mirror_collector
-
-    def set_mirror_logger(self, mirror_logger: MirrorLogger | None = None, top_level_caller: bool = False):
+    def set_mirror_logger(
+        self, mirror_logger: MirrorLogger | None = None, top_level_caller: bool = False
+    ) -> MirrorLogger:
         """If in loading from file fails, e.g., due to ``overwrite``, create a new instance
 
         :param mirror_logger: Optional existing logger instance to use

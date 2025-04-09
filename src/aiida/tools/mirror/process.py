@@ -53,15 +53,26 @@ class ProcessMirror(BaseMirror):
 
         self.process_node = process_node
 
+        super().__init__(
+            mirror_mode=mirror_mode,
+            mirror_paths=mirror_paths,
+            # mirror_logger=mirror_logger,
+        )
+
         if mirror_paths is None:
             default_mirror_path = generate_process_default_mirror_path(process_node=self.process_node)
             mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
 
-        super().__init__(
-            mirror_mode=mirror_mode,
-            mirror_paths=mirror_paths,
-            mirror_logger=mirror_logger,
-        )
+        # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
+        # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
+        # However, the pre_mirror is done before instantiation, so running the mirror with `overwrite` still has the
+        # `dump_logger` from the JSON file of the previous run attached...
+        # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
+        # before instantiation??
+        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
+            mirror_paths.log_path.unlink()
+
+        self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger, top_level_caller=True)
 
         self.config = config or ProcessMirrorConfig()
 
@@ -249,6 +260,7 @@ class ProcessMirror(BaseMirror):
         output_path.mkdir(parents=True, exist_ok=True)
 
         self._write_node_yaml(process_node=workflow_node, output_path=output_path)
+        (output_path / MirrorPaths.safeguard_file).touch()
 
         if self.mirror_logger is not None:
             workflow_store = self.mirror_logger.stores.workflows
@@ -277,7 +289,7 @@ class ProcessMirror(BaseMirror):
 
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
-                if self.mirror_logger:
+                if self.mirror_logger is not None:
                     calculation_store = self.mirror_logger.stores.calculations
 
                     if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
@@ -289,8 +301,7 @@ class ProcessMirror(BaseMirror):
 
                     else:
                         try:
-                            store_entry: MirrorLog | None = calculation_store.get_entry(child_node.uuid)
-                            if store_entry:
+                            if (store_entry := calculation_store.get_entry(child_node.uuid)) is not None:
                                 os.symlink(
                                     store_entry.path,
                                     child_output_path,

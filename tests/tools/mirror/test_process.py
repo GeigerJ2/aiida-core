@@ -57,9 +57,11 @@ def test_mirror(generate_calculation_node_io, generate_workchain_node_io, tmp_pa
             {
                 '01-sub_workflow-8': [
                     '.aiida_node_metadata.yaml',
+                    '.aiida_mirror_safeguard',
                     {
                         '01-calculation-9': [
                             '.aiida_node_metadata.yaml',
+                            '.aiida_mirror_safeguard',
                             {'inputs': ['file.txt']},
                             {
                                 'node_inputs': [
@@ -73,6 +75,7 @@ def test_mirror(generate_calculation_node_io, generate_workchain_node_io, tmp_pa
                     {
                         '02-calculation-10': [
                             '.aiida_node_metadata.yaml',
+                            '.aiida_mirror_safeguard',
                             {'inputs': ['file.txt']},
                             {
                                 'node_inputs': [

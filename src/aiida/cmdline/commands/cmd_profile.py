@@ -285,7 +285,7 @@ def profile_delete(force, delete_data, profiles):
 @options.SYMLINK_CALCS()
 # @options.SYMLINK_BETWEEN_GROUPS()
 @options.ORGANIZE_BY_GROUPS()
-@options.ONLY_GROUPS()
+@options.ALSO_UNGROUPED()
 @options.UPDATE_GROUPS()
 @options.INCLUDE_INPUTS()
 @options.INCLUDE_OUTPUTS()
@@ -308,7 +308,7 @@ def profile_mirror(
     # symlink_between_groups,
     delete_missing,
     update_groups,
-    only_groups,
+    also_ungrouped,
     only_top_level_calcs,
     only_top_level_workflows,
     include_inputs,
@@ -371,7 +371,7 @@ def profile_mirror(
         symlink_calcs=symlink_calcs,
         delete_missing=delete_missing,
         organize_by_groups=organize_by_groups,
-        only_groups=only_groups,
+        also_ungrouped=also_ungrouped,
         update_groups=update_groups,
         # symlink_between_groups=symlink_between_groups
     )

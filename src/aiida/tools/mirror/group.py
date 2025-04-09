@@ -57,7 +57,7 @@ class GroupMirror(BaseCollectionMirror):
     def __init__(
         self,
         group: orm.Group | None,
-        mirror_mode: MirrorMode | None = None,
+        mirror_mode: MirrorMode = MirrorMode.INCREMENTAL,
         mirror_paths: MirrorPaths | None = None,
         mirror_logger: MirrorLogger | None = None,
         config: GroupMirrorConfig | None = None,
@@ -90,7 +90,7 @@ class GroupMirror(BaseCollectionMirror):
         self.process_mirror_config.symlink_calcs = self.config.symlink_calcs
 
     @staticmethod
-    def load_given_group(group: orm.Group | str | None) -> orm.Group:
+    def load_given_group(group: orm.Group | str | None) -> orm.Group | None:
         """Validate the given group identifier.
 
         :param group: The group identifier to validate.
@@ -111,7 +111,6 @@ class GroupMirror(BaseCollectionMirror):
             return group
 
         else:
-            # return orm.Group(label='no-group')
             return None
 
     # staticmethod so I can use it before instantiation of the GroupDumper, as that will need the subpath already
@@ -173,7 +172,7 @@ class GroupMirror(BaseCollectionMirror):
 
         process_paths = MirrorPaths(
             parent=process_mirror_path.parent,
-            child=process_mirror_path.name,
+            child=Path(process_mirror_path.name),
         )
 
         process_mirror_inst = ProcessMirror(
@@ -225,11 +224,20 @@ class GroupMirror(BaseCollectionMirror):
         process_type_path.mkdir(exist_ok=True, parents=True)
 
         # NOTE: This seems a bit hacky. Can probably be improved
-        current_store_key = MirrorStoreKeys.from_instance(node_inst=next(iter(processes)))
-        other_store_key = 'calculations' if current_store_key == 'workflows' else 'workflows'
+        # Get the store key as a string from the instance
+        current_store_key_str = MirrorStoreKeys.from_instance(node_inst=next(iter(processes)))
 
-        current_store = self.mirror_logger.get_store_by_key(key=current_store_key)
-        other_store = self.mirror_logger.get_store_by_key(key=other_store_key)
+        # Convert string to actual enum members
+        current_store_key = MirrorStoreKeys(current_store_key_str)
+        other_store_key = (
+            MirrorStoreKeys.CALCULATIONS
+            if current_store_key == MirrorStoreKeys.WORKFLOWS
+            else MirrorStoreKeys.WORKFLOWS
+        )
+
+        # Now use the enum members with your get_store_by_key method
+        current_store = self.mirror_logger.get_store_by_key(key=current_store_key.value)
+        other_store = self.mirror_logger.get_store_by_key(key=other_store_key.value)
 
         self.current_store: MirrorLogStore = current_store
         self.other_store: MirrorLogStore = other_store
@@ -256,7 +264,7 @@ class GroupMirror(BaseCollectionMirror):
                 logger.report(msg)
                 self.mirror_processes(processes=processes)
             else:
-                if self.group:
+                if self.group is not None:
                     msg = f'No (new) {process_type} to mirror in group `{self.group.label}`.'
                 else:
                     msg = f'No (new) ungrouped {process_type} to mirror.'
@@ -269,7 +277,7 @@ class GroupMirror(BaseCollectionMirror):
         """
 
         self.mirror_logger = self.set_mirror_logger(mirror_logger=self.mirror_logger)
-        self.mirror_collector = self.set_mirror_collector()
+        self.mirror_collector = self.set_mirror_collector(mirror_logger=self.mirror_logger)
 
         if self.config.delete_missing:
             self.delete()
@@ -285,17 +293,17 @@ class GroupMirror(BaseCollectionMirror):
             prepare_mirror_path(
                 path_to_validate=self.mirror_paths.absolute,
                 mirror_mode=self.mirror_mode,
-                safeguard_file=self.mirror_paths.safeguard_path,
+                safeguard_file=self.mirror_paths.safeguard_file,
                 top_level_caller=top_level_caller,
             )
 
         mirror_node_store: MirrorNodeStore = self.mirror_collector.collect_to_mirror(group=self.group)
 
-        _ = self.process_store_mirror(mirror_store=mirror_node_store)
+        self.process_store_mirror(mirror_store=mirror_node_store)
 
         # FIXME: This is a small hack to only write an entry into the logger for actual groups
         # and not the `no-group` container
-        if self.group:
+        if self.group is not None:
             self.mirror_logger.stores.groups.add_entry(
                 uuid=self.group.uuid,
                 entry=MirrorLog(
