@@ -49,8 +49,6 @@ class MirrorCollector:
 
         logger.report(msg)
 
-        # import traceback
-        # traceback.print_stack()
         mirror_times = self.mirror_logger.mirror_times
         if mirror_times.last is None:
             msg = 'For the first mirror, this can take a while.'
