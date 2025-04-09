@@ -326,8 +326,8 @@ def group_relabel(group, label):
     else:
         echo.echo_success(f"Label changed to '{label}'")
         msg = (
-            'Note that if you are mirroring your profile data to disk, to reflect the relabeling of the group, '
-            'run the command: `verdi [group|profile] mirror --update-groups.`'
+            'Note that if you are mirroring your profile datr to disk, to reflect the relabeling of the group, '
+            'run the command: `verdi profile mirror --update-groups.`'
         )
         echo.echo_report(msg)
 
@@ -642,9 +642,7 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
 @verdi_group.command('mirror')
 @arguments.GROUP()
 @options.PATH()
-# @options.DRY_RUN()
 @options.OVERWRITE()
-# @options.INCREMENTAL()
 @options.FILTER_BY_LAST_MIRROR_TIME()
 @options.MIRROR_PROCESSES()
 @options.MIRROR_DATA()
@@ -652,23 +650,20 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
 @options.ONLY_TOP_LEVEL_CALCS()
 @options.ONLY_TOP_LEVEL_WORKFLOWS()
 @options.SYMLINK_CALCS()
-@options.UPDATE_GROUPS()
 @options.INCLUDE_INPUTS()
 @options.INCLUDE_OUTPUTS()
 @options.INCLUDE_ATTRIBUTES()
 @options.INCLUDE_EXTRAS()
 @options.FLAT()
+@options.MIRROR_UNSEALED()
 def group_mirror(
     group,
     path,
-    # dry_run,
     overwrite,
-    # incremental,
     filter_by_last_mirror_time,
     mirror_processes,
     mirror_data,
     delete_missing,
-    update_groups,
     only_top_level_calcs,
     only_top_level_workflows,
     symlink_calcs,
@@ -677,6 +672,7 @@ def group_mirror(
     include_attributes,
     include_extras,
     flat,
+    mirror_unsealed,
 ):
     """Mirror data of group to disk."""
 
@@ -713,6 +709,7 @@ def group_mirror(
         include_attributes=include_attributes,
         include_extras=include_extras,
         flat=flat,
+        mirror_unsealed=mirror_unsealed,
     )
 
     group_mirror_config = GroupMirrorConfig(

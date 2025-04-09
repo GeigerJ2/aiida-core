@@ -116,13 +116,18 @@ class MirrorCollector:
         filters = {}
         orm_key = MirrorStoreKeys.from_class(orm_class=orm_class)
 
+        # Only nodes with an `mtime` up to the current mirror time are selected.
+        # This is to avoid unpredictable behavior on multiple runs of the command.
+        # The current mirror time thus serves as a cutoff for the node selection
+        filters['mtime'] = {'<=': self.mirror_logger.mirror_times.current.astimezone()}
+
         # This might be too annoying to log always, and raising here would require manually setting
         # `filter-by-last-mirror-time` to False for the first mirror
         if self.config.filter_by_last_mirror_time and not self.mirror_logger.mirror_times.last:
             msg = 'Cannot filter by last mirror time if no last mirror time available. Will not filter nodes by time.'
             logger.debug(msg)
 
-        # Filter by modification time if requested
+        # Filter by last_mirror time
         elif self.config.filter_by_last_mirror_time and self.mirror_logger.mirror_times.last:
             filters['mtime'] = {'>=': self.mirror_logger.mirror_times.last.astimezone()}
 

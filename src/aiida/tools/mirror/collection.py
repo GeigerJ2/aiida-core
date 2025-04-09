@@ -77,6 +77,8 @@ class BaseCollectionMirror(BaseMirror):
         # Finally, clean up nodes that were part of deleted groups
         if deleted_groups:
             self.group_store_subnodes_delete(deleted_groups)
+        
+        # TODO: Verify if the log is properly updated here (via the test)
 
     def group_store_delete(self, delete_store: MirrorNodeStore) -> list:
         """Delete groups and return a list of their labels for further processing.
@@ -158,61 +160,3 @@ class BaseCollectionMirror(BaseMirror):
                 path = log_store.get_entry(additional_delete_node).path
                 _ = safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard)
                 self.mirror_logger.del_entry(store=log_store, uuid=additional_delete_node)
-
-    def update_groups(self):
-        mirror_logger = self.mirror_logger
-        old_mirror_logger_dict = self.mirror_logger.to_dict()
-
-        # Order is the same as in the mirroring log file -> Not using a profile QB here
-        # Also, if the group is new (and contains new nodes), it will be mirrored anyway
-        mirrored_group_uuids = list(mirror_logger.groups.entries.keys())
-
-        old_mapping: dict[str, Path] = dict(
-            zip(
-                mirrored_group_uuids,
-                [p.path for p in mirror_logger.groups.entries.values()],
-            )
-        )
-
-        new_mapping: dict[str, Path] = dict(
-            zip(
-                mirrored_group_uuids,
-                [orm.load_group(uuid=uuid).label for uuid in mirrored_group_uuids],
-            )
-        )
-
-        for old_label, new_label in zip([*[p.name for p in old_mapping.values()]], [*new_mapping.values()]):
-            self.mirror_logger.update_paths(old_str=old_label, new_str=new_label)
-
-        new_mirror_logger_dict = self.mirror_logger.to_dict()
-
-        moved_paths = []
-        for entity in ('groups', 'workflows', 'calculations', 'data'):
-            old_store_dict = old_mirror_logger_dict[entity]
-            new_store_dict = new_mirror_logger_dict[entity]
-
-            for uuid, entry in old_store_dict.items():
-                old_path = entry['path']
-                new_path = new_store_dict[uuid]['path']
-
-                if old_path != new_path and old_path not in moved_paths:
-                    try:
-                        shutil.move(str(old_path), str(new_path))
-                        moved_paths.append(old_path)
-
-                        # Update original dictionary to reflect the moves already done
-                        # This works because the `store_dict`s are just references to parts of the original `mirror_logger_dict`
-                        old_store_dict[uuid]['path'] = new_path
-
-                    except FileNotFoundError:
-                        # This could be handled better, the origin of this problem is that if I move the following:
-                        # profile-readme-mirror/groups/add-group
-                        # to
-                        # profile-readme-mirror/groups/xadd-group
-                        # The following move operation will fail:
-                        # profile-readme-mirror/groups/add-group/calculations/ArithmeticAddCalculation-4
-                        # to
-                        # profile-readme-mirror/groups/xadd-group/calculations/ArithmeticAddCalculation-4
-                        # Because the group directory had already been renamed.
-                        # TODO: Fix better in the future...
-                        continue
