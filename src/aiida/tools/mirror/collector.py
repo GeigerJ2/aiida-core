@@ -86,8 +86,6 @@ class MirrorCollector:
             msg = 'Mirroring of data nodes not implemented yet.'
             raise NotImplementedError(msg)
 
-        # import ipdb; ipdb.set_trace()
-
         return node_store
 
     def collect_to_delete(self) -> MirrorNodeStore:

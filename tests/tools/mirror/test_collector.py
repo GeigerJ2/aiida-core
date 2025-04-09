@@ -101,6 +101,9 @@ class TestMirrorNodeCollector:
         process_types = (orm.CalculationNode, orm.WorkflowNode)
         process_dict = dict.fromkeys(process_types)
 
+        # Need to create the processes before MirrorTimes is instantiated
+        # Otherwise the time restriction of nodes up to the current time filters them out
+        # FIXME: This note seems wrong. investigate further
         for process_type in process_types:
             processes = [process_type() for i in range(3)]
             _ = [n.store() for n in processes]

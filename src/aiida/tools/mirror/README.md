@@ -6,15 +6,15 @@ By default, files will be mirrored to disk in the current working directory (CWD
 This means that, as you run your simulations through AiiDA and you keep executing the command, relevant files of
 those new simulations will gradually be written to the directory.
 Instead, if the command is run with the `-o/--overwrite` option, the output directory will be cleaned, and re-created from
-scratch with the data available in the specified entity, be that an individual simulation, a group, or the whole AiiDA
+scratch with the data available in the specified entity, be that an individual process, a group, or the whole AiiDA
 profile.
 
-The command was intended to further bridge the gap between research conducted with AiiDA and research data produced by
-AiiDA with other scientists not familiar with AiiDA.
+The command was intended to further bridge the gap between research conducted with AiiDA and scientists not familiar with AiiDA.
 Some possible use cases that were considered while developing the feature are:
-1. Zipping the resulting `mirror` directory of a data collection and sharing it with collaborators unfamiliar with AiiDA
-   such that it can be explored by others, or
-1. Periodically running the command (e.g., via `cron`) to reflect changes while working on a project, such that they can be analyzed.
+
+1. Sharing the resulting `mirror` directory of a data collection with collaborators unfamiliar with AiiDA such that it can be explored by others, or
+1. Periodically running the command (e.g., via `cron`) to reflect changes while working on a project, such that they can
+   be analyzed in the "classical" way (using shell tools, rather than AiiDA's programmatic approach).
 
 ## CLI options
 
@@ -55,6 +55,7 @@ Options:
                                   Set the verbosity of the output.
   -h, --help                      Show this message and exit.
 ```
+
 </details>
 
 <details>
@@ -112,6 +113,9 @@ Options:
                                   extras]
   -f, --flat                      Mirror files in a flat directory for every
                                   step of a workflow.
+  --mirror-unsealed / --no-mirror-unsealed
+                                  Also allow the mirroring of unsealed process
+                                  nodes.  [default: no-mirror-unsealed]
   -v, --verbosity [notset|debug|info|report|warning|error|critical]
                                   Set the verbosity of the output.
   -h, --help                      Show this message and exit.
@@ -120,105 +124,103 @@ Options:
 </details>
 
 As you can see, the `verdi group mirror` command exposes various options to specify the behavior of the mirroring of the selected group which influence the resulting directory structure.
-These options are `filter-by-last-mirror-time`, `mirror-processes`, `mirror-data`, `delete-missing`, `only-top-level-calcs`,
+These options are `filter-by-last-mirror-time`, `mirror-processes`, `mirror-data` (currently not implemented yet), `delete-missing`, `only-top-level-calcs`,
 `only-top-level-workflows`, and `symlink-calcs`,
 In addition, the same options as for the `verdi process mirror` command are available. This is
-because groups likely contain processes, and so the behavior of mirroring individual processes must be
+because groups likely contain processes, and so the behavior of mirroring individual processes should be
 controllable when mirroring the content of a group.
 
-In accordance, the `verdi profile mirror` command exposes all options of `verdi process mirror` and `verdi group
-mirror`, as well as additional options that can be seen below:
+In accordance, the `verdi profile mirror` command exposes all options of `verdi process mirror` and `verdi group mirror`, as well as additional options that can be seen below:
 
 <details>
 <summary><code>verdi profile mirror -h</code></summary>
 
 Options:
-  -p, --path PATH                 Base path for mirror operations that write
-                                  to disk.
-  -o, --overwrite                 Overwrite file/directory when writing to
-                                  disk.
-  -G, --groups GROUP...           One or multiple groups identified by their
-                                  ID, UUID or label.
-  --filter-by-last-mirror-time / --no-filter-by-last-mirror-time
-                                  Only select nodes whose `mtime` is after the
-                                  last mirror time.  [default: filter-by-last-
-                                  mirror-time]
-  --mirror-processes / --no-mirror-processes
-                                  Mirror process data.  [default: mirror-
-                                  processes]
-  --mirror-data / --no-mirror-data
-                                  Mirror data nodes.  [default: no-mirror-
-                                  data]
-  --only-top-level-calcs / --no-only-top-level-calcs
-                                  Mirror calculations in their own dedicated
-                                  directories, not just as part of the
-                                  mirrored workflow.  [default: only-top-
-                                  level-calcs]
-  --only-top-level-workflows / --no-only-top-level-workflows
-                                  If a top-level workflow calls sub-workflows,
-                                  create a designated directory only for the
-                                  top-level workflow.  [default: only-top-
-                                  level-workflows]
-  --delete-missing / --no-delete-missing
-                                  If a previously mirrored node is deleted
-                                  from AiiDA's DB, also delete the
-                                  corresponding mirror directory.  [default:
-                                  no-delete-missing]
-  --symlink-calcs / --no-symlink-calcs
-                                  Symlink workflow sub-calculations to their
-                                  own dedicated directories.  [default: no-
-                                  symlink-calcs]
-  --symlink-between-groups / --no-symlink-between-groups
-                                  Symlink data if the same node is contained
-                                  in multiple groups.  [default: no-symlink-
-                                  between-groups]
-  --organize-by-groups / --no-organize-by-groups
-                                  If the collection of nodes to be mirrored is
-                                  organized in groups, reproduce its
-                                  hierarchy.  [default: organize-by-groups]
-  --only-groups / --no-only-groups
-                                  Mirror only data of nodes which are already
-                                  organized in groups.  [default: no-only-
-                                  groups]
-  --update-groups / --no-update-groups
-                                  Update directories if nodes have been added
-                                  to other groups, or organized differently in
-                                  terms of groups.  [default: no-update-
-                                  groups]
-  --include-inputs / --exclude-inputs
-                                  Include linked input nodes of
-                                  `CalculationNode`(s).  [default: include-
-                                  inputs]
-  --include-outputs / --exclude-outputs
-                                  Include linked output nodes of
-                                  `CalculationNode`(s).  [default: exclude-
-                                  outputs]
-  --include-attributes / --exclude-attributes
-                                  Include attributes in the
-                                  `.aiida_node_metadata.yaml` written for
-                                  every `ProcessNode`.  [default: include-
-                                  attributes]
-  --include-extras / --exclude-extras
-                                  Include extras in the
-                                  `.aiida_node_metadata.yaml` written for
-                                  every `ProcessNode`.  [default: include-
-                                  extras]
-  -f, --flat                      Mirror files in a flat directory for every
-                                  step of a workflow.
-  --mirror-unsealed / --no-mirror-unsealed
-                                  Also allow the mirroring of unsealed process
-                                  nodes.  [default: no-mirror-unsealed]
-  -v, --verbosity [notset|debug|info|report|warning|error|critical]
-                                  Set the verbosity of the output.
-  -h, --help                      Show this message and exit.
+-p, --path PATH Base path for mirror operations that write
+to disk.
+-o, --overwrite Overwrite file/directory when writing to
+disk.
+-G, --groups GROUP... One or multiple groups identified by their
+ID, UUID or label.
+--filter-by-last-mirror-time / --no-filter-by-last-mirror-time
+Only select nodes whose `mtime` is after the
+last mirror time. [default: filter-by-last-
+mirror-time]
+--mirror-processes / --no-mirror-processes
+Mirror process data. [default: mirror-
+processes]
+--mirror-data / --no-mirror-data
+Mirror data nodes. [default: no-mirror-
+data]
+--only-top-level-calcs / --no-only-top-level-calcs
+Mirror calculations in their own dedicated
+directories, not just as part of the
+mirrored workflow. [default: only-top-
+level-calcs]
+--only-top-level-workflows / --no-only-top-level-workflows
+If a top-level workflow calls sub-workflows,
+create a designated directory only for the
+top-level workflow. [default: only-top-
+level-workflows]
+--delete-missing / --no-delete-missing
+If a previously mirrored node is deleted
+from AiiDA's DB, also delete the
+corresponding mirror directory. [default:
+no-delete-missing]
+--symlink-calcs / --no-symlink-calcs
+Symlink workflow sub-calculations to their
+own dedicated directories. [default: no-
+symlink-calcs]
+--symlink-between-groups / --no-symlink-between-groups
+Symlink data if the same node is contained
+in multiple groups. [default: no-symlink-
+between-groups]
+--organize-by-groups / --no-organize-by-groups
+If the collection of nodes to be mirrored is
+organized in groups, reproduce its
+hierarchy. [default: organize-by-groups]
+--also-ungrouped / --no-also-ungrouped
+Mirror only data of nodes which are already
+organized in groups. [default: no-only-
+groups]
+--update-groups / --no-update-groups
+Update directories if nodes have been added
+to other groups, or organized differently in
+terms of groups. [default: no-update-
+groups]
+--include-inputs / --exclude-inputs
+Include linked input nodes of
+`CalculationNode`(s). [default: include-
+inputs]
+--include-outputs / --exclude-outputs
+Include linked output nodes of
+`CalculationNode`(s). [default: exclude-
+outputs]
+--include-attributes / --exclude-attributes
+Include attributes in the
+`.aiida_node_metadata.yaml` written for
+every `ProcessNode`. [default: include-
+attributes]
+--include-extras / --exclude-extras
+Include extras in the
+`.aiida_node_metadata.yaml` written for
+every `ProcessNode`. [default: include-
+extras]
+-f, --flat Mirror files in a flat directory for every
+step of a workflow.
+--mirror-unsealed / --no-mirror-unsealed
+Also allow the mirroring of unsealed process
+nodes. [default: no-mirror-unsealed]
+-v, --verbosity [notset|debug|info|report|warning|error|critical]
+Set the verbosity of the output.
+-h, --help Show this message and exit.
 
 </details>
 
-The additional options are `--groups`, `--symlink-between-groups`, `--organize-by-groups`, `--only-groups`, and
+The additional options are `--groups`, `--symlink-between-groups`, `--organize-by-groups`, `--also-ungrouped`, and
 `--update-groups`, and, therefore control mainly the behavior of groups in the profile during mirroring.
 
-The final list of options is rather lengthy, but, worry not, sensible defaults have been chosen and should be fine in
-most cases.
+The final list of options is rather lengthy, but, worry not, sensible defaults have been chosen and should be fine in most cases.
 The default mirroring command will result in a self-contained, logical directory structure, ready for sharing.
 
 ## Some examples
@@ -245,10 +247,11 @@ Running `verdi group mirror 1` gives:
 ❯ verdi group mirror 1
 Report: Mirroring data of group `add-group` at path `add-group-mirror`.
 Report: Incremental mirroring selected. Will update directory.
-Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Collecting nodes from the database for group `add-group`.
+Report: For the first mirror, this can take a while.
 Report: Mirroring 1 calculations...
 Report: No (new) workflows to mirror in group `add-group`.
-Success: Raw files for `add-group` <1> mirrored into folder `add-group-mirror`.
+Success: Raw files for group `add-group` <1> mirrored into folder `add-group-mirror`.
 ```
 
 with the following output directory structure:
@@ -313,18 +316,16 @@ Mirroring the data of the entire profile proceeds as follows:
 
 ```
 ❯ verdi profile mirror
-Report: Mirroring data of profile `readme` at path: `profile-readme-mirror`.
+Report: Mirroring data of profile `readme` at path `profile-readme-mirror`.
 Report: Incremental mirroring selected. Will update directory.
-Report: Mirroring processes not in any group for profile `readme`...
-Report: Collecting nodes from the database. For the first mirror, this can take a while.
-Report: No (new) calculations to mirror in group `no-group`.
-Report: No (new) workflows to mirror in group `no-group`.
 Report: Mirroring processes in group `add-group` for profile `readme`...
-Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Collecting nodes from the database for group `add-group`.
+Report: For the first mirror, this can take a while.
 Report: Mirroring 1 calculations...
 Report: No (new) workflows to mirror in group `add-group`.
 Report: Mirroring processes in group `multiply-add-group` for profile `readme`...
-Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Collecting nodes from the database for group `multiply-add-group`.
+Report: For the first mirror, this can take a while.
 Report: No (new) calculations to mirror in group `multiply-add-group`.
 Report: Mirroring 1 workflows...
 Success: Raw files for profile `readme` mirrored into folder `profile-readme-mirror`.
@@ -336,34 +337,33 @@ and gives the directory tree:
 ❯ tree profile-readme-mirror/
 profile-readme-mirror
 ├── groups
-│  ├── add-group
-│  │  └── calculations
-│  │     └── ArithmeticAddCalculation-4
-│  │        ├── inputs
-│  │        │  ├── _aiidasubmit.sh
-│  │        │  └── aiida.in
-│  │        ├── node_inputs
-│  │        └── outputs
-│  │           ├── _scheduler-stderr.txt
-│  │           ├── _scheduler-stdout.txt
-│  │           └── aiida.out
-│  └── multiply-add-group
-│     └── workflows
-│        └── MultiplyAddWorkChain-11
-│           ├── 01-multiply-12
-│           │  ├── inputs
-│           │  │  └── source_file
-│           │  └── node_inputs
-│           └── 02-ArithmeticAddCalculation-14
-│              ├── inputs
-│              │  ├── _aiidasubmit.sh
-│              │  └── aiida.in
-│              ├── node_inputs
-│              └── outputs
-│                 ├── _scheduler-stderr.txt
-│                 ├── _scheduler-stdout.txt
-│                 └── aiida.out
-└── no-group
+   ├── add-group
+   │  └── calculations
+   │     └── ArithmeticAddCalculation-4
+   │        ├── inputs
+   │        │  ├── _aiidasubmit.sh
+   │        │  └── aiida.in
+   │        ├── node_inputs
+   │        └── outputs
+   │           ├── _scheduler-stderr.txt
+   │           ├── _scheduler-stdout.txt
+   │           └── aiida.out
+   └── multiply-add-group
+      └── workflows
+         └── MultiplyAddWorkChain-11
+            ├── 01-multiply-12
+            │  ├── inputs
+            │  │  └── source_file
+            │  └── node_inputs
+            └── 02-ArithmeticAddCalculation-14
+               ├── inputs
+               │  ├── _aiidasubmit.sh
+               │  └── aiida.in
+               ├── node_inputs
+               └── outputs
+                  ├── _scheduler-stderr.txt
+                  ├── _scheduler-stdout.txt
+                  └── aiida.out
 ```
 
 Thus, the `verdi profile mirror` command respects your internal AiiDA data organization in groups.
@@ -395,45 +395,43 @@ add-group-mirror
 ```
 
 we can see that the hidden `.aiida` directory from the working directory of the simulation is also available under the
-`inputs` subdirectory of the calcuulation.
+`inputs` subdirectory of the calculation.
 
 In addition, the top-level output directory `add-group-mirror` contains the `.aiida_mirror_log.json` file that keeps a history
 of the nodes that are mirrored to disk, and is therefore essential for incremental mirroring.
 For the mirror of the `add-group`, it holds the following content:
 
-```json=
+```json
 {
     "calculations": {
         "57a1e7ce-c845-47e8-a940-786a91540a09": {
-            "path": "/home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/readme/add-group-mirror/calculations/ArithmeticAddCalculation-4",
-            "time": "2025-04-01T11:51:33.001012+02:00",
-            "links": []
+            "path": "/home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/add-group-mirror/calculations/ArithmeticAddCalculation-4"
         }
     },
     "workflows": {},
     "groups": {
         "aa13ae86-d6c5-4d2c-94e4-3d42d9619012": {
-            "path": "/home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/readme/add-group-mirror",
-            "time": "2025-04-01T11:51:32.881287+02:00",
-            "links": []
+            "path": "/home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/add-group-mirror"
         }
     },
-    "data": {}
+    "data": {},
+    "last_mirror_time": "2025-04-09T21:45:03.433577+02:00"
 }
 ```
 
-Thus the file keeps track of the `path`, (mirror) `time`, and (sym) `links` for mirrored `calculations`, `workflows`,
-`groups`, and `data`.
+Thus, the file keeps track of the mirror `path`s, for mirrored `calculations`, `workflows`, `groups`, and `data`, as
+well as the `last_mirror_time`.
 More info about the JSON log file will be outlined further below.
 
 ### Safety when overwriting
 
 You can also see that an `.aiida_mirror_safeguard` file is contained in every directory created by the mirror feature for each ORM entitity.
-This file serves as a (surprise...) safeguard file, as, in `overwrite` mode, the `mirror` command option performs a dangerous recursive deletion operation of a previous output directory.
+This file serves as a (surprise...) safeguard file, as, in `overwrite` mode, the `mirror` command option performs a
+dangerous recursive deletion operation of a previous output directory.
 If, for whatever reason, the directory that is supposed to be cleaned by the mirror feature in `overwrite` mode is _not_
 the correct one, the command will abort if it does not find the `.aiida_mirror_safeguard` file, thus ensuring the
-command doesn't accidentally delete your family photo album.
-So don't touch that file!!
+command doesn't accidentally delete crypto wallet.
+So don't mess with that file!!
 
 ### Efficient incremental mirroring
 
@@ -443,7 +441,7 @@ Now that we have already mirrored each group and we didn't add any new nodes, if
 ❯ verdi group mirror 1
 Report: Mirroring data of group `add-group` at path `add-group-mirror`.
 Report: Incremental mirroring selected. Will update directory.
-Report: Collecting nodes from the database. For the first mirror, this can take a while.
+Report: Collecting nodes from the database.
 Report: No (new) calculations to mirror in group `add-group`.
 Report: No (new) workflows to mirror in group `add-group`.
 Success: Raw files for group `add-group` <1> mirrored into folder `add-group-mirror`.
@@ -454,8 +452,8 @@ it should finish almost instantaneously, as there are no new simulations to mirr
 The evaluation of new nodes that should be mirrored is based on the entries in the `.aiida_mirror_log.json` file and the
 last time the `mirror` command was run. This information is used to construct a `QueryBuilder` instance that
 extracts the relevant nodes from the database.
-As this step is the very first one done in the code, and the query is executed using SQL, incremental mirroring for a small number of simulations should be
-quick, even for a large database.
+As this step is the very first one done in the code, and the query is executed using SQL, incremental mirroring for a
+small number of new simulations should be quick, even for a large database (TODO: add benchmark tests).
 The first time a large database is mirrored, however, depending on the number of nodes, might take a considerable amount of time, due to the many individual I/O operations to write the relevant files for each process.
 
 #### Customizing `verdi [group|profile] mirrror`
@@ -495,8 +493,6 @@ As mentioned above, we have the following CLI options when mirroring AiiDA group
 ```
 
 Let's consider how they change the behavior one by one.
-
-<!-- first filter, mirror-proc, and mirror-data -->
 
 ##### `only-top-level-calcs`/`only-top-level-workflows`
 
@@ -857,7 +853,6 @@ Running the command with the flags `--no-only-top-level-workflows` and
 ![alt text](figs/image-1.png)
 </details>
 
-
 ##### `--symlink-calcs`
 
 Using the flag `--no-only-top-level-calcs`, calculations are being mirrored in their own, dedicated directories, under
@@ -900,6 +895,7 @@ multiply-add-group-mirror
       ├── 01-multiply-12 -> /home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/multiply-add-group-mirror/calculations/multiply-12
       └── 02-ArithmeticAddCalculation-14 -> /home/geiger_j/aiida_projects/verdi-profile-dump/dev-dumps/multiply-add-group-mirror/calculations/ArithmeticAddCalculation-14
 ```
+
 </details>
 
 Here, the sub-calculations of the `MultiplyAddWorkChain` are symlinked to the relevant directories in the `calculations`
@@ -972,7 +968,7 @@ profile-readme-mirror
 where the `ArithmeticAddCalculation` with pk=14 is symlinked to the corresponding `calculations` directory of the
 `add-group`.
 Please note that while the symlinking feature is useful for data deduplication, individual subdirectories are **not**
-self-contained. This means that you __cannot__ zip the `multipply-add-group` directory and send it, as it will be
+self-contained. This means that you **cannot** zip the `multipply-add-group` directory and send it, as it will be
 missing the symlinked calculations.
 Evaluate for yourself if that is a price you are willing to pay for the achieved data deduplication.
 We intend to provide fully self-contained output directories with the feature, which is why the `--symlink-calcs` option
@@ -1004,8 +1000,6 @@ mirror_unsealed
 -->
 
 #### Customizing `verdi profile mirrror`
-
-
 
 ## Python API
 
@@ -1185,6 +1179,7 @@ utils.py
 44:class NodeMirrorKeyMapper:
 88:class MirrorPaths:
 ```
+
 </details>
 
 Where the main classes are the `BaseMirror` that holds shared attributes for all mirror classes, and implements the
@@ -1261,6 +1256,5 @@ profile_mirror.do_mirror()
 ```
 
 The top-level method for all Mirror classes is `do_mirror` which performs the mirroring operation.
-
 
 ### More on the logger

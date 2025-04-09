@@ -224,6 +224,7 @@ Below is a list with all available subcommands.
       delete        Delete groups and (optionally) the nodes they contain.
       description   Change the description of a group.
       list          Show a list of existing groups.
+      mirror        Mirror data of group to disk.
       move-nodes    Move the specified NODES from one group to another.
       path          Inspect groups of nodes, with delimited label paths.
       relabel       Change the label of a group.
@@ -368,9 +369,9 @@ Below is a list with all available subcommands.
 
     Commands:
       call-root  Show root process of processes.
-      dump       Dump process input and output files to disk.
       kill       Kill running processes.
       list       Show a list of processes.
+      mirror     Mirror process input and output files to disk.
       pause      Pause running processes.
       play       Play (unpause) paused processes.
       repair     Automatically repair all stuck processes.

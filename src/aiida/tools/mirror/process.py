@@ -378,7 +378,8 @@ class ProcessMirror(BaseMirror):
             calculation_store = self.mirror_logger.stores.calculations
 
             if calculation_node.uuid not in calculation_store.entries:
-                calculation_store.add_entry(
+                self.mirror_logger.add_entry(
+                    store=calculation_store,
                     uuid=calculation_node.uuid,
                     entry=MirrorLog(
                         path=output_path,

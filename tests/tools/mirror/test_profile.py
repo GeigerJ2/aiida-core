@@ -720,8 +720,6 @@ class TestProfileMirror:
         )
         profile_mirror_inst.mirror()
 
-        # import ipdb; ipdb.set_trace()
-
     @pytest.mark.usefixtures('aiida_profile_clean')
     def test_mirror_update_groups(
         self,

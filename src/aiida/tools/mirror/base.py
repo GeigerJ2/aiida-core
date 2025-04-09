@@ -42,19 +42,15 @@ class BaseMirror:
         # FIXME: Rather than having the `top_level_caller` argument everywhere, do this as part of the `mirror`
         # operation of the derived classes, rather than here in the base class
 
-        # If in OVERWRITE mode, create a new instance
-        # ! NOTE: This breaks the symlinking...
-        # import ipdb; ipdb.set_trace()
-        if self.mirror_mode == MirrorMode.OVERWRITE and top_level_caller:
-            return MirrorLogger(mirror_paths=self.mirror_paths, mirror_times=MirrorTimes())
-
         # Use provided mirror_logger if one is passed in
         if mirror_logger is not None:
             return mirror_logger
 
+        if self.mirror_mode == MirrorMode.OVERWRITE and top_level_caller:
+            return MirrorLogger(mirror_paths=self.mirror_paths, mirror_times=MirrorTimes())
+
         # Try to load from file, fall back to new instance on failure
         # NOTE: When in overwrite mode, this file will not exist, so a new instance will be created
-        # import ipdb; ipdb.set_trace()
         try:
             return MirrorLogger.from_file(mirror_paths=self.mirror_paths)
         except (json.JSONDecodeError, OSError):

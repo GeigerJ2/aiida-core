@@ -326,7 +326,7 @@ def group_relabel(group, label):
     else:
         echo.echo_success(f"Label changed to '{label}'")
         msg = (
-            'Note that if you are mirroring your profile datr to disk, to reflect the relabeling of the group, '
+            'Note that if you are mirroring your profile data to disk, to reflect the relabeling of the group, '
             'run the command: `verdi profile mirror --update-groups.`'
         )
         echo.echo_report(msg)
