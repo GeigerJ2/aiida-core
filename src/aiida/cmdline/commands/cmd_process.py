@@ -639,3 +639,47 @@ def process_mirror(
     except Exception as e:
         msg = f'Unexpected error while mirroring {process.__class__.__name__} <{process.pk}>:\n ({e!s}).'
         echo.echo_critical(msg)
+
+@verdi_process.command('dump')
+@arguments.PROCESS()
+@options.PATH()
+@options.OVERWRITE()
+# @options.INCREMENTAL()
+@options.INCLUDE_INPUTS()
+@options.INCLUDE_OUTPUTS()
+@options.INCLUDE_ATTRIBUTES()
+@options.INCLUDE_EXTRAS()
+@options.FLAT()
+@options.MIRROR_UNSEALED()
+@click.pass_context
+def process_dump(
+    ctx,
+    process,
+    path,
+    overwrite,
+    include_inputs,
+    include_outputs,
+    include_attributes,
+    include_extras,
+    flat,
+    mirror_unsealed,
+) -> None:
+    """Mirror process input and output files to disk.
+
+    Child calculations/workflows (also called `CalcJob`s/`CalcFunction`s and `WorkChain`s/`WorkFunction`s in AiiDA
+    jargon) run by the parent workflow are contained in the directory tree as sub-folders and are sorted by their
+    creation time.  The directory tree thus mirrors the logical execution of the workflow, which can also be queried by
+    running `verdi process status <pk>` on the command line.
+
+    By default, input and output files of each calculation can be found in the corresponding "inputs" and
+    "outputs" directories (the former also contains the hidden ".aiida" folder with machine-readable job execution
+    settings). Additional input and output files (depending on the type of calculation) are placed in the "node_inputs"
+    and "node_outputs", respectively.
+
+    Lastly, every folder also contains a hidden, human-readable `.aiida_node_metadata.yaml` file with the relevant AiiDA
+    node data for further inspection.
+    """
+
+    msg = 'The `verdi process dump` command is deprecated and will be removed in a future version. Use `verdi process mirror` instead.'
+    echo.echo_warning(msg)
+    ctx.forward(process_mirror)
