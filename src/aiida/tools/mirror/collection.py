@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.mirror.base import BaseMirror
 from aiida.tools.mirror.collector import MirrorCollector
@@ -94,7 +93,7 @@ class BaseCollectionMirror(BaseMirror):
 
         # TODO: Verify if the log is properly updated here (via the test)
 
-    def group_store_delete(self, delete_store: MirrorNodeStore) -> list:
+    def group_store_delete(self, delete_store: MirrorNodeStore) -> list[str]:
         """Delete groups and return a list of their labels for further processing.
 
         Deletes all groups marked for deletion in the delete_node_container
@@ -105,7 +104,7 @@ class BaseCollectionMirror(BaseMirror):
 
         to_delete_group_uuids: list[str] = getattr(delete_store, 'groups')
         log_group_store = self.mirror_logger.groups
-        deleted_groups = []
+        deleted_groups: list[str] = []
 
         # Early return if no groups in the delete_store
         if not to_delete_group_uuids:
@@ -152,7 +151,11 @@ class BaseCollectionMirror(BaseMirror):
             msg = f'Deleted {len(to_delete_uuids)} {store_name}'
             logger.report(msg)
 
-    def group_store_subnodes_delete(self, deleted_groups: list[orm.Group]) -> None:
+    # TODO: Should this even delete the node directories?
+    # TODO: If so, they should also be deleted from the logger
+    # TODO: Then, after the next `mirror` command, they should be dumped again in the `no-group` directory,
+    # TODO: if `also-ungrouped` is set to True
+    def group_store_subnodes_delete(self, deleted_group_labels: list[str]) -> None:
         """Delete nodes that were part of deleted groups but not explicitly marked for deletion.
 
         After groups are deleted, this method cleans up any nodes that belonged
@@ -167,15 +170,15 @@ class BaseCollectionMirror(BaseMirror):
             MirrorStoreKeys.CALCULATIONS.value,
             MirrorStoreKeys.DATA.value,
         ]
-        for store_entry in store_names:
-            log_store: MirrorLogStore = self.mirror_logger.get_store_by_name(store_entry)
+        for store_name in store_names:
+            log_store: MirrorLogStore = self.mirror_logger.get_store_by_name(store_name)
             additional_delete_nodes = []
 
             # Find all nodes that belong to deleted groups
-            for deleted_group in deleted_groups:
+            for deleted_group_label in deleted_group_labels:
                 for entry_uuid, entry in log_store.entries.items():
                     path_str = str(entry.path)
-                    if deleted_group.label in path_str:
+                    if deleted_group_label in path_str:
                         additional_delete_nodes.append(entry_uuid)
 
             # Delete the identified nodes

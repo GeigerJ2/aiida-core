@@ -61,7 +61,7 @@ class ProcessMirror(BaseMirror):
 
         if mirror_paths is None:
             default_mirror_path = generate_process_default_mirror_path(process_node=self.process_node)
-            mirror_paths = MirrorPaths(parent=Path.cwd(), child=default_mirror_path)
+            self.mirror_paths = MirrorPaths(child=default_mirror_path)
 
         # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
         # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
@@ -69,8 +69,8 @@ class ProcessMirror(BaseMirror):
         # `dump_logger` from the JSON file of the previous run attached...
         # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
         # before instantiation??
-        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
-            mirror_paths.log_path.unlink()
+        if mirror_mode == MirrorMode.OVERWRITE and self.mirror_paths.log_path.exists():
+            self.mirror_paths.log_path.unlink()
 
         self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger, top_level_caller=True)
 
@@ -201,9 +201,8 @@ class ProcessMirror(BaseMirror):
 
         if not process_node.is_sealed and not self.config.mirror_unsealed:
             pk = process_node.pk
-            raise ExportValidationError(
-                f'Process `{pk}` must be sealed before it can be dumped, or `--mirror-unsealed` set to True.'
-            )
+            msg = f'Process `{pk}` must be sealed before it can be dumped, or `--mirror-unsealed` set to True.'
+            raise ExportValidationError(msg)
 
         # This here is mainly for `include_attributes` and `include_extras`.
         # I don't want to include them in the general class `__init__`, as they don't really fit there.

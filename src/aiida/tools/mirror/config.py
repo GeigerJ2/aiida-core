@@ -210,7 +210,7 @@ class GroupMirrorConfig(BaseCollectionMirrorConfig):
 class ProfileMirrorConfig(BaseCollectionMirrorConfig):
     """Arguments for mirroring profile data."""
 
-    organize_by_groups: bool = True  # TODO
+    organize_by_groups: bool = True
     also_ungrouped: bool = False
     update_groups: bool = False
     symlink_between_groups: bool = False  # TODO

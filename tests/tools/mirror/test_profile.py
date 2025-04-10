@@ -321,7 +321,7 @@ tree_profile_groups_multiply_add_add = {
     ]
 }
 
-tree_profile_add_multiply_add_no_organize_by_groups = {
+tree_profile_no_organize_by_groups = {
     profile_mirror_label: [
         '.aiida_mirror_log.json',
         '.aiida_mirror_safeguard',
@@ -392,7 +392,7 @@ tree_profile_add_multiply_add_no_organize_by_groups = {
     ]
 }
 
-tree_profile_add_multiply_add_extra_nodes = {
+tree_profile_also_ungrouped = {
     profile_mirror_label: [
         '.aiida_mirror_log.json',
         '.aiida_mirror_safeguard',
@@ -566,6 +566,200 @@ tree_profile_add_multiply_add_extra_nodes = {
     ]
 }
 
+tree_profile_no_only_top_level_calcs = {
+    'profile-mirror': [
+        '.aiida_mirror_log.json',
+        '.aiida_mirror_safeguard',
+        {
+            'groups': [
+                {
+                    'add-group': [
+                        '.aiida_mirror_safeguard',
+                        {
+                            'calculations': [
+                                {
+                                    'ArithmeticAddCalculation-4': [
+                                        '.aiida_mirror_safeguard',
+                                        '.aiida_node_metadata.yaml',
+                                        {
+                                            'inputs': [
+                                                '_aiidasubmit.sh',
+                                                'aiida.in',
+                                                {
+                                                    '.aiida': [
+                                                        'calcinfo.json',
+                                                        'job_tmpl.json',
+                                                    ]
+                                                },
+                                            ]
+                                        },
+                                        {'node_inputs': []},
+                                        {
+                                            'outputs': [
+                                                '_scheduler-stderr.txt',
+                                                '_scheduler-stdout.txt',
+                                                'aiida.out',
+                                            ]
+                                        },
+                                    ]
+                                }
+                            ]
+                        },
+                    ]
+                },
+                {
+                    'multiply-add-group': [
+                        '.aiida_mirror_safeguard',
+                        {
+                            'calculations': [
+                                {
+                                    'ArithmeticAddCalculation-15': [
+                                        '.aiida_mirror_safeguard',
+                                        '.aiida_node_metadata.yaml',
+                                        {
+                                            'inputs': [
+                                                '_aiidasubmit.sh',
+                                                'aiida.in',
+                                                {
+                                                    '.aiida': [
+                                                        'calcinfo.json',
+                                                        'job_tmpl.json',
+                                                    ]
+                                                },
+                                            ]
+                                        },
+                                        {'node_inputs': []},
+                                        {
+                                            'outputs': [
+                                                '_scheduler-stderr.txt',
+                                                '_scheduler-stdout.txt',
+                                                'aiida.out',
+                                            ]
+                                        },
+                                    ]
+                                },
+                                {
+                                    'multiply-13': [
+                                        '.aiida_mirror_safeguard',
+                                        '.aiida_node_metadata.yaml',
+                                        {'inputs': ['source_file']},
+                                        {'node_inputs': []},
+                                    ]
+                                },
+                            ]
+                        },
+                        {
+                            'workflows': [
+                                {
+                                    'MultiplyAddWorkChain-12': [
+                                        '.aiida_mirror_safeguard',
+                                        '.aiida_node_metadata.yaml',
+                                        {
+                                            '01-multiply-13': [
+                                                '.aiida_mirror_safeguard',
+                                                '.aiida_node_metadata.yaml',
+                                                {'inputs': ['source_file']},
+                                                {'node_inputs': []},
+                                            ]
+                                        },
+                                        {
+                                            '02-ArithmeticAddCalculation-15': [
+                                                '.aiida_mirror_safeguard',
+                                                '.aiida_node_metadata.yaml',
+                                                {
+                                                    'inputs': [
+                                                        '_aiidasubmit.sh',
+                                                        'aiida.in',
+                                                        {
+                                                            '.aiida': [
+                                                                'calcinfo.json',
+                                                                'job_tmpl.json',
+                                                            ]
+                                                        },
+                                                    ]
+                                                },
+                                                {'node_inputs': []},
+                                                {
+                                                    'outputs': [
+                                                        '_scheduler-stderr.txt',
+                                                        '_scheduler-stdout.txt',
+                                                        'aiida.out',
+                                                    ]
+                                                },
+                                            ]
+                                        },
+                                    ]
+                                }
+                            ]
+                        },
+                    ]
+                },
+            ]
+        },
+    ]
+}
+
+tree_profile_delete_missing_nodes = {
+    'profile-mirror': [
+        '.aiida_mirror_log.json',
+        '.aiida_mirror_safeguard',
+        {
+            'groups': [
+                {'add-group': ['.aiida_mirror_safeguard', {'calculations': []}]},
+                {
+                    'multiply-add-group': [
+                        '.aiida_mirror_safeguard',
+                        {
+                            'workflows': [
+                                {
+                                    'MultiplyAddWorkChain-12': [
+                                        '.aiida_mirror_safeguard',
+                                        '.aiida_node_metadata.yaml',
+                                        {
+                                            '01-multiply-13': [
+                                                '.aiida_mirror_safeguard',
+                                                '.aiida_node_metadata.yaml',
+                                                {'inputs': ['source_file']},
+                                                {'node_inputs': []},
+                                            ]
+                                        },
+                                        {
+                                            '02-ArithmeticAddCalculation-15': [
+                                                '.aiida_mirror_safeguard',
+                                                '.aiida_node_metadata.yaml',
+                                                {
+                                                    'inputs': [
+                                                        '_aiidasubmit.sh',
+                                                        'aiida.in',
+                                                        {
+                                                            '.aiida': [
+                                                                'calcinfo.json',
+                                                                'job_tmpl.json',
+                                                            ]
+                                                        },
+                                                    ]
+                                                },
+                                                {'node_inputs': []},
+                                                {
+                                                    'outputs': [
+                                                        '_scheduler-stderr.txt',
+                                                        '_scheduler-stdout.txt',
+                                                        'aiida.out',
+                                                    ]
+                                                },
+                                            ]
+                                        },
+                                    ]
+                                }
+                            ]
+                        },
+                    ]
+                },
+            ]
+        },
+    ]
+}
+
 
 class TestProfileMirror:
     @pytest.mark.usefixtures('aiida_profile_clean')
@@ -618,7 +812,7 @@ class TestProfileMirror:
         )
 
     @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_mirror_add_multiply_add_no_organize_by_groups(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    def test_mirror_no_organize_by_groups(self, tmp_path, setup_add_group, setup_multiply_add_group):
         setup_add_group
         setup_multiply_add_group
         mirror_paths = MirrorPaths.from_path(tmp_path / profile_mirror_label)
@@ -627,12 +821,12 @@ class TestProfileMirror:
         profile_mirror_inst.mirror()
 
         compare_tree(
-            expected=tree_profile_add_multiply_add_no_organize_by_groups,
+            expected=tree_profile_no_organize_by_groups,
             base_path=tmp_path,
         )
 
     @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_mirror_add_multiply_add_also_ungrouped(
+    def test_mirror_also_ungrouped(
         self,
         tmp_path,
         setup_add_group,
@@ -663,7 +857,7 @@ class TestProfileMirror:
         # Tree with extra nodes raises
         with pytest.raises(AssertionError):
             compare_tree(
-                expected=tree_profile_add_multiply_add_extra_nodes,
+                expected=tree_profile_also_ungrouped,
                 base_path=tmp_path,
             )
 
@@ -684,7 +878,7 @@ class TestProfileMirror:
 
         # Now compare with the actual tree
         compare_tree(
-            expected=tree_profile_add_multiply_add_extra_nodes,
+            expected=tree_profile_also_ungrouped,
             base_path=tmp_path,
         )
 
@@ -709,6 +903,11 @@ class TestProfileMirror:
             expected=tree_profile_groups_add_multiply_add,
             base_path=tmp_path,
         )
+        with pytest.raises(AssertionError):
+            compare_tree(
+                expected=tree_profile_delete_missing_nodes,
+                base_path=tmp_path,
+            )
 
         add_node = add_group.nodes[0]
 
@@ -719,6 +918,71 @@ class TestProfileMirror:
             config=ProfileMirrorConfig(delete_missing=True),
         )
         profile_mirror_inst.mirror()
+
+        compare_tree(
+            expected=tree_profile_delete_missing_nodes,
+            base_path=tmp_path,
+        )
+        with pytest.raises(AssertionError):
+            compare_tree(
+                expected=tree_profile_groups_add_multiply_add,
+                base_path=tmp_path,
+            )
+
+    @pytest.mark.usefixtures('aiida_profile_clean')
+    def test_mirror_delete_missing_groups(
+        self,
+        tmp_path,
+        setup_add_group,
+        setup_multiply_add_group,
+    ):
+        from aiida import orm
+
+        add_group = setup_add_group
+        setup_multiply_add_group
+
+        mirror_paths = MirrorPaths.from_path(tmp_path / profile_mirror_label)
+        profile_mirror_inst = ProfileMirror(mirror_paths=mirror_paths)
+        profile_mirror_inst.mirror()
+
+        # Full mirror
+        compare_tree(
+            expected=tree_profile_groups_add_multiply_add,
+            base_path=tmp_path,
+        )
+        # with pytest.raises(AssertionError):
+        #     compare_tree(
+        #         expected=,
+        #         base_path=tmp_path,
+        #     )
+
+        orm.Group.collection.delete(add_group.pk)
+
+        profile_mirror_inst = ProfileMirror(
+            mirror_paths=mirror_paths,
+            config=ProfileMirrorConfig(delete_missing=True),
+        )
+        profile_mirror_inst.mirror()
+        # TODO: This deletes too much:
+        # └── profile-mirror
+        #     ├── .aiida_mirror_log.json
+        #     ├── .aiida_mirror_safeguard
+        #     └── groups
+        #         └── multiply-add-group
+        #             ├── .aiida_mirror_safeguard
+        #             └── workflows
+
+        print(tmp_path)
+
+        # compare_tree(
+        #     expected=tree_profile_delete_missing_nodes,
+        #     base_path=tmp_path,
+        # )
+        # with pytest.raises(AssertionError):
+        #     compare_tree(
+        #         expected=tree_profile_groups_add_multiply_add,
+        #         base_path=tmp_path,
+        #     )
 
     @pytest.mark.usefixtures('aiida_profile_clean')
     def test_mirror_update_groups(
@@ -764,6 +1028,44 @@ class TestProfileMirror:
         )
 
         # TODO: Also verify the log update
+
+    @pytest.mark.usefixtures('aiida_profile_clean')
+    def test_mirror_no_only_top_level_calcs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+        setup_multiply_add_group
+        setup_add_group
+        mirror_paths = MirrorPaths.from_path(tmp_path / profile_mirror_label)
+        mirror_collector_config = MirrorCollectorConfig(only_top_level_calcs=False)
+        profile_mirror_inst = ProfileMirror(mirror_paths=mirror_paths, mirror_collector_config=mirror_collector_config)
+
+        profile_mirror_inst.mirror()
+        compare_tree(
+            expected=tree_profile_no_only_top_level_calcs,
+            base_path=tmp_path,
+        )
+
+    @pytest.mark.usefixtures('aiida_profile_clean')
+    def test_mirror_no_only_top_level_wfs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+        ...
+        # TODO: We currently have no workchain in AiiDA core to test this, or at least I haven't found it
+
+    @pytest.mark.usefixtures('aiida_profile_clean')
+    def test_mirror_symlink_calcs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+        setup_multiply_add_group
+        setup_add_group
+        mirror_paths = MirrorPaths.from_path(tmp_path / profile_mirror_label)
+        mirror_collector_config = MirrorCollectorConfig(only_top_level_calcs=False)
+        profile_mirror_inst = ProfileMirror(mirror_paths=mirror_paths, mirror_collector_config=mirror_collector_config)
+
+        profile_mirror_inst.mirror()
+        compare_tree(
+            expected=tree_profile_no_only_top_level_calcs,
+            base_path=tmp_path,
+        )
+
+    @pytest.mark.usefixtures('aiida_profile_clean')
+    def test_mirror_symlink_wfs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+        ...
+        # TODO: This is not implemented yet, and not sure if it's necessary
 
     def test_delete_missing_group_nodes_retained(self): ...
 

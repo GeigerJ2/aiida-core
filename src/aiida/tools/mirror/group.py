@@ -249,7 +249,6 @@ class GroupMirror(BaseCollectionMirror):
             else MirrorStoreKeys.WORKFLOWS
         )
 
-        # Now use the enum members with your get_store_by_key method
         current_store = self.mirror_logger.get_store_by_name(name=current_store_key.value)
         other_store = self.mirror_logger.get_store_by_name(name=other_store_key.value)
 

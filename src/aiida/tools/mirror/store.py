@@ -82,32 +82,6 @@ class MirrorNodeStore:
     def is_empty(self) -> bool:
         return len(self) == 0
 
-    def get_store_by_type(self, node_type: Any) -> list:
-        """Get the appropriate store based on node_type.
-
-        Args:
-            node_type: The type of nodes (can be a class or a string identifier)
-
-        Returns:
-            The corresponding store list
-        """
-
-        attr = MirrorStoreKeys.from_class(node_type)
-        return getattr(self, attr)
-
-    def get_store_by_key(self, node_type: Any) -> list:
-        """Get the appropriate store based on node_type.
-
-        Args:
-            node_type: The type of nodes (can be a class or a string identifier)
-
-        Returns:
-            The corresponding store list
-        """
-
-        attr = MirrorStoreKeys.from_class(node_type)
-        return getattr(self, attr)
-
     def get_store_by_name(self, name: StoreNameType) -> list:
         """Get the appropriate store based on node_type.
 
@@ -124,3 +98,18 @@ class MirrorNodeStore:
             raise ValueError(msg)
 
         return getattr(self.stores, name)
+
+    def get_store_by_type(self, node_type: Any) -> list:
+        """Get the appropriate store based on node_type.
+
+        Args:
+            node_type: The type of nodes (can be a class or a string identifier)
+
+        Returns:
+            The corresponding store list
+        """
+
+        attr = MirrorStoreKeys.from_class(node_type)
+        return getattr(self, attr)
+
+    # def get_store_by_instance(self, node_instance: Any) -> list: ...

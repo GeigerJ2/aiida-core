@@ -37,7 +37,7 @@ class TestMirrorNodeCollector:
         # # NOTE: This doesn't raise anymore
         # # with pytest.raises(ValueError):
         # #     mirror_node_collector = MirrorNodeCollector(
-        # #         mirror_logger=mirror_logger, config=NodeCollectorConfig()
+        # #         mirror_logger=mirror_logger, config=MirrorCollectorConfig()
         # #     )
         # #     _ = mirror_node_collector._resolve_filters(orm_class=orm_class)
 
