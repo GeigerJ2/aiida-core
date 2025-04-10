@@ -50,6 +50,9 @@ class MirrorCollector:
         logger.report(msg)
 
         mirror_times = self.mirror_logger.mirror_times
+        # TODO: last mirror time defined in two places, once, `MirrorTimes.last`
+        # TODO: as well as `MirrorLogger.last_mirror_time`
+        # NOTE: Should be fine, though, as in both places, the value is read from the log file, if it exists
         if mirror_times.last is None:
             msg = 'For the first mirror, this can take a while.'
             logger.report(msg)
@@ -75,7 +78,7 @@ class MirrorCollector:
             )
 
             # If not using top-level-only filter, add descendant calculations from workflows
-            if not workflows and self.config.only_top_level_calcs:
+            if workflows and not self.config.only_top_level_calcs:
                 descendant_calcs = self._get_workflow_descendant_calcs(workflows)
                 # Combine and remove duplicates
                 calculations = list(set(calculations + descendant_calcs))
@@ -97,10 +100,6 @@ class MirrorCollector:
             mirror_store = getattr(self.mirror_logger, store_name)
             mirrored_uuids = set(mirror_store.entries.keys())
             qb = orm.QueryBuilder()
-            # if group:
-            #     qb.append(orm.Group, filters={'id': group.id}, tag='group')
-            #     qb.append(orm_type, project=['uuid'], with_group='group')
-            # else:
             qb.append(orm_type, project=['uuid'])
 
             db_uuids = set(qb.all(flat=True))
@@ -232,7 +231,7 @@ class MirrorCollector:
         self, orm_class: QbMirrorEntityType, group: orm.Group, filters: Dict[str, Any] = {}
     ) -> list[Any]:
         qb = orm.QueryBuilder()
-        qb.append(orm.Group, filters={'id': group.id}, tag='group')
+        qb.append(orm.Group, filters={'pk': group.pk}, tag='group')
         qb.append(orm_class, filters=filters, with_group='group', tag='node')
         return qb.all(flat=True)
 
