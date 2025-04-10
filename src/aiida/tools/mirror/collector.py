@@ -231,7 +231,7 @@ class MirrorCollector:
         self, orm_class: QbMirrorEntityType, group: orm.Group, filters: Dict[str, Any] = {}
     ) -> list[Any]:
         qb = orm.QueryBuilder()
-        qb.append(orm.Group, filters={'pk': group.pk}, tag='group')
+        qb.append(orm.Group, filters={'id': group.pk}, tag='group')
         qb.append(orm_class, filters=filters, with_group='group', tag='node')
         return qb.all(flat=True)
 
