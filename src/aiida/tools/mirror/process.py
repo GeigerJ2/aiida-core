@@ -264,6 +264,7 @@ class ProcessMirror(BaseMirror):
         if self.mirror_logger is not None:
             workflow_store = self.mirror_logger.stores.workflows
 
+            # import ipdb; ipdb.set_trace()
             self.mirror_logger.add_entry(
                 store=workflow_store,
                 uuid=workflow_node.uuid,
@@ -377,6 +378,7 @@ class ProcessMirror(BaseMirror):
             calculation_store = self.mirror_logger.stores.calculations
 
             if calculation_node.uuid not in calculation_store.entries:
+                # import ipdb; ipdb.set_trace()
                 self.mirror_logger.add_entry(
                     store=calculation_store,
                     uuid=calculation_node.uuid,

@@ -130,8 +130,14 @@ class MirrorTimes:
 class MirrorPaths:
     parent: Path = field(default_factory=Path.cwd)
     child: Path = field(default_factory=lambda: Path('aiida-mirror'))
+    top_level: Path = field(default=None, init=True)  # Added top_level property
 
     safeguard_file = '.aiida_mirror_safeguard'
+
+    def __post_init__(self):
+        # Set top_level during initialization if not provided
+        if self.top_level is None:
+            self.top_level = self.parent / self.child # Default to parent if not specified
 
     @classmethod
     def from_path(cls, path: Path):

@@ -176,33 +176,35 @@ class MirrorLogger:
         """Save the log to a JSON file."""
 
         log_dict = {
-            'calculations': MirrorLogger.serialize_logs(self.calculations),
-            'workflows': MirrorLogger.serialize_logs(self.workflows),
-            'groups': MirrorLogger.serialize_logs(self.groups),
-            'data': MirrorLogger.serialize_logs(self.data),
+            'calculations': self.serialize_logs(self.calculations),
+            'workflows': self.serialize_logs(self.workflows),
+            'groups': self.serialize_logs(self.groups),
+            'data': self.serialize_logs(self.data),
             'last_mirror_time': self.mirror_times.current.isoformat(),
         }
 
         with self.mirror_paths.log_path.open('w', encoding='utf-8') as f:
             json.dump(log_dict, f, indent=4)
 
-    @staticmethod
-    def serialize_logs(container: MirrorLogStore) -> dict:
+    def serialize_logs(self, container: MirrorLogStore) -> dict:
         serialized = {}
         for uuid, entry in container.entries.items():
+            relative_path = entry.path.relative_to(self.mirror_paths.parent)
             serialized[uuid] = {
-                'path': str(entry.path),
+                'path': str(relative_path),
             }
         return serialized
 
+    # TODO: Could also convert to normal method, such that I have access to self.mirror_paths and can deserialize to
+    # absolute Paths
     @staticmethod
-    def deserialize_logs(category_data: dict) -> MirrorLogStore:
+    def deserialize_logs(category_data: dict, mirror_paths: MirrorPaths) -> MirrorLogStore:
         container = MirrorLogStore()
         for uuid, entry in category_data.items():
             container.add_entry(
                 uuid,
                 MirrorLog(
-                    path=Path(entry['path']),
+                    path=mirror_paths.parent / Path(entry['path']),
                 ),
             )
         return container
@@ -221,9 +223,9 @@ class MirrorLogger:
                 mirror_times = MirrorTimes.from_file(mirror_paths=mirror_paths)
                 instance = cls(mirror_paths=mirror_paths, mirror_times=mirror_times)
 
-            instance.calculations = MirrorLogger.deserialize_logs(prev_mirror_data['calculations'])
-            instance.workflows = MirrorLogger.deserialize_logs(prev_mirror_data['workflows'])
-            instance.groups = MirrorLogger.deserialize_logs(prev_mirror_data['groups'])
+            instance.calculations = MirrorLogger.deserialize_logs(prev_mirror_data['calculations'], mirror_paths=mirror_paths)
+            instance.workflows = MirrorLogger.deserialize_logs(prev_mirror_data['workflows'], mirror_paths=mirror_paths)
+            instance.groups = MirrorLogger.deserialize_logs(prev_mirror_data['groups'], mirror_paths=mirror_paths)
             # instance.data = deserialize_logs(data['data'])
 
             # Load the last mirror time

@@ -255,16 +255,16 @@ class GroupMirror(BaseCollectionMirror):
         self.current_store: MirrorLogStore = current_store
         self.other_store: MirrorLogStore = other_store
 
-        set_progress_bar_tqdm()
+        # set_progress_bar_tqdm()
 
-        # Mirror each process with progress tracking
-        with get_progress_reporter()(desc='Mirroring new processes', total=len(processes)) as progress:
-            for process in processes:
-                self.mirror_process(
-                    process=process,
-                    process_type_path=process_type_path,
-                )
-                progress.update()
+        # # Mirror each process with progress tracking
+        # with get_progress_reporter()(desc='Mirroring new processes', total=len(processes)) as progress:
+        for process in processes:
+            self.mirror_process(
+                process=process,
+                process_type_path=process_type_path,
+            )
+                # progress.update()
 
     def process_store_mirror(self, mirror_store: MirrorNodeStore) -> None:
         """Handle mirroring of different process collections."""
