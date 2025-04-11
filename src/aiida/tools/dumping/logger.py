@@ -320,7 +320,6 @@ class DumpLogger:
             store: DumpLogStore = getattr(self, store_name)
             store.update_paths(old_str, new_str)
 
-
     def _extract_expected_paths(self) -> dict:
         """
         Extract all expected paths from the log data.

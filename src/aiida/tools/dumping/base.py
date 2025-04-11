@@ -30,9 +30,7 @@ class BaseDumper:
         # self.dump_logger = dump_logger
         # self.dump_collector_config = dump_collector_config or DumpCollectorConfig()
 
-    def set_dump_logger(
-        self, dump_logger: DumpLogger | None = None, top_level_caller: bool = False
-    ) -> DumpLogger:
+    def set_dump_logger(self, dump_logger: DumpLogger | None = None, top_level_caller: bool = False) -> DumpLogger:
         """If in loading from file fails, e.g., due to ``overwrite``, create a new instance
 
         :param dump_logger: Optional existing logger instance to use

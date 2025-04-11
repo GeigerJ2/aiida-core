@@ -192,9 +192,7 @@ def generate_profile_default_dump_path(profile: Profile, prefix: str = 'profile'
     return Path(f'{prefix}-{profile.name}-{appendix}')
 
 
-def generate_group_default_dump_path(
-    group: orm.Group | None, prefix: str = 'group', appendix: str = 'dump'
-) -> Path:
+def generate_group_default_dump_path(group: orm.Group | None, prefix: str = 'group', appendix: str = 'dump') -> Path:
     # TODO: Or, make sure dump not in the group name?
     if not group:
         label_elements = ['no-group', appendix]
@@ -281,7 +279,6 @@ def delete_missing_node_dir(dump_logger: DumpLogger, to_delete_uuid: str) -> Non
 
 
 def tree_to_dict(root_path: Path) -> dict[str, list[Any]]:
-
     """
     Convert a directory tree structure into a dictionary representation.
 
@@ -298,7 +295,7 @@ def tree_to_dict(root_path: Path) -> dict[str, list[Any]]:
         Dict[str, List[Any]]: Dictionary representation of the directory structure
     """
     if not root_path.exists() or not root_path.is_dir():
-        raise ValueError(f"The path {root_path} does not exist or is not a directory")
+        raise ValueError(f'The path {root_path} does not exist or is not a directory')
 
     # Get the directory name
     dir_name = root_path.name

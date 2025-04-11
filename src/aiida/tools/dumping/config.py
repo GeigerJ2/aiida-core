@@ -21,11 +21,11 @@ from aiida.common import timezone
 
 __all__ = (
     'BaseCollectionDumperConfig',
-    'GroupDumperConfig',
     'DumpCollectorConfig',
     'DumpMode',
     'DumpPaths',
     'DumpTimes',
+    'GroupDumperConfig',
     'NodeDumpGroupScope',
     'ProcessDumperConfig',
     'ProfileDumperConfig',
@@ -137,7 +137,7 @@ class DumpPaths:
     def __post_init__(self):
         # Set top_level during initialization if not provided
         if self.top_level is None:
-            self.top_level = self.parent / self.child # Default to parent if not specified
+            self.top_level = self.parent / self.child  # Default to parent if not specified
 
     @classmethod
     def from_path(cls, path: Path):

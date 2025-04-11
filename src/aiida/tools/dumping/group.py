@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -24,11 +25,11 @@ from aiida.common.progress_reporter import (
 from aiida.tools.dumping.base import BaseDumper
 from aiida.tools.dumping.collection import BaseCollectionDumper
 from aiida.tools.dumping.config import (
-    GroupDumperConfig,
     DumpCollectorConfig,
     DumpMode,
     DumpPaths,
     DumpStoreKeys,
+    GroupDumperConfig,
     ProcessDumperConfig,
 )
 from aiida.tools.dumping.logger import DumpLog, DumpLogger, DumpLogStore
@@ -39,7 +40,6 @@ from aiida.tools.dumping.utils import (
     generate_process_default_dump_path,
     prepare_dump_path,
 )
-import shutil
 
 logger = AIIDA_LOGGER.getChild('tools.dump.group')
 
@@ -182,9 +182,7 @@ class GroupDumper(BaseCollectionDumper):
         :param process_type_path: Path where processes of this type are stored
         :param process_dump: The ProcessDump instance to use
         """
-        process_dump_path = process_type_path / generate_process_default_dump_path(
-            process_node=process, prefix=None
-        )
+        process_dump_path = process_type_path / generate_process_default_dump_path(process_node=process, prefix=None)
 
         process_paths = DumpPaths(
             parent=process_dump_path.parent,
@@ -246,9 +244,7 @@ class GroupDumper(BaseCollectionDumper):
         # Convert string to actual enum members
         current_store_key = DumpStoreKeys(current_store_key_str)
         other_store_key = (
-            DumpStoreKeys.CALCULATIONS
-            if current_store_key == DumpStoreKeys.WORKFLOWS
-            else DumpStoreKeys.WORKFLOWS
+            DumpStoreKeys.CALCULATIONS if current_store_key == DumpStoreKeys.WORKFLOWS else DumpStoreKeys.WORKFLOWS
         )
 
         current_store = self.dump_logger.get_store_by_name(name=current_store_key.value)
@@ -329,8 +325,8 @@ class GroupDumper(BaseCollectionDumper):
         if top_level_caller:
             self.dump_logger.save_log()
 
-class GroupDumpVerifyer(BaseDumper):
 
+class GroupDumpVerifyer(BaseDumper):
     def __init__(
         self,
         group: orm.Group,
@@ -349,9 +345,7 @@ class GroupDumpVerifyer(BaseDumper):
 
         self.validation_result = None
 
-
     def update_groups(self):
-
         dump_logger = self.dump_logger
         assert dump_logger is not None
 

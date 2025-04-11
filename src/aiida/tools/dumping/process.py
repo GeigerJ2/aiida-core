@@ -339,9 +339,7 @@ class ProcessDumper(BaseDumper):
 
         self._write_node_yaml(process_node=calculation_node, output_path=output_path)
 
-        io_dump_mapping = self._generate_calculation_io_mapping(
-            io_dump_paths=io_dump_paths, flat=self.config.flat
-        )
+        io_dump_mapping = self._generate_calculation_io_mapping(io_dump_paths=io_dump_paths, flat=self.config.flat)
 
         # Dump the repository contents of the node
         calculation_node.base.repository.copy_tree(output_path.resolve() / io_dump_mapping.repository)

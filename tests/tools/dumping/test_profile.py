@@ -8,7 +8,6 @@
 ###########################################################################
 """Tests for the dumping of profile data to disk."""
 
-import copy
 
 import pytest
 
@@ -1028,7 +1027,7 @@ class TestProfileDumper:
     #         base_path=tmp_path,
     #     )
 
-        # TODO: Also verify the log update
+    # TODO: Also verify the log update
 
     @pytest.mark.usefixtures('aiida_profile_clean')
     def test_dump_no_only_top_level_calcs(self, tmp_path, setup_add_group, setup_multiply_add_group):

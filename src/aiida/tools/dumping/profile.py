@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-import shutil
 from pathlib import Path
 from typing import cast
 
@@ -28,10 +27,10 @@ from aiida.manage import load_profile
 from aiida.manage.configuration.profile import Profile
 from aiida.tools.dumping.collection import BaseCollectionDumper
 from aiida.tools.dumping.config import (
-    GroupDumperConfig,
     DumpCollectorConfig,
     DumpMode,
     DumpPaths,
+    GroupDumperConfig,
     NodeDumpGroupScope,
     ProcessDumperConfig,
     ProfileDumperConfig,
@@ -217,5 +216,7 @@ class ProfileDumper(BaseCollectionDumper):
                 self.dump_not_in_any_group()
 
         if top_level_caller:
-            import ipdb; ipdb.set_trace()
+            import ipdb
+
+            ipdb.set_trace()
             self.dump_logger.save_log()
