@@ -62,7 +62,7 @@ __all__ = (
     'EXIT_STATUS',
     'EXPORT_FORMAT',
     'FAILED',
-    'FILTER_BY_LAST_MIRROR_TIME',
+    'FILTER_BY_LAST_DUMP_TIME',
     'FLAT',
     'FORCE',
     'FORMULA_MODE',
@@ -81,9 +81,9 @@ __all__ = (
     'INPUT_PLUGIN',
     'LABEL',
     'LIMIT',
-    'MIRROR_DATA',
-    'MIRROR_PROCESSES',
-    'MIRROR_UNSEALED',
+    'DUMP_DATA',
+    'DUMP_PROCESSES',
+    'DUMP_UNSEALED',
     'MOST_RECENT_NODE',
     'NODE',
     'NODES',
@@ -800,7 +800,7 @@ SORT = OverridableOption(
     show_default=True,
 )
 
-MIRROR_DATA = OverridableOption(
+DUMP_DATA = OverridableOption(
     '--mirror-data/--no-mirror-data',
     is_flag=True,
     default=False,
@@ -808,7 +808,7 @@ MIRROR_DATA = OverridableOption(
     help='Mirror data nodes.',
 )
 
-MIRROR_PROCESSES = OverridableOption(
+DUMP_PROCESSES = OverridableOption(
     '--mirror-processes/--no-mirror-processes',
     is_flag=True,
     default=True,
@@ -911,7 +911,7 @@ UPDATE_GROUPS = OverridableOption(
     help='Update directories if nodes have been added to other groups, or organized differently in terms of groups.',
 )
 
-MIRROR_UNSEALED = OverridableOption(
+DUMP_UNSEALED = OverridableOption(
     '--mirror-unsealed/--no-mirror-unsealed',
     is_flag=True,
     default=False,
@@ -919,7 +919,7 @@ MIRROR_UNSEALED = OverridableOption(
     help='Also allow the mirroring of unsealed process nodes.',
 )
 
-FILTER_BY_LAST_MIRROR_TIME = OverridableOption(
+FILTER_BY_LAST_DUMP_TIME = OverridableOption(
     '--filter-by-last-mirror-time/--no-filter-by-last-mirror-time',
     is_flag=True,
     default=True,

@@ -6,7 +6,7 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-"""Class to collect nodes for mirror feature."""
+"""Class to collect nodes for dump feature."""
 
 from __future__ import annotations
 
@@ -14,34 +14,34 @@ from typing import Any, Dict
 
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.mirror.config import (
-    MirrorCollectorConfig,
-    MirrorStoreKeys,
-    NodeMirrorGroupScope,
+from aiida.tools.dumping.config import (
+    DumpCollectorConfig,
+    DumpStoreKeys,
+    NodeDumpGroupScope,
 )
-from aiida.tools.mirror.logger import MirrorLogger
-from aiida.tools.mirror.store import MirrorNodeStore
-from aiida.tools.mirror.utils import QbMirrorEntityType
+from aiida.tools.dumping.logger import DumpLogger
+from aiida.tools.dumping.store import DumpNodeStore
+from aiida.tools.dumping.utils import QbDumpEntityType
 
-logger = AIIDA_LOGGER.getChild('tools.mirror.collector')
+logger = AIIDA_LOGGER.getChild('tools.dump.collector')
 
-# TODO: Limit to only sealed nodes. This option is currently accessible for `verdi process mirror`, but it is not a
+# TODO: Limit to only sealed nodes. This option is currently accessible for `verdi process dump`, but it is not a
 # generally exposed option
 
 
-__all__ = ('MirrorCollector',)
+__all__ = ('DumpCollector',)
 
 
-class MirrorCollector:
+class DumpCollector:
     def __init__(
         self,
-        mirror_logger: MirrorLogger,
-        config: MirrorCollectorConfig | None = None,
+        dump_logger: DumpLogger,
+        config: DumpCollectorConfig | None = None,
     ):
-        self.mirror_logger = mirror_logger
-        self.config = config or MirrorCollectorConfig()
+        self.dump_logger = dump_logger
+        self.config = config or DumpCollectorConfig()
 
-    def collect_to_mirror(self, group: orm.Group | None = None, filters: dict | None = None) -> MirrorNodeStore:
+    def collect_to_dump(self, group: orm.Group | None = None, filters: dict | None = None) -> DumpNodeStore:
         if group:
             msg = f'Collecting nodes from the database for group `{group.label}`.'
         else:
@@ -49,15 +49,15 @@ class MirrorCollector:
 
         logger.report(msg)
 
-        mirror_times = self.mirror_logger.mirror_times
-        # TODO: last mirror time defined in two places, once, `MirrorTimes.last`
-        # TODO: as well as `MirrorLogger.last_mirror_time`
+        dump_times = self.dump_logger.dump_times
+        # TODO: last dump time defined in two places, once, `DumpTimes.last`
+        # TODO: as well as `DumpLogger.last_dump_time`
         # NOTE: Should be fine, though, as in both places, the value is read from the log file, if it exists
-        if mirror_times.last is None:
-            msg = 'For the first mirror, this can take a while.'
+        if dump_times.last is None:
+            msg = 'For the first dump, this can take a while.'
             logger.report(msg)
 
-        node_store = MirrorNodeStore()
+        node_store = DumpNodeStore()
 
         if self.config.get_processes:
             # Get workflow nodes
@@ -86,55 +86,55 @@ class MirrorCollector:
             node_store.calculations = calculations
 
         if self.config.get_data:
-            msg = 'Mirroring of data nodes not implemented yet.'
+            msg = 'Dumping of data nodes not implemented yet.'
             raise NotImplementedError(msg)
 
         return node_store
 
-    def collect_to_delete(self) -> MirrorNodeStore:
+    def collect_to_delete(self) -> DumpNodeStore:
         """ """
-        delete_node_container = MirrorNodeStore()
+        delete_node_container = DumpNodeStore()
 
         for orm_type in (orm.CalculationNode, orm.WorkflowNode, orm.Data, orm.Group):
-            store_name = MirrorStoreKeys.from_class(orm_class=orm_type)
-            mirror_store = getattr(self.mirror_logger, store_name)
-            mirrored_uuids = set(mirror_store.entries.keys())
+            store_name = DumpStoreKeys.from_class(orm_class=orm_type)
+            dump_store = getattr(self.dump_logger, store_name)
+            dumped_uuids = set(dump_store.entries.keys())
             qb = orm.QueryBuilder()
             qb.append(orm_type, project=['uuid'])
 
             db_uuids = set(qb.all(flat=True))
-            # Ensure that the nodes were _actually_ already mirrored in the past
-            db_uuids = set([db_uuid for db_uuid in db_uuids if db_uuid in mirrored_uuids])
-            to_delete_uuids = mirrored_uuids - db_uuids
+            # Ensure that the nodes were _actually_ already dumped in the past
+            db_uuids = set([db_uuid for db_uuid in db_uuids if db_uuid in dumped_uuids])
+            to_delete_uuids = dumped_uuids - db_uuids
             setattr(delete_node_container, store_name, to_delete_uuids)
 
         return delete_node_container
 
-    def _resolve_filters(self, orm_class: QbMirrorEntityType) -> Dict[str, Any]:
+    def _resolve_filters(self, orm_class: QbDumpEntityType) -> Dict[str, Any]:
         filters: Dict[str, Any] = {}
-        orm_key = MirrorStoreKeys.from_class(orm_class=orm_class)
+        orm_key = DumpStoreKeys.from_class(orm_class=orm_class)
 
         # Initialize mtime filter as a dictionary
         mtime_filter: Dict[str, Any] = {}
 
-        # Add current mirror time as upper bound
-        mtime_filter['<='] = self.mirror_logger.mirror_times.current.astimezone()
+        # Add current dump time as upper bound
+        mtime_filter['<='] = self.dump_logger.dump_times.current.astimezone()
 
         # This might be too annoying to log always, and raising here would require manually setting
-        # `filter-by-last-mirror-time` to False for the first mirror
-        if self.config.filter_by_last_mirror_time and not self.mirror_logger.mirror_times.last:
-            msg = 'Cannot filter by last mirror time if no last mirror time available. Will not filter nodes by time.'
+        # `filter-by-last-dump-time` to False for the first dump
+        if self.config.filter_by_last_dump_time and not self.dump_logger.dump_times.last:
+            msg = 'Cannot filter by last dump time if no last dump time available. Will not filter nodes by time.'
             logger.debug(msg)
 
-        # Add last mirror time as lower bound if available and configured
-        elif self.config.filter_by_last_mirror_time and self.mirror_logger.mirror_times.last:
-            mtime_filter['>='] = self.mirror_logger.mirror_times.last.astimezone()
+        # Add last dump time as lower bound if available and configured
+        elif self.config.filter_by_last_dump_time and self.dump_logger.dump_times.last:
+            mtime_filter['>='] = self.dump_logger.dump_times.last.astimezone()
 
         # Add the mtime filter to the main filters dictionary
         filters['mtime'] = mtime_filter
 
-        # Filter out already logged nodes if mirror_logger is available
-        store = getattr(self.mirror_logger, orm_key)
+        # Filter out already logged nodes if dump_logger is available
+        store = getattr(self.dump_logger, orm_key)
         if len(store) > 0:
             filters['uuid'] = {'!in': list(store.entries.keys())}
 
@@ -142,7 +142,7 @@ class MirrorCollector:
 
     def get_nodes(
         self,
-        orm_type: QbMirrorEntityType,
+        orm_type: QbDumpEntityType,
         group: orm.Group | None = None,
         top_level_only: bool = False,
         filters: dict | None = None,
@@ -153,15 +153,15 @@ class MirrorCollector:
             filters = self._resolve_filters(orm_type)
 
         if self.config.group_scope not in (
-            NodeMirrorGroupScope.IN_GROUP,
-            NodeMirrorGroupScope.ANY,
-            NodeMirrorGroupScope.NO_GROUP,
+            NodeDumpGroupScope.IN_GROUP,
+            NodeDumpGroupScope.ANY,
+            NodeDumpGroupScope.NO_GROUP,
         ):
             msg = f'Unknown scope: {self.config.group_scope}'
             raise ValueError(msg)
 
         # Build query based on scope
-        if self.config.group_scope == NodeMirrorGroupScope.IN_GROUP:
+        if self.config.group_scope == NodeDumpGroupScope.IN_GROUP:
             if group is None:
                 msg = 'Group must be provided when scope is IN_GROUP'
                 raise ValueError(msg)
@@ -186,10 +186,10 @@ class MirrorCollector:
                         descendant_wfs.extend([n for n in node.called_descendants if isinstance(n, orm.WorkflowNode)])
                 nodes += descendant_wfs
 
-        elif self.config.group_scope == NodeMirrorGroupScope.ANY:
+        elif self.config.group_scope == NodeDumpGroupScope.ANY:
             nodes = self._query_all_nodes(orm_type, filters)
 
-        elif self.config.group_scope == NodeMirrorGroupScope.NO_GROUP:
+        elif self.config.group_scope == NodeDumpGroupScope.NO_GROUP:
             nodes = self._query_no_group_nodes(orm_type, filters)
 
         # Apply top-level filtering if requested
@@ -199,19 +199,19 @@ class MirrorCollector:
         return nodes
 
     def _query_group_nodes(
-        self, orm_class: QbMirrorEntityType, group: orm.Group, filters: Dict[str, Any] = {}
+        self, orm_class: QbDumpEntityType, group: orm.Group, filters: Dict[str, Any] = {}
     ) -> list[Any]:
         qb = orm.QueryBuilder()
         qb.append(orm.Group, filters={'id': group.pk}, tag='group')
         qb.append(orm_class, filters=filters, with_group='group', tag='node')
         return qb.all(flat=True)
 
-    def _query_all_nodes(self, orm_class: QbMirrorEntityType, filters: Dict[str, Any]) -> list[Any]:
+    def _query_all_nodes(self, orm_class: QbDumpEntityType, filters: Dict[str, Any]) -> list[Any]:
         qb = orm.QueryBuilder()
         qb.append(orm_class, filters=filters, tag='node')
         return qb.all(flat=True)
 
-    def _query_no_group_nodes(self, orm_class: QbMirrorEntityType, filters: Dict[str, Any]) -> list[Any]:
+    def _query_no_group_nodes(self, orm_class: QbDumpEntityType, filters: Dict[str, Any]) -> list[Any]:
         # First get all nodes
         all_nodes = self._query_all_nodes(orm_class, filters)
 

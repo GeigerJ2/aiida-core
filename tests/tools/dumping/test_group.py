@@ -11,14 +11,14 @@
 # TODO: Test incremental dumping
 
 tree_multiply_add_group = {
-    'multiply-add-group-mirror': [
-        '.aiida_mirror_log.json',
-        '.aiida_mirror_safeguard',
+    'multiply-add-group-dump': [
+        '.aiida_dump_log.json',
+        '.aiida_dump_safeguard',
         {
             'workflows': [
                 {
                     'MultiplyAddWorkChain-5': [
-                        '.aiida_mirror_safeguard',
+                        '.aiida_dump_safeguard',
                         '.aiida_node_metadata.yaml',
                         {
                             '01-multiply-6': [
@@ -60,7 +60,7 @@ tree_multiply_add_group = {
 
 
 # @pytest.mark.usefixtures('aiida_profile_clean_class')
-class TestGroupMirror:
+class TestGroupDump:
     pass
     # @pytest.mark.usefixtures('aiida_profile_clean')
     # def test_should_dump_processes(self, setup_no_process_group, setup_add_group):
@@ -76,13 +76,13 @@ class TestGroupMirror:
 
     #     assert collection_dumper._should_dump_processes() is True
 
-    # def test_mirror_processes(self, ):
+    # def test_dump_processes(self, ):
     # @pytest.mark.usefixtures('aiida_profile_clean')
     # def test_resolve_collection_nodes(self, setup_add_group, generate_calculation_node_add):
     #     add_group: orm.Group = setup_add_group
     #     add_nodes = add_group.nodes
 
-    #     add_dumper = GroupMirror(group=add_group)
+    #     add_dumper = GroupDump(group=add_group)
 
     #     nodes = add_dumper._get_group_nodes()
     #     assert len(nodes) == 1
@@ -108,7 +108,7 @@ class TestGroupMirror:
     #     assert set(nodes) == set([add_nodes[0].uuid, cj_node1.uuid])
 
     #     # Filtering by time should work -> Now, only cj_node2 gets returned
-    #     add_dumper.base_mirror_config.last_dump_time = datetime.now().astimezone()
+    #     add_dumper.base_dump_config.last_dump_time = datetime.now().astimezone()
 
     #     cj_node2 = generate_calculation_node_add()
     #     add_group.add_nodes([cj_node2])
@@ -118,7 +118,7 @@ class TestGroupMirror:
     #     assert nodes[0] == cj_node2.uuid
 
     #     for invalid_collection in [{'foo': 'bar'}, [1.0, 1.1]]:
-    #         collection_dumper = GroupMirror(group=invalid_collection)
+    #         collection_dumper = GroupDump(group=invalid_collection)
     #         with pytest.raises(ValueError):
     #             collection_dumper._get_group_nodes()
 
@@ -130,8 +130,8 @@ class TestGroupMirror:
     #     add_nodes = list(add_group.nodes)
     #     multiply_add_nodes = list(multiply_add_group.nodes)
 
-    #     add_dumper = GroupMirror(group=add_group)
-    #     multiply_add_dumper = GroupMirror(group=multiply_add_group)
+    #     add_dumper = GroupDump(group=add_group)
+    #     multiply_add_dumper = GroupDump(group=multiply_add_group)
 
     #     add_process_to_dump = add_dumper._get_processes_to_dump()
     #     assert len(add_process_to_dump.calculations) == 1
@@ -153,9 +153,9 @@ class TestGroupMirror:
     #     add_group_label = add_group.label
     #     add_group_path = tmp_path / add_group_label
 
-    #     add_dumper = GroupMirror(group=add_group, output_path=add_group_path)
+    #     add_dumper = GroupDump(group=add_group, output_path=add_group_path)
 
-    #     add_dumper._mirror_processes(add_dumper._get_processes_to_dump().calculations)
+    #     add_dumper._dump_processes(add_dumper._get_processes_to_dump().calculations)
 
     #     expected_tree = {
     #         'calculations': {
@@ -175,18 +175,18 @@ class TestGroupMirror:
     #     multiply_add_group_label = multiply_add_group.label
     #     multiply_add_group_path = tmp_path / multiply_add_group_label
 
-    #     multiply_add_dumper = GroupMirror(group=multiply_add_group, output_path=multiply_add_group_path)
+    #     multiply_add_dumper = GroupDump(group=multiply_add_group, output_path=multiply_add_group_path)
 
     #     # No calculations to dump when deduplication is enabled
-    #     multiply_add_dumper._mirror_processes(multiply_add_dumper._get_processes_to_dump().calculations)
+    #     multiply_add_dumper._dump_processes(multiply_add_dumper._get_processes_to_dump().calculations)
     #     assert not (multiply_add_group_path / 'calculations').exists()
 
     #     # Now, disable de-duplication -> Should dump calculations
-    #     multiply_add_dumper_no_dedup = GroupMirror(
+    #     multiply_add_dumper_no_dedup = GroupDump(
     #         group=multiply_add_group, output_path=multiply_add_group_path, deduplicate=False
     #     )
 
-    #     multiply_add_dumper_no_dedup._mirror_processes(
+    #     multiply_add_dumper_no_dedup._dump_processes(
     #         multiply_add_dumper_no_dedup._get_processes_to_dump().calculations
     #     )
 
@@ -244,7 +244,7 @@ class TestGroupMirror:
     #     assert len(nodes) == 2
 
     #     # Filtering by time should work
-    #     collection_dumper.base_mirror_config.last_dump_time = datetime.now().astimezone()
+    #     collection_dumper.base_dump_config.last_dump_time = datetime.now().astimezone()
 
     #     cj_node2 = generate_calculation_node_add()
     #     add_group.add_nodes([cj_node2])

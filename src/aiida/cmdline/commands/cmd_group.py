@@ -326,8 +326,8 @@ def group_relabel(group, label):
     else:
         echo.echo_success(f"Label changed to '{label}'")
         msg = (
-            'Note that if you are mirroring your profile data to disk, to reflect the relabeling of the group, '
-            'run the command: `verdi profile mirror --update-groups.`'
+            'Note that if you are dumping your profile data to disk, to reflect the relabeling of the group, '
+            'run the command: `verdi profile dump --update-groups.`'
         )
         echo.echo_report(msg)
 
@@ -639,13 +639,13 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
             echo.echo(child.path, bold=not child.is_virtual)
 
 
-@verdi_group.command('mirror')
+@verdi_group.command('dump')
 @arguments.GROUP()
 @options.PATH()
 @options.OVERWRITE()
-@options.FILTER_BY_LAST_MIRROR_TIME()
-@options.MIRROR_PROCESSES()
-@options.MIRROR_DATA()
+@options.FILTER_BY_LAST_DUMP_TIME()
+@options.DUMP_PROCESSES()
+@options.DUMP_DATA()
 @options.DELETE_MISSING()
 @options.ONLY_TOP_LEVEL_CALCS()
 @options.ONLY_TOP_LEVEL_WORKFLOWS()
@@ -655,14 +655,14 @@ def group_path_ls(path, type_string, recursive, as_table, no_virtual, with_descr
 @options.INCLUDE_ATTRIBUTES()
 @options.INCLUDE_EXTRAS()
 @options.FLAT()
-@options.MIRROR_UNSEALED()
-def group_mirror(
+@options.DUMP_UNSEALED()
+def group_dump(
     group,
     path,
     overwrite,
-    filter_by_last_mirror_time,
-    mirror_processes,
-    mirror_data,
+    filter_by_last_dump_time,
+    dump_processes,
+    dump_data,
     delete_missing,
     only_top_level_calcs,
     only_top_level_workflows,
@@ -672,69 +672,69 @@ def group_mirror(
     include_attributes,
     include_extras,
     flat,
-    mirror_unsealed,
+    dump_unsealed,
 ):
-    """Mirror data of group to disk."""
+    """Dump data of group to disk."""
 
     from aiida.tools.archive.exceptions import ExportValidationError
-    from aiida.tools.mirror import GroupMirror
-    from aiida.tools.mirror.config import GroupMirrorConfig, MirrorCollectorConfig, MirrorMode, ProcessMirrorConfig
-    from aiida.tools.mirror.utils import resolve_click_path_for_mirror
+    from aiida.tools.dumping import GroupDumper
+    from aiida.tools.dumping.config import GroupDumperConfig, DumpCollectorConfig, DumpMode, ProcessDumperConfig
+    from aiida.tools.dumping.utils import resolve_click_path_for_dump
 
-    # FIXME: If nodes not newly created since the last Mirroring, but only added to the group, those are not picked up
-    # during the incremental mirroring
+    # FIXME: If nodes not newly created since the last Dumping, but only added to the group, those are not picked up
+    # during the incremental dumping
 
-    mirror_paths = resolve_click_path_for_mirror(path=path, entity=group)
-    output_path = mirror_paths.parent / mirror_paths.child
+    dump_paths = resolve_click_path_for_dump(path=path, entity=group)
+    output_path = dump_paths.parent / dump_paths.child
 
-    msg = f'Mirroring data of group `{group.label}` at path `{output_path.name}`.'
+    msg = f'Dumping data of group `{group.label}` at path `{output_path.name}`.'
     echo.echo_report(msg)
 
     if overwrite:
-        mirror_mode = MirrorMode.OVERWRITE
+        dump_mode = DumpMode.OVERWRITE
     else:
-        mirror_mode = MirrorMode.INCREMENTAL
+        dump_mode = DumpMode.INCREMENTAL
 
-    mirror_collector_config = MirrorCollectorConfig(
-        get_processes=mirror_processes,
-        get_data=mirror_data,
-        filter_by_last_mirror_time=filter_by_last_mirror_time,
+    dump_collector_config = DumpCollectorConfig(
+        get_processes=dump_processes,
+        get_data=dump_data,
+        filter_by_last_dump_time=filter_by_last_dump_time,
         only_top_level_calcs=only_top_level_calcs,
         only_top_level_workflows=only_top_level_workflows,
     )
 
-    process_mirror_config = ProcessMirrorConfig(
+    process_dump_config = ProcessDumperConfig(
         include_inputs=include_inputs,
         include_outputs=include_outputs,
         include_attributes=include_attributes,
         include_extras=include_extras,
         flat=flat,
-        mirror_unsealed=mirror_unsealed,
+        dump_unsealed=dump_unsealed,
     )
 
-    group_mirror_config = GroupMirrorConfig(
+    group_dump_config = GroupDumperConfig(
         symlink_calcs=symlink_calcs,
         delete_missing=delete_missing,
     )
 
-    group_mirror_inst = GroupMirror(
+    group_dumper = GroupDumper(
         group=group,
-        mirror_mode=mirror_mode,
-        mirror_paths=mirror_paths,
-        mirror_collector_config=mirror_collector_config,
-        config=group_mirror_config,
-        process_mirror_config=process_mirror_config,
+        dump_mode=dump_mode,
+        dump_paths=dump_paths,
+        dump_collector_config=dump_collector_config,
+        config=group_dump_config,
+        process_dump_config=process_dump_config,
     )
 
     try:
-        _ = group_mirror_inst.mirror(top_level_caller=True)
-        # _ = group_mirror_inst._generate_readme()
-        msg = f'Raw files for group `{group.label}` <{group.pk}> mirrored into folder `{output_path.name}`.'
+        _ = group_dumper.dump(top_level_caller=True)
+        # _ = group_dumper._generate_readme()
+        msg = f'Raw files for group `{group.label}` <{group.pk}> dumped into folder `{output_path.name}`.'
         echo.echo_success(msg)
     except ExportValidationError as e:
         echo.echo_critical(f'{e!s}')
     except Exception as e:
         import traceback
 
-        msg = f'Unexpected error while mirroring {group.label} <{group.pk}>:\n ({e!s}). \n'
+        msg = f'Unexpected error while dumping {group.label} <{group.pk}>:\n ({e!s}). \n'
         echo.echo_critical(msg + traceback.format_exc())

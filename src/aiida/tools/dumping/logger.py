@@ -16,23 +16,23 @@ from datetime import datetime
 from pathlib import Path
 
 from aiida.common.exceptions import NotExistent
-from aiida.tools.mirror.config import MirrorPaths, MirrorStoreKeys, MirrorTimes
-from aiida.tools.mirror.utils import StoreNameType
+from aiida.tools.dumping.config import DumpPaths, DumpStoreKeys, DumpTimes
+from aiida.tools.dumping.utils import StoreNameType
 
-# TODO: Possibly mirror hierarchy of mirrored directory inside json file
+# TODO: Possibly dump hierarchy of dumped directory inside json file
 # TODO: Currently, json file has only top-level "groups", "workflows", and "calculations"
 # TODO: `add_entry` and `add_entries` shouldn't _require_ passing a store, but could be automatically evaluated from the
 # type of the first node in the passed entry/entries
-# NOTE: Could use MirrorLogger also as container for orm.Nodes, that should be mirrored
-# NOTE: Should MirrorLogger be not provided (None), or should it rather just be empty with no entries
+# NOTE: Could use DumpLogger also as container for orm.Nodes, that should be dumped
+# NOTE: Should DumpLogger be not provided (None), or should it rather just be empty with no entries
 # NOTE: Is on `save_log` again the whole history being written to disk? Ideally, this would be incremental
-# NOTE: Shouldn't the logger have the `MirrorTimes` attached to it??
+# NOTE: Shouldn't the logger have the `DumpTimes` attached to it??
 # NOTE: Problem with general `node_mtime` is that `Group`s don't have an `mtime` attribute
 
 
 @dataclass
-class MirrorLog:
-    """Represents a single mirror log entry."""
+class DumpLog:
+    """Represents a single dump log entry."""
 
     # TODO: Possibly add `node_type` or something similar here
 
@@ -44,24 +44,24 @@ class MirrorLog:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'MirrorLog':
+    def from_dict(cls, data: dict) -> 'DumpLog':
         return cls(
             path=Path(data['path']),
         )
 
 
 @dataclass
-class MirrorLogStore:
-    """A store for MirrorLog entries, indexed by UUID."""
+class DumpLogStore:
+    """A store for DumpLog entries, indexed by UUID."""
 
-    entries: dict[str, MirrorLog] = field(default_factory=dict)
+    entries: dict[str, DumpLog] = field(default_factory=dict)
 
     # TODO: If I support keeping track of the symlinks, possibly should implement extending them here
-    def add_entry(self, uuid: str, entry: MirrorLog) -> None:
+    def add_entry(self, uuid: str, entry: DumpLog) -> None:
         """Add a single entry to the container."""
         self.entries[uuid] = entry
 
-    def add_entries(self, entries: dict[str, MirrorLog]) -> None:
+    def add_entries(self, entries: dict[str, DumpLog]) -> None:
         """Add a collection of entries to the container."""
         self.entries.update(entries)
 
@@ -78,7 +78,7 @@ class MirrorLogStore:
             if uuid in self.entries:
                 del self.entries[uuid]
 
-    def get_entry(self, uuid: str) -> MirrorLog | None:
+    def get_entry(self, uuid: str) -> DumpLog | None:
         """Retrieve a single entry by UUID."""
         return self.entries.get(uuid)
 
@@ -94,9 +94,9 @@ class MirrorLogStore:
         return {uuid: entry.to_dict() for uuid, entry in self.entries.items()}
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'MirrorLogStore':
+    def from_dict(cls, data: dict) -> 'DumpLogStore':
         store = cls()
-        store.entries = {uuid: MirrorLog.from_dict(entry) for uuid, entry in data.items()}
+        store.entries = {uuid: DumpLog.from_dict(entry) for uuid, entry in data.items()}
         return store
 
     def update_paths(self, old_str: str, new_str: str) -> None:
@@ -120,52 +120,52 @@ class MirrorLogStore:
 
 
 @dataclass
-class MirrorLogStoreCollection:
+class DumpLogStoreCollection:
     """Represents the entire log, with calculations and workflows (will be extended with Data)."""
 
-    calculations: MirrorLogStore
-    workflows: MirrorLogStore
-    groups: MirrorLogStore
-    data: MirrorLogStore
+    calculations: DumpLogStore
+    workflows: DumpLogStore
+    groups: DumpLogStore
+    data: DumpLogStore
 
 
-class MirrorLogger:
-    """Main Logger class for data mirroring."""
+class DumpLogger:
+    """Main Logger class for data dumping."""
 
-    MIRROR_LOG_FILE: str = '.aiida_mirror_log.json'
+    dump_LOG_FILE: str = '.aiida_dump_log.json'
 
     def __init__(
         self,
-        mirror_paths: MirrorPaths,
-        mirror_times: MirrorTimes,
-        calculations: MirrorLogStore | None = None,
-        workflows: MirrorLogStore | None = None,
-        groups: MirrorLogStore | None = None,
-        data: MirrorLogStore | None = None,
-        last_mirror_time: datetime | None = None,
+        dump_paths: DumpPaths,
+        dump_times: DumpTimes,
+        calculations: DumpLogStore | None = None,
+        workflows: DumpLogStore | None = None,
+        groups: DumpLogStore | None = None,
+        data: DumpLogStore | None = None,
+        last_dump_time: datetime | None = None,
     ) -> None:
-        self.mirror_paths = mirror_paths
-        self.mirror_times = mirror_times
-        self.calculations = calculations or MirrorLogStore()
-        self.workflows = workflows or MirrorLogStore()
-        self.groups = groups or MirrorLogStore()
-        self.data = data or MirrorLogStore()
-        self.last_mirror_time = last_mirror_time
+        self.dump_paths = dump_paths
+        self.dump_times = dump_times
+        self.calculations = calculations or DumpLogStore()
+        self.workflows = workflows or DumpLogStore()
+        self.groups = groups or DumpLogStore()
+        self.data = data or DumpLogStore()
+        self.last_dump_time = last_dump_time
 
-    def add_entry(self, store: MirrorLogStore, uuid: str, entry: MirrorLog) -> None:
+    def add_entry(self, store: DumpLogStore, uuid: str, entry: DumpLog) -> None:
         store.add_entry(uuid, entry)
 
-    def add_entries(self, store: MirrorLogStore, uuids: list[str], entries: list[MirrorLog]) -> None:
+    def add_entries(self, store: DumpLogStore, uuids: list[str], entries: list[DumpLog]) -> None:
         for uuid, entry in zip(uuids, entries):
             store.add_entry(uuid, entry)
 
-    def del_entry(self, store: MirrorLogStore, uuid: str) -> bool:
+    def del_entry(self, store: DumpLogStore, uuid: str) -> bool:
         return store.del_entry(uuid)
 
     @property
-    def stores(self) -> MirrorLogStoreCollection:
+    def stores(self) -> DumpLogStoreCollection:
         """Retrieve the current state of the log as a dataclass."""
-        return MirrorLogStoreCollection(
+        return DumpLogStoreCollection(
             calculations=self.calculations,
             workflows=self.workflows,
             groups=self.groups,
@@ -180,76 +180,76 @@ class MirrorLogger:
             'workflows': self.serialize_logs(self.workflows),
             'groups': self.serialize_logs(self.groups),
             'data': self.serialize_logs(self.data),
-            'last_mirror_time': self.mirror_times.current.isoformat(),
+            'last_dump_time': self.dump_times.current.isoformat(),
         }
 
-        with self.mirror_paths.log_path.open('w', encoding='utf-8') as f:
+        with self.dump_paths.log_path.open('w', encoding='utf-8') as f:
             json.dump(log_dict, f, indent=4)
 
-    def serialize_logs(self, container: MirrorLogStore) -> dict:
+    def serialize_logs(self, container: DumpLogStore) -> dict:
         serialized = {}
         for uuid, entry in container.entries.items():
-            relative_path = entry.path.relative_to(self.mirror_paths.parent)
+            relative_path = entry.path.relative_to(self.dump_paths.parent)
             serialized[uuid] = {
                 'path': str(relative_path),
             }
         return serialized
 
-    # TODO: Could also convert to normal method, such that I have access to self.mirror_paths and can deserialize to
+    # TODO: Could also convert to normal method, such that I have access to self.dump_paths and can deserialize to
     # absolute Paths
     @staticmethod
-    def deserialize_logs(category_data: dict, mirror_paths: MirrorPaths) -> MirrorLogStore:
-        container = MirrorLogStore()
+    def deserialize_logs(category_data: dict, dump_paths: DumpPaths) -> DumpLogStore:
+        container = DumpLogStore()
         for uuid, entry in category_data.items():
             container.add_entry(
                 uuid,
-                MirrorLog(
-                    path=mirror_paths.parent / Path(entry['path']),
+                DumpLog(
+                    path=dump_paths.parent / Path(entry['path']),
                 ),
             )
         return container
 
     @classmethod
-    def from_file(cls, mirror_paths: MirrorPaths) -> 'MirrorLogger':
+    def from_file(cls, dump_paths: DumpPaths) -> 'DumpLogger':
         """Alternative constructor to load from an existing JSON file."""
 
-        if not mirror_paths.log_path.exists():
-            mirror_times = MirrorTimes()
-            return cls(mirror_paths=mirror_paths, mirror_times=mirror_times)
+        if not dump_paths.log_path.exists():
+            dump_times = DumpTimes()
+            return cls(dump_paths=dump_paths, dump_times=dump_times)
 
         try:
-            with mirror_paths.log_path.open('r', encoding='utf-8') as f:
-                prev_mirror_data = json.load(f)
-                mirror_times = MirrorTimes.from_file(mirror_paths=mirror_paths)
-                instance = cls(mirror_paths=mirror_paths, mirror_times=mirror_times)
+            with dump_paths.log_path.open('r', encoding='utf-8') as f:
+                prev_dump_data = json.load(f)
+                dump_times = DumpTimes.from_file(dump_paths=dump_paths)
+                instance = cls(dump_paths=dump_paths, dump_times=dump_times)
 
-            instance.calculations = MirrorLogger.deserialize_logs(prev_mirror_data['calculations'], mirror_paths=mirror_paths)
-            instance.workflows = MirrorLogger.deserialize_logs(prev_mirror_data['workflows'], mirror_paths=mirror_paths)
-            instance.groups = MirrorLogger.deserialize_logs(prev_mirror_data['groups'], mirror_paths=mirror_paths)
+            instance.calculations = DumpLogger.deserialize_logs(prev_dump_data['calculations'], dump_paths=dump_paths)
+            instance.workflows = DumpLogger.deserialize_logs(prev_dump_data['workflows'], dump_paths=dump_paths)
+            instance.groups = DumpLogger.deserialize_logs(prev_dump_data['groups'], dump_paths=dump_paths)
             # instance.data = deserialize_logs(data['data'])
 
-            # Load the last mirror time
-            if prev_mirror_data.get('last_mirror_time'):
-                instance.last_mirror_time = datetime.fromisoformat(prev_mirror_data['last_mirror_time'])
+            # Load the last dump time
+            if prev_dump_data.get('last_dump_time'):
+                instance.last_dump_time = datetime.fromisoformat(prev_dump_data['last_dump_time'])
 
         except (json.JSONDecodeError, OSError):
             raise
 
         return instance
 
-    def get_store_by_uuid(self, uuid: str) -> MirrorLogStore:
+    def get_store_by_uuid(self, uuid: str) -> DumpLogStore:
         """Find the store that contains the given UUID."""
 
-        # Iterate over the fields of the MirrorLogStoreCollection dataclass for generality
+        # Iterate over the fields of the DumpLogStoreCollection dataclass for generality
         for field_ in fields(self.stores):
             store = getattr(self.stores, field_.name)
             if uuid in store.entries:
                 return store
 
-        msg = f'No corresponding `MirrorLogStore` found for UUID: `{uuid}`.'
+        msg = f'No corresponding `DumpLogStore` found for UUID: `{uuid}`.'
         raise NotExistent(msg)
 
-    def get_store_by_name(self, name: StoreNameType) -> MirrorLogStore:
+    def get_store_by_name(self, name: StoreNameType) -> DumpLogStore:
         """Get the store by its string literal."""
 
         store_names = [field.name for field in fields(self.stores)]
@@ -259,9 +259,9 @@ class MirrorLogger:
 
         return getattr(self.stores, name)
 
-    def get_mirror_path_by_uuid(self, uuid: str) -> Path | None:
+    def get_dump_path_by_uuid(self, uuid: str) -> Path | None:
         """Find the store that contains the given UUID."""
-        # Iterate over the fields of the MirrorLogStoreCollection dataclass for generality
+        # Iterate over the fields of the DumpLogStoreCollection dataclass for generality
 
         try:
             current_store = self.get_store_by_uuid(uuid=uuid)
@@ -279,10 +279,10 @@ class MirrorLogger:
 
     def to_dict(self) -> dict:
         """
-        Convert the MirrorLogger state to a dictionary format.
+        Convert the DumpLogger state to a dictionary format.
 
         Returns:
-            dict: A dictionary representation of the MirrorLogger state,
+            dict: A dictionary representation of the DumpLogger state,
                 containing all calculations, workflows, groups, and data entries.
         """
 
@@ -293,8 +293,8 @@ class MirrorLogger:
             'data': self.data.to_dict(),
         }
 
-    def get_store_by_orm(self, orm_type) -> MirrorLogStore:
-        return getattr(self, MirrorStoreKeys.from_class(orm_type))
+    def get_store_by_orm(self, orm_type) -> DumpLogStore:
+        return getattr(self, DumpStoreKeys.from_class(orm_type))
 
     def update_paths(self, old_str: str, new_str: str):
         """Update all paths across all stores by replacing exact occurrences of old_str with new_str.
@@ -317,5 +317,29 @@ class MirrorLogger:
             new_str = f'/{new_str}'
 
         for store_name in ['calculations', 'workflows', 'groups', 'data']:
-            store: MirrorLogStore = getattr(self, store_name)
+            store: DumpLogStore = getattr(self, store_name)
             store.update_paths(old_str, new_str)
+
+
+    def _extract_expected_paths(self) -> dict:
+        """
+        Extract all expected paths from the log data.
+
+        Args:
+            log_data (Dict): Logger data containing UUIDs and paths
+
+        Returns:
+            Dict: Mapping of paths to their UUID and entity type
+        """
+        expected_paths = {}
+        for entity_type in ['calculations', 'workflows', 'groups', 'data']:
+            for uuid, entry in self.to_dict().get(entity_type, {}).items():
+                path = entry.get('path')
+                if path:
+                    # Convert to Path object and normalize
+                    if not isinstance(path, Path):
+                        path = Path(path)
+                    # Store the expected path with its UUID and type
+                    expected_paths[path] = {'uuid': uuid, 'type': entity_type}
+
+        return expected_paths

@@ -6,11 +6,11 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-"""Modules related to the mirroring of AiiDA data to disk."""
+"""Modules related to the dumping of AiiDA data to disk."""
 
-from .group import GroupMirror
-from .logger import MirrorLogger
-from .process import ProcessMirror
-from .profile import ProfileMirror
+from .group import GroupDumper
+from .logger import DumpLogger
+from .process import ProcessDump
+from .profile import ProfileDumper
 
-__all__ = ('GroupMirror', 'MirrorLogger', 'ProcessMirror', 'ProfileMirror')
+__all__ = ('GroupDumper', 'DumpLogger', 'ProcessDump', 'ProfileDumper')

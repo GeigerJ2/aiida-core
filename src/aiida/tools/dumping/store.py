@@ -6,7 +6,7 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-"""Class to collect nodes for mirror feature."""
+"""Class to collect nodes for dump feature."""
 
 from __future__ import annotations
 
@@ -14,22 +14,22 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.mirror.config import MirrorStoreKeys
-from aiida.tools.mirror.utils import StoreNameType
+from aiida.tools.dumping.config import DumpStoreKeys
+from aiida.tools.dumping.utils import StoreNameType
 
-logger = AIIDA_LOGGER.getChild('tools.mirror.collector')
+logger = AIIDA_LOGGER.getChild('tools.dump.collector')
 
 # TODO: Limit to only sealed nodes
 # NOTE: Not sure if this is even necessary, or I can just use lists?
 
-__all__ = ('MirrorNodeStore',)
+__all__ = ('DumpNodeStore',)
 
 
 @dataclass
-class MirrorNodeStore:
-    """Store for nodes to be mirrored.
+class DumpNodeStore:
+    """Store for nodes to be dumped.
 
-    This class follows a similar structure to MirrorLogger, making it easier
+    This class follows a similar structure to DumpLogger, making it easier
     to convert between the two.
     """
 
@@ -42,18 +42,18 @@ class MirrorNodeStore:
     def stores(self) -> dict:
         """Retrieve the current state of the container as a dataclass."""
         return {
-            MirrorStoreKeys.CALCULATIONS.value: self.calculations,
-            MirrorStoreKeys.WORKFLOWS.value: self.workflows,
-            MirrorStoreKeys.DATA.value: self.data,
-            MirrorStoreKeys.GROUPS.value: self.groups,
+            DumpStoreKeys.CALCULATIONS.value: self.calculations,
+            DumpStoreKeys.WORKFLOWS.value: self.workflows,
+            DumpStoreKeys.DATA.value: self.data,
+            DumpStoreKeys.GROUPS.value: self.groups,
         }
 
     @property
-    def should_mirror_processes(self) -> bool:
+    def should_dump_processes(self) -> bool:
         return len(self.calculations) > 0 or len(self.workflows) > 0
 
     @property
-    def should_mirror_data(self) -> bool:
+    def should_dump_data(self) -> bool:
         return len(self.data) > 0
 
     def __len__(self) -> int:
@@ -70,9 +70,9 @@ class MirrorNodeStore:
             nodes: List of nodes to add
         """
         if node_type:
-            attr = MirrorStoreKeys.from_class(node_type)
+            attr = DumpStoreKeys.from_class(node_type)
         elif len(nodes) > 0:
-            attr = MirrorStoreKeys.from_instance(nodes[0])
+            attr = DumpStoreKeys.from_instance(nodes[0])
         else:
             raise ValueError
 
@@ -109,7 +109,7 @@ class MirrorNodeStore:
             The corresponding store list
         """
 
-        attr = MirrorStoreKeys.from_class(node_type)
+        attr = DumpStoreKeys.from_class(node_type)
         return getattr(self, attr)
 
     # def get_store_by_instance(self, node_instance: Any) -> list: ...

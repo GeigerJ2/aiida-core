@@ -20,31 +20,31 @@ from aiida import orm
 from aiida.common import timezone
 
 __all__ = (
-    'BaseCollectionMirrorConfig',
-    'GroupMirrorConfig',
-    'MirrorCollectorConfig',
-    'MirrorMode',
-    'MirrorPaths',
-    'MirrorTimes',
-    'NodeMirrorGroupScope',
-    'ProcessMirrorConfig',
-    'ProfileMirrorConfig',
+    'BaseCollectionDumperConfig',
+    'GroupDumperConfig',
+    'DumpCollectorConfig',
+    'DumpMode',
+    'DumpPaths',
+    'DumpTimes',
+    'NodeDumpGroupScope',
+    'ProcessDumperConfig',
+    'ProfileDumperConfig',
 )
 
 
-class MirrorMode(Enum):
+class DumpMode(Enum):
     OVERWRITE = auto()
     INCREMENTAL = auto()
     DRY_RUN = auto()
 
 
-class NodeMirrorGroupScope(Enum):
+class NodeDumpGroupScope(Enum):
     IN_GROUP = auto()
     ANY = auto()
     NO_GROUP = auto()
 
 
-class MirrorStoreKeys(str, Enum):
+class DumpStoreKeys(str, Enum):
     CALCULATIONS = 'calculations'
     WORKFLOWS = 'workflows'
     GROUPS = 'groups'
@@ -61,7 +61,7 @@ class MirrorStoreKeys(str, Enum):
         elif isinstance(node_inst, orm.Group):
             return cls.GROUPS.value
         else:
-            msg = f'Mirroring not implemented yet for node type: {type(node_inst)}'
+            msg = f'Dumping not implemented yet for node type: {type(node_inst)}'
             raise NotImplementedError(msg)
 
     @classmethod
@@ -75,11 +75,11 @@ class MirrorStoreKeys(str, Enum):
         elif issubclass(orm_class, orm.Group):
             return cls.GROUPS.value
         else:
-            msg = f'Mirroring not implemented yet for node type: {orm_class}'
+            msg = f'Dumping not implemented yet for node type: {orm_class}'
             raise NotImplementedError(msg)
 
     @classmethod
-    def to_class(cls, key: 'MirrorStoreKeys') -> Type:
+    def to_class(cls, key: 'DumpStoreKeys') -> Type:
         mapping = {
             cls.CALCULATIONS: orm.CalculationNode,
             cls.WORKFLOWS: orm.WorkflowNode,
@@ -95,7 +95,7 @@ class MirrorStoreKeys(str, Enum):
 
 # NOTE: Should this be a singleton?
 @dataclass
-class MirrorTimes:
+class DumpTimes:
     _instance = None
     last: datetime | None = None
     # Fixed time set at instantiation
@@ -117,22 +117,22 @@ class MirrorTimes:
         return self._current
 
     @classmethod
-    def from_file(cls, mirror_paths: 'MirrorPaths') -> 'MirrorTimes':
+    def from_file(cls, dump_paths: 'DumpPaths') -> 'DumpTimes':
         try:
-            with mirror_paths.log_path.open('r', encoding='utf-8') as f:
-                prev_mirror_data = json.load(f)
-                return cls(last=datetime.fromisoformat(prev_mirror_data['last_mirror_time']))
+            with dump_paths.log_path.open('r', encoding='utf-8') as f:
+                prev_dump_data = json.load(f)
+                return cls(last=datetime.fromisoformat(prev_dump_data['last_dump_time']))
         except:
             raise
 
 
 @dataclass
-class MirrorPaths:
+class DumpPaths:
     parent: Path = field(default_factory=Path.cwd)
-    child: Path = field(default_factory=lambda: Path('aiida-mirror'))
+    child: Path = field(default_factory=lambda: Path('aiida-dump'))
     top_level: Path = field(default=None, init=True)  # Added top_level property
 
-    safeguard_file = '.aiida_mirror_safeguard'
+    safeguard_file = '.aiida_dump_safeguard'
 
     def __post_init__(self):
         # Set top_level during initialization if not provided
@@ -155,66 +155,66 @@ class MirrorPaths:
 
     @property
     def log_path(self) -> Path:
-        from aiida.tools.mirror.logger import MirrorLogger
+        from aiida.tools.dumping.logger import DumpLogger
 
         """Returns the path of the logger JSON."""
-        return self.absolute / MirrorLogger.MIRROR_LOG_FILE
+        return self.absolute / DumpLogger.dump_LOG_FILE
 
     # NOTE: Should this return a new instance?
-    def extend_paths(self, subdir: str) -> 'MirrorPaths':
+    def extend_paths(self, subdir: str) -> 'DumpPaths':
         """
-        Creates a new MirrorPaths instance with an additional subdirectory.
+        Creates a new DumpPaths instance with an additional subdirectory.
 
         Args:
             subdir: The name of the subdirectory to add
 
         Returns:
-            A new MirrorPaths instance with the updated path structure
+            A new DumpPaths instance with the updated path structure
         """
-        return MirrorPaths(parent=self.absolute, child=Path(subdir))
+        return DumpPaths(parent=self.absolute, child=Path(subdir))
 
 
 @dataclass
-class MirrorCollectorConfig:
-    """Shared arguments for mirroring of collections of nodes."""
+class DumpCollectorConfig:
+    """Shared arguments for dumping of collections of nodes."""
 
     get_processes: bool = True
     get_data: bool = False
-    filter_by_last_mirror_time: bool = True
+    filter_by_last_dump_time: bool = True
     only_top_level_calcs: bool = True
     only_top_level_workflows: bool = True
-    group_scope: NodeMirrorGroupScope = NodeMirrorGroupScope.IN_GROUP
+    group_scope: NodeDumpGroupScope = NodeDumpGroupScope.IN_GROUP
 
 
 @dataclass
-class ProcessMirrorConfig:
-    """Arguments for mirroring process data."""
+class ProcessDumperConfig:
+    """Arguments for dumping process data."""
 
     include_inputs: bool = True
     include_outputs: bool = False
     include_attributes: bool = True
     include_extras: bool = True
     flat: bool = False
-    mirror_unsealed: bool = False
+    dump_unsealed: bool = False
     symlink_calcs: bool = False
 
 
 @dataclass
-class BaseCollectionMirrorConfig:
+class BaseCollectionDumperConfig:
     symlink_calcs: bool = False
     delete_missing: bool = False  # TODO
 
 
 @dataclass
-class GroupMirrorConfig(BaseCollectionMirrorConfig):
-    """Arguments for mirroring group data."""
+class GroupDumperConfig(BaseCollectionDumperConfig):
+    """Arguments for dumping group data."""
 
     ...
 
 
 @dataclass
-class ProfileMirrorConfig(BaseCollectionMirrorConfig):
-    """Arguments for mirroring profile data."""
+class ProfileDumperConfig(BaseCollectionDumperConfig):
+    """Arguments for dumping profile data."""
 
     organize_by_groups: bool = True
     also_ungrouped: bool = False

@@ -6,7 +6,7 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-"""Functionality for mirroring of ProcessNodes."""
+"""Functionality for dumping of ProcessNodes."""
 
 from __future__ import annotations
 
@@ -23,58 +23,58 @@ from aiida.common import LinkType
 from aiida.common.exceptions import NotExistentAttributeError
 from aiida.orm.utils import LinkTriple
 from aiida.tools.archive.exceptions import ExportValidationError
-from aiida.tools.mirror.base import BaseMirror
-from aiida.tools.mirror.config import (
-    MirrorMode,
-    MirrorPaths,
-    ProcessMirrorConfig,
+from aiida.tools.dumping.base import BaseDump
+from aiida.tools.dumping.config import (
+    DumpMode,
+    DumpPaths,
+    ProcessDumperConfig,
 )
-from aiida.tools.mirror.logger import MirrorLog, MirrorLogger
-from aiida.tools.mirror.utils import (
-    generate_process_default_mirror_path,
-    prepare_mirror_path,
+from aiida.tools.dumping.logger import DumpLog, DumpLogger
+from aiida.tools.dumping.utils import (
+    generate_process_default_dump_path,
+    prepare_dump_path,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class ProcessMirror(BaseMirror):
-    """Class to handle mirroring of an AiiDA process."""
+class ProcessDump(BaseDump):
+    """Class to handle dumping of an AiiDA process."""
 
     def __init__(
         self,
         process_node: orm.ProcessNode,
-        mirror_mode: MirrorMode = MirrorMode.INCREMENTAL,
-        mirror_paths: MirrorPaths | None = None,
-        mirror_logger: MirrorLogger | None = None,
-        config: ProcessMirrorConfig | None = None,
+        dump_mode: DumpMode = DumpMode.INCREMENTAL,
+        dump_paths: DumpPaths | None = None,
+        dump_logger: DumpLogger | None = None,
+        config: ProcessDumperConfig | None = None,
     ) -> None:
-        """Initialize the ProcessMirror."""
+        """Initialize the ProcessDump."""
 
         self.process_node = process_node
 
         super().__init__(
-            mirror_mode=mirror_mode,
-            mirror_paths=mirror_paths,
-            # mirror_logger=mirror_logger,
+            dump_mode=dump_mode,
+            dump_paths=dump_paths,
+            # dump_logger=dump_logger,
         )
 
-        if mirror_paths is None:
-            default_mirror_path = generate_process_default_mirror_path(process_node=self.process_node)
-            self.mirror_paths = MirrorPaths(child=default_mirror_path)
+        if dump_paths is None:
+            default_dump_path = generate_process_default_dump_path(process_node=self.process_node)
+            self.dump_paths = DumpPaths(child=default_dump_path)
 
-        # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
-        # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
-        # However, the pre_mirror is done before instantiation, so running the mirror with `overwrite` still has the
+        # The problem is that the dump_logger is not a singleton, but is passed around and attached to various
+        # classes. During dumping with the `overwrite` option, it gets reset for every `ProcessDump` instantiation.
+        # However, the pre_dump is done before instantiation, so running the dump with `overwrite` still has the
         # `dump_logger` from the JSON file of the previous run attached...
-        # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
+        # Solve by deleting the log file in overwrite mode here, or making pre_dump a `classmethod` that's executed
         # before instantiation??
-        if mirror_mode == MirrorMode.OVERWRITE and self.mirror_paths.log_path.exists():
-            self.mirror_paths.log_path.unlink()
+        if dump_mode == DumpMode.OVERWRITE and self.dump_paths.log_path.exists():
+            self.dump_paths.log_path.unlink()
 
-        self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger, top_level_caller=True)
+        self.dump_logger = self.set_dump_logger(dump_logger=dump_logger, top_level_caller=True)
 
-        self.config = config or ProcessMirrorConfig()
+        self.config = config or ProcessDumperConfig()
 
         # Unpack arguments for easier access
         # self.include_inputs = self.config.include_inputs
@@ -82,13 +82,13 @@ class ProcessMirror(BaseMirror):
         # self.include_attributes = self.config.include_attributes
         # self.include_extras = self.config.include_extras
         # self.config.flat = self.config.flat
-        # self.config.mirror_unsealed = self.config.mirror_unsealed
+        # self.config.dump_unsealed = self.config.dump_unsealed
 
     def _generate_readme(self) -> None:
-        """Generate README.md file in main mirroring directory.
+        """Generate README.md file in main dumping directory.
 
         :param process_node: `CalculationNode` or `WorkflowNode`.
-        :param output_path: Output path for mirroring.
+        :param output_path: Output path for dumping.
 
         """
 
@@ -112,7 +112,7 @@ class ProcessMirror(BaseMirror):
 
         Child calculations/workflows (also called `CalcJob`s/`CalcFunction`s and `WorkChain`s/`WorkFunction`s in AiiDA
         jargon) run by the parent workflow are contained in the directory tree as sub-folders and are sorted by their
-        creation time. The directory tree thus mirrors the logical execution of the workflow, which can also be queried
+        creation time. The directory tree thus dumps the logical execution of the workflow, which can also be queried
         by running `verdi process status {pk}` on the command line.
 
         By default, input and output files of each calculation can be found in the corresponding "inputs" and "outputs"
@@ -145,7 +145,7 @@ class ProcessMirror(BaseMirror):
         process_show = get_node_info(node=process_node)
         _readme_string += f'\n\n\nOutput of `verdi process show {pk}`:\n\n```shell\n{process_show}\n```'
 
-        (self.mirror_paths.absolute / 'README.md').write_text(_readme_string)
+        (self.dump_paths.absolute / 'README.md').write_text(_readme_string)
 
     @staticmethod
     def _generate_child_node_label(index: int, link_triple: LinkTriple, append_pk: bool = True) -> str:
@@ -180,95 +180,95 @@ class ProcessMirror(BaseMirror):
         return node_label.replace('None-', '')
 
     # TODO: Make the ProcessNode an attribute of the class?
-    def mirror(
+    def dump(
         self,
-        io_mirror_paths: list[str | Path] | None = None,
+        io_dump_paths: list[str | Path] | None = None,
         top_level_caller: bool = True,
     ) -> None:
-        """Mirrors all data involved in a `ProcessNode`, including its outgoing links.
+        """Dumps all data involved in a `ProcessNode`, including its outgoing links.
 
         Note that if an outgoing link is a `WorkflowNode`, the function recursively calls itself, while files are
         only actually created when a `CalculationNode` is reached.
 
         :param process_node: The parent `ProcessNode` node to be dumped.
         :param output_path: Custom output path where the directory tree will be created.
-        :param io_mirror_paths: Subdirectories created for each `CalculationNode`.
+        :param io_dump_paths: Subdirectories created for each `CalculationNode`.
             Default: ['inputs', 'outputs', 'node_inputs', 'node_outputs']
-        :raises: ExportValidationError if the node is not sealed and mirror_unsealed is False.
+        :raises: ExportValidationError if the node is not sealed and dump_unsealed is False.
         """
 
         process_node = self.process_node
 
-        if not process_node.is_sealed and not self.config.mirror_unsealed:
+        if not process_node.is_sealed and not self.config.dump_unsealed:
             pk = process_node.pk
-            msg = f'Process `{pk}` must be sealed before it can be dumped, or `--mirror-unsealed` set to True.'
+            msg = f'Process `{pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True.'
             raise ExportValidationError(msg)
 
         # This here is mainly for `include_attributes` and `include_extras`.
         # I don't want to include them in the general class `__init__`, as they don't really fit there.
-        # But the `_mirror_node_yaml` function is private, so it's never called outside by the user.
+        # But the `_dump_node_yaml` function is private, so it's never called outside by the user.
         # Setting the class attributes here dynamically is probably not a good solution, but it works for now.
         # for key, value in kwargs.items():
         #     setattr(self, key, value)
 
         if top_level_caller:
-            prepare_mirror_path(
-                path_to_validate=self.mirror_paths.absolute,
-                mirror_mode=self.mirror_mode,
-                safeguard_file=self.mirror_paths.safeguard_file,
+            prepare_dump_path(
+                path_to_validate=self.dump_paths.absolute,
+                dump_mode=self.dump_mode,
+                safeguard_file=self.dump_paths.safeguard_file,
                 top_level_caller=top_level_caller,
             )
 
-            self.mirror_logger = self.set_mirror_logger(mirror_logger=self.mirror_logger)
+            self.dump_logger = self.set_dump_logger(dump_logger=self.dump_logger)
 
         if isinstance(process_node, orm.CalculationNode):
-            self._mirror_calculation(
+            self._dump_calculation(
                 calculation_node=process_node,
-                output_path=self.mirror_paths.absolute,
-                io_mirror_paths=io_mirror_paths,
+                output_path=self.dump_paths.absolute,
+                io_dump_paths=io_dump_paths,
             )
 
         elif isinstance(process_node, orm.WorkflowNode):
-            self._mirror_workflow(
+            self._dump_workflow(
                 workflow_node=process_node,
-                output_path=self.mirror_paths.absolute,
-                io_mirror_paths=io_mirror_paths,
+                output_path=self.dump_paths.absolute,
+                io_dump_paths=io_dump_paths,
             )
 
         if top_level_caller:
             # When should the logger ever be None?
-            assert self.mirror_logger is not None
-            self.mirror_logger.save_log()
+            assert self.dump_logger is not None
+            self.dump_logger.save_log()
 
-    def _mirror_workflow(
+    def _dump_workflow(
         self,
         workflow_node: orm.WorkflowNode,
         output_path,
-        io_mirror_paths: list[str | Path] | None = None,
+        io_dump_paths: list[str | Path] | None = None,
     ) -> None:
         """Recursive function to traverse a `WorkflowNode` and dump its `CalculationNode` s.
 
         :param workflow_node: `WorkflowNode` to be traversed. Will be updated during recursion.
-        :param output_path: Mirroring parent directory. Will be updated during recursion.
-        :param io_mirror_paths: Custom subdirectories for `CalculationNode` s, defaults to None
+        :param output_path: Dumping parent directory. Will be updated during recursion.
+        :param io_dump_paths: Custom subdirectories for `CalculationNode` s, defaults to None
         """
 
         if not output_path:
-            output_path = self.mirror_paths.absolute
+            output_path = self.dump_paths.absolute
 
         output_path.mkdir(parents=True, exist_ok=True)
 
         self._write_node_yaml(process_node=workflow_node, output_path=output_path)
-        (output_path / MirrorPaths.safeguard_file).touch()
+        (output_path / DumpPaths.safeguard_file).touch()
 
-        if self.mirror_logger is not None:
-            workflow_store = self.mirror_logger.stores.workflows
+        if self.dump_logger is not None:
+            workflow_store = self.dump_logger.stores.workflows
 
             # import ipdb; ipdb.set_trace()
-            self.mirror_logger.add_entry(
+            self.dump_logger.add_entry(
                 store=workflow_store,
                 uuid=workflow_node.uuid,
-                entry=MirrorLog(path=output_path.resolve()),
+                entry=DumpLog(path=output_path.resolve()),
             )
 
         called_links = workflow_node.base.links.get_outgoing(link_type=(LinkType.CALL_CALC, LinkType.CALL_WORK)).all()
@@ -281,22 +281,22 @@ class ProcessMirror(BaseMirror):
 
             # Recursive function call for `WorkFlowNode`
             if isinstance(child_node, orm.WorkflowNode):
-                self._mirror_workflow(
+                self._dump_workflow(
                     workflow_node=child_node,
                     output_path=child_output_path,
-                    io_mirror_paths=io_mirror_paths,
+                    io_dump_paths=io_dump_paths,
                 )
 
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
-                calculation_store = self.mirror_logger.stores.calculations
+                calculation_store = self.dump_logger.stores.calculations
 
                 # TODO: Could add a `uuid_in_store` or similarly named method
                 if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
-                    self._mirror_calculation(
+                    self._dump_calculation(
                         calculation_node=child_node,
                         output_path=child_output_path,
-                        io_mirror_paths=io_mirror_paths,
+                        io_dump_paths=io_dump_paths,
                     )
 
                 else:
@@ -310,91 +310,91 @@ class ProcessMirror(BaseMirror):
                         # For debugging
                         raise
                 # else:
-                #     self._mirror_calculation(
+                #     self._dump_calculation(
                 #         calculation_node=child_node,
                 #         output_path=child_output_path,
-                #         io_mirror_paths=io_mirror_paths,
+                #         io_dump_paths=io_dump_paths,
                 #     )
 
-    def _mirror_calculation(
+    def _dump_calculation(
         self,
         calculation_node: orm.CalculationNode,
         output_path: Path,
-        io_mirror_paths: list[str | Path] | None = None,
+        io_dump_paths: list[str | Path] | None = None,
     ) -> None:
-        """Mirror the contents of a `CalculationNode` to a specified output path.
+        """Dump the contents of a `CalculationNode` to a specified output path.
 
         :param calculation_node: The `CalculationNode` to be dumped.
         :param output_path: The path where the files will be dumped.
-        :param io_mirror_paths: Subdirectories created for the `CalculationNode`.
+        :param io_dump_paths: Subdirectories created for the `CalculationNode`.
             Default: ['inputs', 'outputs', 'node_inputs', 'node_outputs']
         """
 
-        prepare_mirror_path(
+        prepare_dump_path(
             path_to_validate=output_path,
-            mirror_mode=self.mirror_mode,
-            safeguard_file=self.mirror_paths.safeguard_file,
+            dump_mode=self.dump_mode,
+            safeguard_file=self.dump_paths.safeguard_file,
             top_level_caller=False,
         )
 
         self._write_node_yaml(process_node=calculation_node, output_path=output_path)
 
-        io_mirror_mapping = self._generate_calculation_io_mapping(
-            io_mirror_paths=io_mirror_paths, flat=self.config.flat
+        io_dump_mapping = self._generate_calculation_io_mapping(
+            io_dump_paths=io_dump_paths, flat=self.config.flat
         )
 
-        # Mirror the repository contents of the node
-        calculation_node.base.repository.copy_tree(output_path.resolve() / io_mirror_mapping.repository)
+        # Dump the repository contents of the node
+        calculation_node.base.repository.copy_tree(output_path.resolve() / io_dump_mapping.repository)
 
-        # Mirror the repository contents of `outputs.retrieved`
+        # Dump the repository contents of `outputs.retrieved`
         with contextlib.suppress(NotExistentAttributeError):
             calculation_node.outputs.retrieved.base.repository.copy_tree(
-                output_path.resolve() / io_mirror_mapping.retrieved
+                output_path.resolve() / io_dump_mapping.retrieved
             )
 
-        # Mirror the node_inputs
+        # Dump the node_inputs
         if self.config.include_inputs:
             input_links = calculation_node.base.links.get_incoming(link_type=LinkType.INPUT_CALC)
             # Need to create the path before, otherwise getting Exception
-            input_path = output_path / io_mirror_mapping.inputs
+            input_path = output_path / io_dump_mapping.inputs
             input_path.mkdir(parents=True, exist_ok=True)
 
-            self._mirror_calculation_io_files(
-                parent_path=output_path / io_mirror_mapping.inputs,
+            self._dump_calculation_io_files(
+                parent_path=output_path / io_dump_mapping.inputs,
                 link_triples=input_links,
             )
 
-        # Mirror the node_outputs apart from `retrieved`
+        # Dump the node_outputs apart from `retrieved`
         if self.config.include_outputs:
             output_links = list(calculation_node.base.links.get_outgoing(link_type=LinkType.CREATE))
             output_links = [output_link for output_link in output_links if output_link.link_label != 'retrieved']
 
-            self._mirror_calculation_io_files(
-                parent_path=output_path / io_mirror_mapping.outputs,
+            self._dump_calculation_io_files(
+                parent_path=output_path / io_dump_mapping.outputs,
                 link_triples=output_links,
             )
 
-        if self.mirror_logger is not None:
-            calculation_store = self.mirror_logger.stores.calculations
+        if self.dump_logger is not None:
+            calculation_store = self.dump_logger.stores.calculations
 
             if calculation_node.uuid not in calculation_store.entries:
                 # import ipdb; ipdb.set_trace()
-                self.mirror_logger.add_entry(
+                self.dump_logger.add_entry(
                     store=calculation_store,
                     uuid=calculation_node.uuid,
-                    entry=MirrorLog(
+                    entry=DumpLog(
                         path=output_path,
                     ),
                 )
 
-    def _mirror_calculation_io_files(
+    def _dump_calculation_io_files(
         self,
         parent_path: Path,
         link_triples: orm.LinkManager | list[orm.LinkTriple],
     ):
         """Small helper function to dump linked input/output nodes of a `orm.CalculationNode`.
 
-        :param parent_path: Parent directory for mirroring the linked node contents.
+        :param parent_path: Parent directory for dumping the linked node contents.
         :param link_triples: list of link triples.
         """
 
@@ -411,54 +411,54 @@ class ProcessMirror(BaseMirror):
 
     @staticmethod
     def _generate_calculation_io_mapping(
-        io_mirror_paths: list[str | Path] | None = None, flat: bool = False
+        io_dump_paths: list[str | Path] | None = None, flat: bool = False
     ) -> SimpleNamespace:
         """Helper function to generate mapping for entities dumped for each `CalculationNode`.
 
         This is to avoid exposing AiiDA terminology, like `repository` to the user, while keeping track of which
         entities should be dumped into which directory, and allowing for alternative directory names.
 
-        :param io_mirror_paths: Subdirectories created for the `CalculationNode`.
+        :param io_dump_paths: Subdirectories created for the `CalculationNode`.
             Default: ['inputs', 'outputs', 'node_inputs', 'node_outputs']
         :return: SimpleNamespace mapping.
         """
 
-        aiida_entities_to_mirror: list[str] = [
+        aiida_entities_to_dump: list[str] = [
             'repository',
             'retrieved',
             'inputs',
             'outputs',
         ]
-        default_calculation_io_mirror_paths: list[str | Path] = [
+        default_calculation_io_dump_paths: list[str | Path] = [
             'inputs',
             'outputs',
             'node_inputs',
             'node_outputs',
         ]
-        if flat and io_mirror_paths is None:
+        if flat and io_dump_paths is None:
             logger.info(
-                'Flat set to True and no `io_mirror_paths`. Mirroring in a flat directory, files might be overwritten.'
+                'Flat set to True and no `io_dump_paths`. Dumping in a flat directory, files might be overwritten.'
             )
-            empty_calculation_io_mirror_paths = [''] * 4
+            empty_calculation_io_dump_paths = [''] * 4
 
-            return SimpleNamespace(**dict(zip(aiida_entities_to_mirror, empty_calculation_io_mirror_paths)))
+            return SimpleNamespace(**dict(zip(aiida_entities_to_dump, empty_calculation_io_dump_paths)))
 
-        if not flat and io_mirror_paths is None:
+        if not flat and io_dump_paths is None:
             logger.info(
-                'Flat set to False but no `io_mirror_paths` provided. '
-                + f'Will use the defaults {default_calculation_io_mirror_paths}.'
+                'Flat set to False but no `io_dump_paths` provided. '
+                + f'Will use the defaults {default_calculation_io_dump_paths}.'
             )
-            io_mirror_paths = default_calculation_io_mirror_paths
+            io_dump_paths = default_calculation_io_dump_paths
 
         elif flat:
-            logger.info('Flat set to True but `io_mirror_paths` provided. These will be used, but `inputs` not nested.')
+            logger.info('Flat set to True but `io_dump_paths` provided. These will be used, but `inputs` not nested.')
         else:
             logger.info(
-                'Flat set to False but no `io_mirror_paths` provided. These will be used, but `node_inputs` flattened.'
+                'Flat set to False but no `io_dump_paths` provided. These will be used, but `node_inputs` flattened.'
             )
 
-        assert io_mirror_paths is not None
-        return SimpleNamespace(**dict(zip(aiida_entities_to_mirror, io_mirror_paths)))
+        assert io_dump_paths is not None
+        return SimpleNamespace(**dict(zip(aiida_entities_to_dump, io_dump_paths)))
 
     def _write_node_yaml(
         self,
@@ -466,7 +466,7 @@ class ProcessMirror(BaseMirror):
         output_path: Path,
         output_filename: str = '.aiida_node_metadata.yaml',
     ) -> None:
-        """Mirror the selected `ProcessNode` properties, attributes, and extras to a YAML file.
+        """Dump the selected `ProcessNode` properties, attributes, and extras to a YAML file.
 
         :param process_node: The `ProcessNode` to dump.
         :param output_path: The path to the directory where the YAML file will be saved.

@@ -7,58 +7,58 @@
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
 
-"""Base class for collection mirror."""
+"""Base class for collection dump."""
 
 from __future__ import annotations
 
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.mirror.base import BaseMirror
-from aiida.tools.mirror.collector import MirrorCollector
-from aiida.tools.mirror.config import MirrorCollectorConfig, MirrorMode, MirrorPaths, MirrorStoreKeys
-from aiida.tools.mirror.logger import MirrorLogger, MirrorLogStore
-from aiida.tools.mirror.store import MirrorNodeStore
-from aiida.tools.mirror.utils import StoreNameType, safe_delete_dir
+from aiida.tools.dumping.base import BaseDump
+from aiida.tools.dumping.collector import DumpCollector
+from aiida.tools.dumping.config import DumpCollectorConfig, DumpMode, DumpPaths, DumpStoreKeys
+from aiida.tools.dumping.logger import DumpLogger, DumpLogStore
+from aiida.tools.dumping.store import DumpNodeStore
+from aiida.tools.dumping.utils import StoreNameType, safe_delete_dir
 
-logger = AIIDA_LOGGER.getChild('tools.mirror.group')
+logger = AIIDA_LOGGER.getChild('tools.dump.group')
 
 
-class BaseCollectionMirror(BaseMirror):
+class BaseCollectionDumper(BaseDump):
     def __init__(
         self,
-        mirror_mode: MirrorMode,
-        mirror_paths: MirrorPaths,
-        mirror_logger: MirrorLogger | None = None,
-        mirror_collector_config: MirrorCollectorConfig | None = None,
+        dump_mode: DumpMode,
+        dump_paths: DumpPaths,
+        dump_logger: DumpLogger | None = None,
+        dump_collector_config: DumpCollectorConfig | None = None,
     ):
         super().__init__(
-            mirror_mode=mirror_mode,
-            mirror_paths=mirror_paths,
-            # mirror_logger=mirror_logger,
+            dump_mode=dump_mode,
+            dump_paths=dump_paths,
+            # dump_logger=dump_logger,
         )
 
-        self.mirror_collector_config = mirror_collector_config or MirrorCollectorConfig()
+        self.dump_collector_config = dump_collector_config or DumpCollectorConfig()
 
-        # The problem is that the mirror_logger is not a singleton, but is passed around and attached to various
-        # classes. During mirroring with the `overwrite` option, it gets reset for every `ProcessMirror` instantiation.
-        # However, the pre_mirror is done before instantiation, so running the mirror with `overwrite` still has the
+        # The problem is that the dump_logger is not a singleton, but is passed around and attached to various
+        # classes. During dumping with the `overwrite` option, it gets reset for every `ProcessDump` instantiation.
+        # However, the pre_dump is done before instantiation, so running the dump with `overwrite` still has the
         # `dump_logger` from the JSON file of the previous run attached...
-        # Solve by deleting the log file in overwrite mode here, or making pre_mirror a `classmethod` that's executed
+        # Solve by deleting the log file in overwrite mode here, or making pre_dump a `classmethod` that's executed
         # before instantiation??
-        if mirror_mode == MirrorMode.OVERWRITE and mirror_paths.log_path.exists():
-            mirror_paths.log_path.unlink()
+        if dump_mode == DumpMode.OVERWRITE and dump_paths.log_path.exists():
+            dump_paths.log_path.unlink()
 
-        self.mirror_logger = self.set_mirror_logger(mirror_logger=mirror_logger, top_level_caller=True)
+        self.dump_logger = self.set_dump_logger(dump_logger=dump_logger, top_level_caller=True)
 
-        # Initialize mirror_collector as None - it will be properly set by child classes
-        self.mirror_collector: MirrorCollector | None = None
+        # Initialize dump_collector as None - it will be properly set by child classes
+        self.dump_collector: DumpCollector | None = None
 
-    # ! This shouldn't be here, because the `mirror_collector` only is required for collections of nodes
-    def set_mirror_collector(self, mirror_logger: MirrorLogger) -> MirrorCollector:
-        mirror_collector = MirrorCollector(
-            mirror_logger=mirror_logger,
-            config=self.mirror_collector_config,
+    # ! This shouldn't be here, because the `dump_collector` only is required for collections of nodes
+    def set_dump_collector(self, dump_logger: DumpLogger) -> DumpCollector:
+        dump_collector = DumpCollector(
+            dump_logger=dump_logger,
+            config=self.dump_collector_config,
         )
-        return mirror_collector
+        return dump_collector
 
     # Implement this here, as for the deletion, we don't care about the group
     def delete(self) -> None:
@@ -75,11 +75,11 @@ class BaseCollectionMirror(BaseMirror):
         msg = '`--delete-missing` option selected. Will delete missing node directories and log entries.'
         logger.report(msg)
 
-        if self.mirror_collector is None:
-            msg = 'mirror_collector is not set. This should be initialized in a child class.'
+        if self.dump_collector is None:
+            msg = 'dump_collector is not set. This should be initialized in a child class.'
             raise AttributeError(msg)
 
-        delete_store: MirrorNodeStore = self.mirror_collector.collect_to_delete()
+        delete_store: DumpNodeStore = self.dump_collector.collect_to_delete()
 
         # First, handle groups and collect deleted group labels
         deleted_groups = self.group_store_delete(delete_store=delete_store)
@@ -93,7 +93,7 @@ class BaseCollectionMirror(BaseMirror):
 
         # TODO: Verify if the log is properly updated here (via the test)
 
-    def group_store_delete(self, delete_store: MirrorNodeStore) -> list[str]:
+    def group_store_delete(self, delete_store: DumpNodeStore) -> list[str]:
         """Delete groups and return a list of their labels for further processing.
 
         Deletes all groups marked for deletion in the delete_node_container
@@ -103,7 +103,7 @@ class BaseCollectionMirror(BaseMirror):
         """
 
         to_delete_group_uuids: list[str] = getattr(delete_store, 'groups')
-        log_group_store = self.mirror_logger.groups
+        log_group_store = self.dump_logger.groups
         deleted_groups: list[str] = []
 
         # Early return if no groups in the delete_store
@@ -123,15 +123,15 @@ class BaseCollectionMirror(BaseMirror):
             entry = log_group_store.get_entry(to_delete_group_uuid)
             assert entry is not None, f'Group with UUID {to_delete_group_uuid} should exist but was not found'
             path = entry.path
-            safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
-            self.mirror_logger.del_entry(store=log_group_store, uuid=to_delete_group_uuid)
+            safe_delete_dir(path=path, safeguard_file=DumpPaths.from_path(path).safeguard_path)
+            self.dump_logger.del_entry(store=log_group_store, uuid=to_delete_group_uuid)
 
         msg = f'Deleted the groups: {deleted_groups}'
         logger.report(msg)
 
         return deleted_groups
 
-    def process_store_delete(self, delete_store: MirrorNodeStore) -> None:
+    def process_store_delete(self, delete_store: DumpNodeStore) -> None:
         """Delete individual nodes marked for deletion.
 
         Processes workflows, calculations, and data entities that were
@@ -141,19 +141,19 @@ class BaseCollectionMirror(BaseMirror):
         """
         for store_name in ('workflows', 'calculations'):  # , 'data'):
             to_delete_uuids = getattr(delete_store, store_name)
-            log_store = getattr(self.mirror_logger, store_name)
+            log_store = getattr(self.dump_logger, store_name)
 
             for to_delete_uuid in to_delete_uuids:
                 path = log_store.get_entry(to_delete_uuid).path
-                safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
-                self.mirror_logger.del_entry(store=log_store, uuid=to_delete_uuid)
+                safe_delete_dir(path=path, safeguard_file=DumpPaths.from_path(path).safeguard_path)
+                self.dump_logger.del_entry(store=log_store, uuid=to_delete_uuid)
 
             msg = f'Deleted {len(to_delete_uuids)} {store_name}'
             logger.report(msg)
 
     # TODO: Should this even delete the node directories?
     # TODO: If so, they should also be deleted from the logger
-    # TODO: Then, after the next `mirror` command, they should be dumped again in the `no-group` directory,
+    # TODO: Then, after the next `dump` command, they should be dumped again in the `no-group` directory,
     # TODO: if `also-ungrouped` is set to True
     def group_store_subnodes_delete(self, deleted_group_labels: list[str]) -> None:
         """Delete nodes that were part of deleted groups but not explicitly marked for deletion.
@@ -166,12 +166,12 @@ class BaseCollectionMirror(BaseMirror):
         :return: None
         """
         store_names: list[StoreNameType] = [
-            MirrorStoreKeys.WORKFLOWS.value,
-            MirrorStoreKeys.CALCULATIONS.value,
-            MirrorStoreKeys.DATA.value,
+            DumpStoreKeys.WORKFLOWS.value,
+            DumpStoreKeys.CALCULATIONS.value,
+            DumpStoreKeys.DATA.value,
         ]
         for store_name in store_names:
-            log_store: MirrorLogStore = self.mirror_logger.get_store_by_name(store_name)
+            log_store: DumpLogStore = self.dump_logger.get_store_by_name(store_name)
             additional_delete_nodes = []
 
             # Find all nodes that belong to deleted groups
@@ -186,5 +186,5 @@ class BaseCollectionMirror(BaseMirror):
                 entry = log_store.get_entry(additional_delete_node)  # type: ignore[assignment]
                 assert entry is not None, f'Entry with UUID {additional_delete_node} should exist but was not found'
                 path = entry.path
-                safe_delete_dir(path=path, safeguard_file=MirrorPaths.from_path(path).safeguard_path)
-                self.mirror_logger.del_entry(store=log_store, uuid=additional_delete_node)
+                safe_delete_dir(path=path, safeguard_file=DumpPaths.from_path(path).safeguard_path)
+                self.dump_logger.del_entry(store=log_store, uuid=additional_delete_node)

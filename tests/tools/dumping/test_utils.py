@@ -6,52 +6,52 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-"""Tests for the utilities of mirroring AiiDA data to disk."""
+"""Tests for the utilities of dumping AiiDA data to disk."""
 
 from pathlib import Path
 
 import pytest
 
-from aiida.tools.mirror.config import MirrorMode, MirrorPaths
-from aiida.tools.mirror.utils import generate_process_default_mirror_path
+from aiida.tools.dumping.config import DumpMode, DumpPaths
+from aiida.tools.dumping.utils import generate_process_default_dump_path
 
 filename = 'file.txt'
-safeguard_file = MirrorPaths.safeguard_file
+safeguard_file = DumpPaths.safeguard_file
 
 
 @pytest.mark.usefixtures('aiida_profile_clean')
-def test_generate_process_default_mirror_path(
+def test_generate_process_default_dump_path(
     generate_calculation_node_add,
     generate_workchain_multiply_add,
 ):
     add_node = generate_calculation_node_add()
     multiply_add_node = generate_workchain_multiply_add()
-    add_path = generate_process_default_mirror_path(process_node=add_node)
-    multiply_add_path = generate_process_default_mirror_path(process_node=multiply_add_node)
+    add_path = generate_process_default_dump_path(process_node=add_node)
+    multiply_add_path = generate_process_default_dump_path(process_node=multiply_add_node)
 
     assert str(add_path) == f'ArithmeticAddCalculation-{add_node.pk}'
     assert str(multiply_add_path) == f'MultiplyAddWorkChain-{multiply_add_node.pk}'
 
 
 @pytest.mark.usefixtures('chdir_tmp_path')
-def test_prepare_mirror_path(tmp_path):
-    from aiida.tools.mirror.utils import prepare_mirror_path
+def test_prepare_dump_path(tmp_path):
+    from aiida.tools.dumping.utils import prepare_dump_path
 
     test_dir = tmp_path / Path('test-dir')
     test_file = test_dir / filename
     safeguard_file_path = test_dir / safeguard_file
 
     # Check if path created if non-existent
-    prepare_mirror_path(
+    prepare_dump_path(
         path_to_validate=test_dir,
-        mirror_mode=MirrorMode.INCREMENTAL,
+        dump_mode=DumpMode.INCREMENTAL,
     )
     assert test_dir.exists()
     assert safeguard_file_path.is_file()
 
     # Directory exists, but empty -> is fine
     safeguard_file_path.unlink()
-    prepare_mirror_path(path_to_validate=test_dir, mirror_mode=MirrorMode.INCREMENTAL)
+    prepare_dump_path(path_to_validate=test_dir, dump_mode=DumpMode.INCREMENTAL)
     assert test_dir.exists()
     assert safeguard_file_path.is_file()
 
@@ -59,14 +59,14 @@ def test_prepare_mirror_path(tmp_path):
     safeguard_file_path.unlink()
     test_file.touch()
     with pytest.raises(FileNotFoundError):
-        prepare_mirror_path(path_to_validate=test_dir, mirror_mode=MirrorMode.OVERWRITE)
+        prepare_dump_path(path_to_validate=test_dir, dump_mode=DumpMode.OVERWRITE)
 
     # Works if directory not empty, overwrite set to True and safeguard_file contained
     # -> After function call, test_file is deleted, and safeguard_file again created
     safeguard_file_path.touch()
-    prepare_mirror_path(
+    prepare_dump_path(
         path_to_validate=test_dir,
-        mirror_mode=MirrorMode.OVERWRITE,
+        dump_mode=DumpMode.OVERWRITE,
     )
     assert not test_file.is_file()
     assert safeguard_file_path.is_file()
@@ -74,11 +74,11 @@ def test_prepare_mirror_path(tmp_path):
     # Works if directory not empty, but incremental=True and safeguard_file (e.g. `.aiida_node_metadata.yaml`) contained
     # -> After function call, test file and safeguard_file still there
     test_file.touch()
-    prepare_mirror_path(path_to_validate=test_dir, mirror_mode=MirrorMode.INCREMENTAL)
+    prepare_dump_path(path_to_validate=test_dir, dump_mode=DumpMode.INCREMENTAL)
     assert safeguard_file_path.is_file()
     assert test_file.is_file()
 
 
-def test_resolve_click_path_for_mirror(tmp_path):
-    # from aiida.tools.mirror.utils import resolve_click_path_for_mirror
+def test_resolve_click_path_for_dump(tmp_path):
+    # from aiida.tools.dumping.utils import resolve_click_path_for_dump
     pass

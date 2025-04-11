@@ -26,7 +26,7 @@ from .calculations import *
 from .data import *
 from .graph import *
 from .groups import *
-from .mirror import *
+from .dumping import *
 from .visualization import *
 
 __all__ = (

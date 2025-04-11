@@ -271,14 +271,14 @@ def profile_delete(force, delete_data, profiles):
         echo.echo_success(f'Profile `{profile.name}` was deleted.')
 
 
-@verdi_profile.command('mirror')
+@verdi_profile.command('dump')
 @options.PATH()
 # @options.DRY_RUN()
 @options.OVERWRITE()
 @options.GROUPS()
-@options.FILTER_BY_LAST_MIRROR_TIME()
-@options.MIRROR_PROCESSES()
-@options.MIRROR_DATA()
+@options.FILTER_BY_LAST_DUMP_TIME()
+@options.DUMP_PROCESSES()
+@options.DUMP_DATA()
 @options.ONLY_TOP_LEVEL_CALCS()
 @options.ONLY_TOP_LEVEL_WORKFLOWS()
 @options.DELETE_MISSING()
@@ -292,16 +292,16 @@ def profile_delete(force, delete_data, profiles):
 @options.INCLUDE_ATTRIBUTES()
 @options.INCLUDE_EXTRAS()
 @options.FLAT()
-@options.MIRROR_UNSEALED()
+@options.DUMP_UNSEALED()
 @click.pass_context
-def profile_mirror(
+def profile_dump(
     ctx,
     path,
     # dry_run,
     overwrite,
-    filter_by_last_mirror_time,
-    mirror_processes,
-    mirror_data,
+    filter_by_last_dump_time,
+    dump_processes,
+    dump_data,
     groups,
     organize_by_groups,
     symlink_calcs,
@@ -316,14 +316,14 @@ def profile_mirror(
     include_attributes,
     include_extras,
     flat,
-    mirror_unsealed,
+    dump_unsealed,
 ):
-    """Mirror all data in an AiiDA profile's storage to disk."""
+    """Dump all data in an AiiDA profile's storage to disk."""
 
     from aiida.tools.archive.exceptions import ExportValidationError
-    from aiida.tools.mirror import ProfileMirror
-    from aiida.tools.mirror.config import MirrorCollectorConfig, MirrorMode, ProcessMirrorConfig, ProfileMirrorConfig
-    from aiida.tools.mirror.utils import resolve_click_path_for_mirror
+    from aiida.tools.dumping import ProfileDumper
+    from aiida.tools.dumping.config import DumpCollectorConfig, DumpMode, ProcessDumperConfig, ProfileDumperConfig
+    from aiida.tools.dumping.utils import resolve_click_path_for_dump
 
     profile = ctx.obj['profile']
 
@@ -331,16 +331,16 @@ def profile_mirror(
         msg = '`--update-groups` selected, even though `--organize-by-groups` is set to False.'
         echo.echo_critical(msg)
 
-    mirror_paths = resolve_click_path_for_mirror(path=path, entity=profile)
-    output_path_absolute = mirror_paths.absolute
+    dump_paths = resolve_click_path_for_dump(path=path, entity=profile)
+    output_path_absolute = dump_paths.absolute
 
-    msg = f'Mirroring data of profile `{profile.name}` at path `{output_path_absolute.name}`.'
+    msg = f'Dumping data of profile `{profile.name}` at path `{output_path_absolute.name}`.'
     echo.echo_report(msg)
 
     if overwrite:
-        mirror_mode = MirrorMode.OVERWRITE
+        dump_mode = DumpMode.OVERWRITE
     else:
-        mirror_mode = MirrorMode.INCREMENTAL
+        dump_mode = DumpMode.INCREMENTAL
 
     if groups and overwrite:
         msg = (
@@ -350,24 +350,24 @@ def profile_mirror(
         echo.echo_critical(msg)
 
     # Create config options that hold the various settings for dumping data
-    mirror_collector_config = MirrorCollectorConfig(
-        get_processes=mirror_processes,
-        get_data=mirror_data,
-        filter_by_last_mirror_time=filter_by_last_mirror_time,
+    dump_collector_config = DumpCollectorConfig(
+        get_processes=dump_processes,
+        get_data=dump_data,
+        filter_by_last_dump_time=filter_by_last_dump_time,
         only_top_level_calcs=only_top_level_calcs,
         only_top_level_workflows=only_top_level_workflows,
     )
 
-    process_mirror_config = ProcessMirrorConfig(
+    process_dump_config = ProcessDumperConfig(
         include_inputs=include_inputs,
         include_outputs=include_outputs,
         include_attributes=include_attributes,
         include_extras=include_extras,
         flat=flat,
-        mirror_unsealed=mirror_unsealed,
+        dump_unsealed=dump_unsealed,
     )
 
-    profile_mirror_config = ProfileMirrorConfig(
+    profile_dump_config = ProfileDumperConfig(
         symlink_calcs=symlink_calcs,
         delete_missing=delete_missing,
         organize_by_groups=organize_by_groups,
@@ -376,20 +376,20 @@ def profile_mirror(
         # symlink_between_groups=symlink_between_groups
     )
 
-    profile_mirror_inst = ProfileMirror(
+    profile_dumper = ProfileDumper(
         profile=profile,
-        mirror_mode=mirror_mode,
-        mirror_paths=mirror_paths,
-        mirror_collector_config=mirror_collector_config,
-        process_mirror_config=process_mirror_config,
-        config=profile_mirror_config,
+        dump_mode=dump_mode,
+        dump_paths=dump_paths,
+        dump_collector_config=dump_collector_config,
+        process_dump_config=process_dump_config,
+        config=profile_dump_config,
         groups=groups,
     )
 
     # # FIXME: This doesn't respect the -G --groups selection
     # if dry_run:
     #     dry_run_message = (
-    #         f'Dry run for mirroring of profile `{profile.name}`. '
+    #         f'Dry run for dumping of profile `{profile.name}`. '
     #         f'Would dump: {num_processes_to_dump} new nodes and delete '
     #         f'{num_processes_to_delete} previously dumped node directories.'
     #     )
@@ -397,13 +397,13 @@ def profile_mirror(
     #     return
 
     try:
-        _ = profile_mirror_inst.mirror()
-        msg = f'Raw files for profile `{profile.name}` mirrored into folder `{mirror_paths.child}`.'
+        _ = profile_dumper.dump()
+        msg = f'Raw files for profile `{profile.name}` dumped into folder `{dump_paths.child}`.'
         echo.echo_success(msg)
     except ExportValidationError as e:
         echo.echo_critical(f'{e!s}')
     except Exception as e:
         import traceback
 
-        msg = f'Unexpected error while mirroring {profile.name}:\n ({e!s}).\n'
+        msg = f'Unexpected error while dumping {profile.name}:\n ({e!s}).\n'
         echo.echo_critical(msg + traceback.format_exc())
