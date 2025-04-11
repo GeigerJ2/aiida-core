@@ -17,7 +17,7 @@ from aiida.tools.dumping.config import DumpMode, DumpPaths, DumpTimes
 from aiida.tools.dumping.logger import DumpLogger
 
 
-class BaseDump:
+class BaseDumper:
     def __init__(
         self,
         dump_mode: DumpMode | None = None,

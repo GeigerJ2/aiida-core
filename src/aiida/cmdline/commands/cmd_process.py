@@ -600,7 +600,7 @@ def process_dump(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.dumping.config import DumpMode, ProcessDumperConfig
-    from aiida.tools.dumping.process import ProcessDump
+    from aiida.tools.dumping.process import ProcessDumper
     from aiida.tools.dumping.utils import (
         resolve_click_path_for_dump,
     )
@@ -622,7 +622,7 @@ def process_dump(
         dump_unsealed=dump_unsealed,
     )
 
-    process_dumper = ProcessDump(
+    process_dumper = ProcessDumper(
         process_node=process,
         dump_paths=dump_paths,
         dump_mode=dump_mode,

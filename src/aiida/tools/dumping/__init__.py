@@ -10,7 +10,7 @@
 
 from .group import GroupDumper
 from .logger import DumpLogger
-from .process import ProcessDump
+from .process import ProcessDumper
 from .profile import ProfileDumper
 
-__all__ = ('GroupDumper', 'DumpLogger', 'ProcessDump', 'ProfileDumper')
+__all__ = ('GroupDumper', 'DumpLogger', 'ProcessDumper', 'ProfileDumper')

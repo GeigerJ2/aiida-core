@@ -23,7 +23,7 @@ from aiida.common import LinkType
 from aiida.common.exceptions import NotExistentAttributeError
 from aiida.orm.utils import LinkTriple
 from aiida.tools.archive.exceptions import ExportValidationError
-from aiida.tools.dumping.base import BaseDump
+from aiida.tools.dumping.base import BaseDumper
 from aiida.tools.dumping.config import (
     DumpMode,
     DumpPaths,
@@ -38,7 +38,7 @@ from aiida.tools.dumping.utils import (
 logger = logging.getLogger(__name__)
 
 
-class ProcessDump(BaseDump):
+class ProcessDumper(BaseDumper):
     """Class to handle dumping of an AiiDA process."""
 
     def __init__(

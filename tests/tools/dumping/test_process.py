@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from aiida.tools.dumping.config import DumpMode, DumpPaths, ProcessDumperConfig
-from aiida.tools.dumping.process import ProcessDump
+from aiida.tools.dumping.process import ProcessDumper
 
 from .utils import compare_tree
 
@@ -97,7 +97,7 @@ def test_dump(generate_calculation_node_io, generate_workchain_node_io, tmp_path
     # Don't attach outputs, as it would require storing the calculation_node and then it cannot be used in the workchain
     cj_nodes = [generate_calculation_node_io(attach_outputs=False), generate_calculation_node_io(attach_outputs=False)]
     wc_node = generate_workchain_node_io(cj_nodes=cj_nodes)
-    process_dumper = ProcessDump(process_node=wc_node, dump_paths=dump_paths)
+    process_dumper = ProcessDumper(process_node=wc_node, dump_paths=dump_paths)
 
     # Raises if ProcessNode not sealed
     with pytest.raises(ExportValidationError):
@@ -119,7 +119,7 @@ def test_dump_workflow(generate_calculation_node_io, generate_workchain_node_io,
     # Don't attach outputs, as it would require storing the calculation_node and then it cannot be used in the workchain
     cj_nodes = [generate_calculation_node_io(attach_outputs=False), generate_calculation_node_io(attach_outputs=False)]
     wc_node = generate_workchain_node_io(cj_nodes=cj_nodes)
-    process_dumper = ProcessDump(process_node=wc_node, dump_paths=DumpPaths.from_path(dump_parent_path))
+    process_dumper = ProcessDumper(process_node=wc_node, dump_paths=DumpPaths.from_path(dump_parent_path))
     process_dumper._dump_workflow(workflow_node=wc_node, output_path=dump_parent_path)
 
     base_path = Path('01-sub_workflow-8/01-calculation-9')
@@ -142,7 +142,7 @@ def test_dump_workflow(generate_calculation_node_io, generate_workchain_node_io,
     # Flat dumping
     dump_parent_path = tmp_path / 'wc-dump-test-io-flat'
     process_dump_config = ProcessDumperConfig(flat=True)
-    process_dumper = ProcessDump(config=process_dump_config, process_node=wc_node)
+    process_dumper = ProcessDumper(config=process_dump_config, process_node=wc_node)
     process_dumper._dump_workflow(workflow_node=wc_node, output_path=dump_parent_path)
 
     input_path = base_path / 'file.txt'
@@ -166,7 +166,7 @@ def test_dump_multiply_add(tmp_path, generate_workchain_multiply_add):
     dump_parent_path = tmp_path / 'wc-dump-test-multiply-add'
     dump_paths = DumpPaths.from_path(dump_parent_path)
     wc_node = generate_workchain_multiply_add()
-    process_dumper = ProcessDump(dump_paths=dump_paths, process_node=wc_node)
+    process_dumper = ProcessDumper(dump_paths=dump_paths, process_node=wc_node)
     process_dumper.dump()
 
     arithmetic_add_path = dump_parent_path / '02-ArithmeticAddCalculation-8'
@@ -192,7 +192,7 @@ def test_dump_multiply_add(tmp_path, generate_workchain_multiply_add):
     dump_parent_path = tmp_path / 'wc-dump-test-multiply-add-flat'
     dump_paths_flat = DumpPaths.from_path(dump_parent_path)
     process_dump_config = ProcessDumperConfig(flat=True)
-    process_dumper = ProcessDump(
+    process_dumper = ProcessDumper(
         dump_paths=dump_paths_flat, config=process_dump_config, process_node=wc_node
     )
     process_dumper.dump()
@@ -226,7 +226,7 @@ def test_dump_calculation_node(tmp_path, generate_calculation_node_io):
     dump_paths = DumpPaths.from_path(dump_parent_path)
     process_dump_config = ProcessDumperConfig(include_outputs=True)
     calculation_node = generate_calculation_node_io()
-    process_dumper = ProcessDump(
+    process_dumper = ProcessDumper(
         dump_paths=dump_paths, config=process_dump_config, process_node=calculation_node
     )
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
@@ -260,7 +260,7 @@ def test_dump_calculation_flat(tmp_path, generate_calculation_node_io):
     dump_paths = DumpPaths.from_path(dump_parent_path)
     process_dump_config = ProcessDumperConfig(flat=True)
     calculation_node = generate_calculation_node_io()
-    process_dumper = ProcessDump(
+    process_dumper = ProcessDumper(
         dump_paths=dump_paths, process_node=calculation_node, config=process_dump_config
     )
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
@@ -284,13 +284,13 @@ def test_dump_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
     # base_dump_config = DumpMode(overwrite=False, incremental=False)
     calculation_node = generate_calculation_node_io()
     calculation_node.seal()
-    process_dumper = ProcessDump(dump_paths=dump_paths, process_node=calculation_node)
+    process_dumper = ProcessDumper(dump_paths=dump_paths, process_node=calculation_node)
     # Create safeguard file to mock existing dump directory
     dump_parent_path.mkdir()
     # we create safeguard file so the dumping works
     (dump_parent_path / '.aiida_dump_safeguard').touch()
     # With overwrite option true no error is raised and the dumping can run through.
-    process_dumper = ProcessDump(
+    process_dumper = ProcessDumper(
         dump_mode=DumpMode.OVERWRITE, dump_paths=dump_paths, process_node=calculation_node
     )
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
@@ -301,7 +301,7 @@ def test_dump_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
     # Incremental also does work
     dump_parent_path.mkdir()
     (dump_parent_path / '.aiida_dump_safeguard').touch()
-    process_dumper = ProcessDump(dump_paths=dump_paths, process_node=calculation_node)
+    process_dumper = ProcessDumper(dump_paths=dump_paths, process_node=calculation_node)
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
     assert (dump_parent_path / inputs_relpath / filename).is_file()
 
@@ -313,7 +313,7 @@ def test_dump_calculation_no_inputs(tmp_path, generate_calculation_node_io):
     dump_paths = DumpPaths.from_path(dump_parent_path)
     config = ProcessDumperConfig(include_inputs=False)
     calculation_node = generate_calculation_node_io()
-    process_dumper = ProcessDump(config=config, dump_paths=dump_paths, process_node=calculation_node)
+    process_dumper = ProcessDumper(config=config, dump_paths=dump_paths, process_node=calculation_node)
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
     assert not (dump_parent_path / node_inputs_relpath).is_dir()
 
@@ -324,7 +324,7 @@ def test_dump_calculation_add(tmp_path, generate_calculation_node_add):
     dump_paths = DumpPaths.from_path(dump_parent_path)
 
     calculation_node_add = generate_calculation_node_add()
-    process_dumper = ProcessDump(dump_paths=dump_paths, process_node=calculation_node_add)
+    process_dumper = ProcessDumper(dump_paths=dump_paths, process_node=calculation_node_add)
     process_dumper._dump_calculation(calculation_node=calculation_node_add, output_path=dump_parent_path)
 
     input_files = ['_aiidasubmit.sh', 'aiida.in', '.aiida/job_tmpl.json', '.aiida/calcinfo.json']
@@ -338,13 +338,13 @@ def test_dump_calculation_add(tmp_path, generate_calculation_node_add):
 
 @pytest.mark.usefixtures('aiida_profile_clean')
 def test_generate_calculation_io_mapping():
-    calculation_io_mapping = ProcessDump._generate_calculation_io_mapping()
+    calculation_io_mapping = ProcessDumper._generate_calculation_io_mapping()
     assert calculation_io_mapping.repository == 'inputs'
     assert calculation_io_mapping.retrieved == 'outputs'
     assert calculation_io_mapping.inputs == 'node_inputs'
     assert calculation_io_mapping.outputs == 'node_outputs'
 
-    calculation_io_mapping = ProcessDump._generate_calculation_io_mapping(io_dump_paths=custom_dump_paths)
+    calculation_io_mapping = ProcessDumper._generate_calculation_io_mapping(io_dump_paths=custom_dump_paths)
     assert calculation_io_mapping.repository == 'inputs_'
     assert calculation_io_mapping.retrieved == 'outputs_'
     assert calculation_io_mapping.inputs == 'node_inputs_'
@@ -367,7 +367,7 @@ def test_generate_child_node_label(
 
     output_paths = sorted(
         [
-            ProcessDump._generate_child_node_label(index, output_node)
+            ProcessDumper._generate_child_node_label(index, output_node)
             for index, output_node in enumerate(output_triples)
         ]
     )
@@ -379,7 +379,7 @@ def test_generate_child_node_label(
     # Sort by ctime here, not mtime, as I'm generating the WorkChain normally
     output_triples = sorted(output_triples, key=lambda link_triple: link_triple.node.ctime)
     output_paths = sorted(
-        [ProcessDump._generate_child_node_label(_, output_node) for _, output_node in enumerate(output_triples)]
+        [ProcessDumper._generate_child_node_label(_, output_node) for _, output_node in enumerate(output_triples)]
     )
     print(output_paths)
     assert output_paths == ['00-multiply-12', '01-ArithmeticAddCalculation-14', '02-result-17']
@@ -388,7 +388,7 @@ def test_generate_child_node_label(
 def test_write_node_yaml(generate_calculation_node_io, tmp_path, generate_workchain_multiply_add):
     sub_path = 'add'
     cj_node = generate_calculation_node_io(attach_outputs=False)
-    process_dumper = ProcessDump(process_node=cj_node, dump_paths=DumpPaths(parent=tmp_path, child=sub_path))
+    process_dumper = ProcessDumper(process_node=cj_node, dump_paths=DumpPaths(parent=tmp_path, child=sub_path))
     process_dumper._write_node_yaml(process_node=cj_node, output_path=tmp_path)
 
     assert (tmp_path / node_metadata_file).is_file()
@@ -397,7 +397,7 @@ def test_write_node_yaml(generate_calculation_node_io, tmp_path, generate_workch
     sub_path = 'multiply-add'
     wc_node = generate_workchain_multiply_add()
     dump_paths = DumpPaths(parent=tmp_path, child=sub_path)
-    process_dumper = ProcessDump(process_node=wc_node, dump_paths=dump_paths)
+    process_dumper = ProcessDumper(process_node=wc_node, dump_paths=dump_paths)
     process_dumper._write_node_yaml(process_node=wc_node, output_path=tmp_path)
 
     assert (tmp_path / node_metadata_file).is_file()
@@ -415,7 +415,7 @@ def test_write_node_yaml(generate_calculation_node_io, tmp_path, generate_workch
     assert 'Node extras:' in contents
 
     config = ProcessDumperConfig(include_attributes=False, include_extras=False)
-    process_dumper = ProcessDump(process_node=wc_node, dump_paths=dump_paths, config=config)
+    process_dumper = ProcessDumper(process_node=wc_node, dump_paths=dump_paths, config=config)
 
     (tmp_path / node_metadata_file).unlink()
     process_dumper._write_node_yaml(process_node=wc_node, output_path=tmp_path)
@@ -436,7 +436,7 @@ def test_write_node_yaml(generate_calculation_node_io, tmp_path, generate_workch
 def test_generate_parent_readme(tmp_path, generate_workchain_multiply_add):
     wc_node = generate_workchain_multiply_add()
     sub_path = 'readme'
-    process_dumper = ProcessDump(dump_paths=DumpPaths(parent=tmp_path, child=sub_path), process_node=wc_node)
+    process_dumper = ProcessDumper(dump_paths=DumpPaths(parent=tmp_path, child=sub_path), process_node=wc_node)
 
     (tmp_path / sub_path).mkdir(parents=True, exist_ok=True)
     process_dumper._generate_readme()

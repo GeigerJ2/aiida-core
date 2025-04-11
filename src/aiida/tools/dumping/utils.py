@@ -278,3 +278,48 @@ def delete_missing_node_dir(dump_logger: DumpLogger, to_delete_uuid: str) -> Non
             current_store.del_entry(uuid=to_delete_uuid)
         except:
             raise
+
+
+def tree_to_dict(root_path: Path) -> dict[str, list[Any]]:
+
+    """
+    Convert a directory tree structure into a dictionary representation.
+
+    The representation follows this format:
+    - Each directory is represented as a dictionary with the directory name as key
+      and a list of its contents as value
+    - Files are represented as strings in the list
+    - Subdirectories are represented as dictionaries in the list
+
+    Args:
+        root_path (Path): The root directory to convert
+
+    Returns:
+        Dict[str, List[Any]]: Dictionary representation of the directory structure
+    """
+    if not root_path.exists() or not root_path.is_dir():
+        raise ValueError(f"The path {root_path} does not exist or is not a directory")
+
+    # Get the directory name
+    dir_name = root_path.name
+
+    # Initialize the content list for this directory
+    contents = []
+
+    # Process all entries in the directory (sorted alphabetically)
+    entries = sorted(root_path.iterdir(), key=lambda p: p.name)
+
+    # First, add all files to the content list
+    for entry in entries:
+        if entry.is_file():
+            contents.append(entry.name)
+
+    # Then, recursively process all directories
+    for entry in entries:
+        if entry.is_dir():
+            # Create a dictionary for this subdirectory
+            subdir_dict = tree_to_dict(entry)
+            contents.append(subdir_dict)
+
+    # Return the directory as a dictionary with its contents
+    return {dir_name: contents}

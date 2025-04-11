@@ -779,7 +779,7 @@ PATH = OverridableOption(
     '--path',
     type=click.Path(path_type=pathlib.Path),
     show_default=False,
-    help='Base path for mirror operations that write to disk.',
+    help='Base path for dump operations that write to disk.',
 )
 
 OVERWRITE = OverridableOption(
@@ -801,7 +801,7 @@ SORT = OverridableOption(
 )
 
 DUMP_DATA = OverridableOption(
-    '--mirror-data/--no-mirror-data',
+    '--dump-data/--no-dump-data',
     is_flag=True,
     default=False,
     show_default=True,
@@ -809,7 +809,7 @@ DUMP_DATA = OverridableOption(
 )
 
 DUMP_PROCESSES = OverridableOption(
-    '--mirror-processes/--no-mirror-processes',
+    '--dump-processes/--no-dump-processes',
     is_flag=True,
     default=True,
     show_default=True,
@@ -822,7 +822,7 @@ ORGANIZE_BY_GROUPS = OverridableOption(
     is_flag=True,
     type=bool,
     show_default=True,
-    help='If the collection of nodes to be mirrored is organized in groups, reproduce its hierarchy.',
+    help='If the collection of nodes to be dumped is organized in groups, reproduce its hierarchy.',
 )
 
 INCLUDE_INPUTS = OverridableOption(
@@ -880,7 +880,7 @@ DELETE_MISSING = OverridableOption(
     '--delete-missing/--no-delete-missing',
     default=False,
     show_default=True,
-    help="If a previously mirrored node is deleted from AiiDA's DB, also delete the corresponding mirror directory.",
+    help="If a previously dumped node is deleted from AiiDA's DB, also delete the corresponding dump directory.",
 )
 
 ALSO_UNGROUPED = OverridableOption(
@@ -894,7 +894,7 @@ ONLY_TOP_LEVEL_CALCS = OverridableOption(
     '--only-top-level-calcs/--no-only-top-level-calcs',
     default=True,
     show_default=True,
-    help='Mirror calculations in their own dedicated directories, not just as part of the mirrored workflow.',
+    help='Mirror calculations in their own dedicated directories, not just as part of the dumped workflow.',
 )
 
 ONLY_TOP_LEVEL_WORKFLOWS = OverridableOption(
@@ -912,17 +912,17 @@ UPDATE_GROUPS = OverridableOption(
 )
 
 DUMP_UNSEALED = OverridableOption(
-    '--mirror-unsealed/--no-mirror-unsealed',
+    '--dump-unsealed/--no-dump-unsealed',
     is_flag=True,
     default=False,
     show_default=True,
-    help='Also allow the mirroring of unsealed process nodes.',
+    help='Also allow the dumping of unsealed process nodes.',
 )
 
 FILTER_BY_LAST_DUMP_TIME = OverridableOption(
-    '--filter-by-last-mirror-time/--no-filter-by-last-mirror-time',
+    '--filter-by-last-dump-time/--no-filter-by-last-dump-time',
     is_flag=True,
     default=True,
     show_default=True,
-    help='Only select nodes whose `mtime` is after the last mirror time.',
+    help='Only select nodes whose `mtime` is after the last dump time.',
 )

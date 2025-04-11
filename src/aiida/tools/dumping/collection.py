@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.dumping.base import BaseDump
+from aiida.tools.dumping.base import BaseDumper
 from aiida.tools.dumping.collector import DumpCollector
 from aiida.tools.dumping.config import DumpCollectorConfig, DumpMode, DumpPaths, DumpStoreKeys
 from aiida.tools.dumping.logger import DumpLogger, DumpLogStore
@@ -22,7 +22,7 @@ from aiida.tools.dumping.utils import StoreNameType, safe_delete_dir
 logger = AIIDA_LOGGER.getChild('tools.dump.group')
 
 
-class BaseCollectionDumper(BaseDump):
+class BaseCollectionDumper(BaseDumper):
     def __init__(
         self,
         dump_mode: DumpMode,
