@@ -678,7 +678,7 @@ def group_dump(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.dumping import GroupDumper
-    from aiida.tools.dumping.config import GroupDumperConfig, DumpCollectorConfig, DumpMode, ProcessDumperConfig
+    from aiida.tools.dumping.config import GroupDumperConfig, DumpDbCollectorConfig, DumpMode, ProcessDumperConfig
     from aiida.tools.dumping.utils import resolve_click_path_for_dump
 
     # FIXME: If nodes not newly created since the last Dumping, but only added to the group, those are not picked up
@@ -695,7 +695,7 @@ def group_dump(
     else:
         dump_mode = DumpMode.INCREMENTAL
 
-    dump_collector_config = DumpCollectorConfig(
+    dump_collector_config = DumpDbCollectorConfig(
         get_processes=dump_processes,
         get_data=dump_data,
         filter_by_last_dump_time=filter_by_last_dump_time,

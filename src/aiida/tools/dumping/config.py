@@ -22,7 +22,7 @@ from aiida.common import timezone
 __all__ = (
     'BaseCollectionDumperConfig',
     'GroupDumperConfig',
-    'DumpCollectorConfig',
+    'DumpDbCollectorConfig',
     'DumpMode',
     'DumpPaths',
     'DumpTimes',
@@ -158,7 +158,7 @@ class DumpPaths:
         from aiida.tools.dumping.logger import DumpLogger
 
         """Returns the path of the logger JSON."""
-        return self.absolute / DumpLogger.dump_LOG_FILE
+        return self.absolute / DumpLogger.DUMP_LOG_FILE
 
     # NOTE: Should this return a new instance?
     def extend_paths(self, subdir: str) -> 'DumpPaths':
@@ -175,7 +175,7 @@ class DumpPaths:
 
 
 @dataclass
-class DumpCollectorConfig:
+class DumpDbCollectorConfig:
     """Shared arguments for dumping of collections of nodes."""
 
     get_processes: bool = True

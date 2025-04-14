@@ -17,7 +17,7 @@ from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.config import DumpStoreKeys
 from aiida.tools.dumping.utils import StoreNameType
 
-logger = AIIDA_LOGGER.getChild('tools.dump.collector')
+logger = AIIDA_LOGGER.getChild('tools.dumping.collector')
 
 # TODO: Limit to only sealed nodes
 # NOTE: Not sure if this is even necessary, or I can just use lists?

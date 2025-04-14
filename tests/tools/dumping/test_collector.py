@@ -13,9 +13,9 @@ import pytest
 
 from aiida import orm
 from aiida.tools.graph.deletions import delete_nodes
-from aiida.tools.dumping.collector import DumpCollector
+from aiida.tools.dumping.collector import DumpDbCollector
 from aiida.tools.dumping.config import (
-    DumpCollectorConfig,
+    DumpDbCollectorConfig,
     DumpPaths,
     DumpTimes,
     NodeDumpGroupScope,
@@ -121,9 +121,9 @@ class TestDumpNodeCollector:
                 entries=[DumpLog(path=(tmp_path / f'{proc.__class__.__name__[:4]}')) for proc in processes],
             )
 
-        dump_collector_config = DumpCollectorConfig(group_scope=NodeDumpGroupScope.NO_GROUP)
+        dump_collector_config = DumpDbCollectorConfig(group_scope=NodeDumpGroupScope.NO_GROUP)
 
-        dump_node_collector = DumpCollector(config=dump_collector_config, dump_logger=empty_dump_logger)
+        dump_node_collector = DumpDbCollector(config=dump_collector_config, dump_logger=empty_dump_logger)
 
         dump_node_store = dump_node_collector.collect_to_dump()
 

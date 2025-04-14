@@ -15,7 +15,7 @@ from typing import Any, Dict
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.config import (
-    DumpCollectorConfig,
+    DumpDbCollectorConfig,
     DumpStoreKeys,
     NodeDumpGroupScope,
 )
@@ -23,23 +23,23 @@ from aiida.tools.dumping.logger import DumpLogger
 from aiida.tools.dumping.store import DumpNodeStore
 from aiida.tools.dumping.utils import QbDumpEntityType
 
-logger = AIIDA_LOGGER.getChild('tools.dump.collector')
+logger = AIIDA_LOGGER.getChild('tools.dumping.collector')
 
 # TODO: Limit to only sealed nodes. This option is currently accessible for `verdi process dump`, but it is not a
 # generally exposed option
 
 
-__all__ = ('DumpCollector',)
+__all__ = ('DumpDbCollector',)
 
 
-class DumpCollector:
+class DumpDbCollector:
     def __init__(
         self,
         dump_logger: DumpLogger,
-        config: DumpCollectorConfig | None = None,
+        config: DumpDbCollectorConfig | None = None,
     ):
         self.dump_logger = dump_logger
-        self.config = config or DumpCollectorConfig()
+        self.config = config or DumpDbCollectorConfig()
 
     def collect_to_dump(self, group: orm.Group | None = None, filters: dict | None = None) -> DumpNodeStore:
         if group:

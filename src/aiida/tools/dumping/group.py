@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -21,14 +22,13 @@ from aiida.common.progress_reporter import (
     get_progress_reporter,
     set_progress_bar_tqdm,
 )
-from aiida.tools.dumping.base import BaseDumper
 from aiida.tools.dumping.collection import BaseCollectionDumper
 from aiida.tools.dumping.config import (
-    GroupDumperConfig,
-    DumpCollectorConfig,
+    DumpDbCollectorConfig,
     DumpMode,
     DumpPaths,
     DumpStoreKeys,
+    GroupDumperConfig,
     ProcessDumperConfig,
 )
 from aiida.tools.dumping.logger import DumpLog, DumpLogger, DumpLogStore
@@ -39,9 +39,8 @@ from aiida.tools.dumping.utils import (
     generate_process_default_dump_path,
     prepare_dump_path,
 )
-import shutil
 
-logger = AIIDA_LOGGER.getChild('tools.dump.group')
+logger = AIIDA_LOGGER.getChild('tools.dumping.group')
 
 # NOTE: `load_dump_logger` could be put in general Parent cparent class
 # NOTE: Accessing via `group.nodes` might be nice, keep in mind
@@ -63,7 +62,7 @@ class GroupDumper(BaseCollectionDumper):
         dump_paths: DumpPaths | None = None,
         dump_logger: DumpLogger | None = None,
         config: GroupDumperConfig | None = None,
-        dump_collector_config: DumpCollectorConfig | None = None,
+        dump_collector_config: DumpDbCollectorConfig | None = None,
         process_dump_config: ProcessDumperConfig | None = None,
     ):
         """Initialize the GroupDump class."""
@@ -182,9 +181,7 @@ class GroupDumper(BaseCollectionDumper):
         :param process_type_path: Path where processes of this type are stored
         :param process_dump: The ProcessDump instance to use
         """
-        process_dump_path = process_type_path / generate_process_default_dump_path(
-            process_node=process, prefix=None
-        )
+        process_dump_path = process_type_path / generate_process_default_dump_path(process_node=process, prefix=None)
 
         process_paths = DumpPaths(
             parent=process_dump_path.parent,
@@ -246,9 +243,7 @@ class GroupDumper(BaseCollectionDumper):
         # Convert string to actual enum members
         current_store_key = DumpStoreKeys(current_store_key_str)
         other_store_key = (
-            DumpStoreKeys.CALCULATIONS
-            if current_store_key == DumpStoreKeys.WORKFLOWS
-            else DumpStoreKeys.WORKFLOWS
+            DumpStoreKeys.CALCULATIONS if current_store_key == DumpStoreKeys.WORKFLOWS else DumpStoreKeys.WORKFLOWS
         )
 
         current_store = self.dump_logger.get_store_by_name(name=current_store_key.value)
@@ -328,80 +323,3 @@ class GroupDumper(BaseCollectionDumper):
 
         if top_level_caller:
             self.dump_logger.save_log()
-
-class GroupDumpVerifyer(BaseDumper):
-
-    def __init__(
-        self,
-        group: orm.Group,
-        dump_mode: DumpMode,
-        dump_paths: DumpPaths,
-        dump_logger: DumpLogger,
-    ):
-        """Initialize the GroupDump class."""
-
-        super().__init__(
-            dump_mode=dump_mode,
-            dump_paths=dump_paths,
-            dump_logger=dump_logger,
-        )
-        self.group = group
-
-        self.validation_result = None
-
-
-    def update_groups(self):
-
-        dump_logger = self.dump_logger
-        assert dump_logger is not None
-
-        old_dump_logger_dict = dump_logger.to_dict()
-
-        # Get the list of dumped group UUIDs
-        dumped_group_uuids = list(dump_logger.groups.entries.keys())
-
-        # Create mappings of group UUIDs to old paths and new labels
-        old_paths = [entry.path for entry in dump_logger.groups.entries.values()]
-        new_labels = [orm.load_group(uuid=uuid).label for uuid in dumped_group_uuids]
-
-        # Update paths in dump logger for changed labels
-        for old_path, new_label in zip(old_paths, new_labels):
-            old_label = old_path.name
-            if old_label != new_label:
-                dump_logger.update_paths(old_str=old_label, new_str=new_label)
-                logger.report(f'Applied group relabelling `{old_label}` -> `{new_label}` in dump directory and log.')
-
-        # Get updated paths
-        new_dump_logger_dict = dump_logger.to_dict()
-
-        # Track paths that have already been moved to avoid duplicate moves
-        moved_paths = set()
-
-        # Move files for all entity types
-        for entity_type in ('groups', 'workflows', 'calculations', 'data'):
-            old_store = old_dump_logger_dict[entity_type]
-            new_store = new_dump_logger_dict[entity_type]
-
-            for uuid, entry in old_store.items():
-                old_path = entry['path']
-                new_path = new_store[uuid]['path']
-
-                if old_path != new_path and old_path not in moved_paths:
-                    parent_dir = Path(new_path).parent
-
-                    # Create parent directory if it doesn't exist
-                    if not parent_dir.exists():
-                        parent_dir.mkdir(parents=True, exist_ok=True)
-
-                    try:
-                        shutil.move(str(old_path), str(new_path))
-                        moved_paths.add(old_path)
-
-                        # Update the old store to reflect the completed move
-                        old_store[uuid]['path'] = new_path
-                    except FileNotFoundError:
-                        # Path might have been implicitly moved when a parent directory was moved
-                        continue
-
-        # Save the updated log
-        dump_logger.save_log()

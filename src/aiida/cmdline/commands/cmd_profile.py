@@ -322,7 +322,7 @@ def profile_dump(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.dumping import ProfileDumper
-    from aiida.tools.dumping.config import DumpCollectorConfig, DumpMode, ProcessDumperConfig, ProfileDumperConfig
+    from aiida.tools.dumping.config import DumpDbCollectorConfig, DumpMode, ProcessDumperConfig, ProfileDumperConfig
     from aiida.tools.dumping.utils import resolve_click_path_for_dump
 
     profile = ctx.obj['profile']
@@ -350,7 +350,7 @@ def profile_dump(
         echo.echo_critical(msg)
 
     # Create config options that hold the various settings for dumping data
-    dump_collector_config = DumpCollectorConfig(
+    dump_collector_config = DumpDbCollectorConfig(
         get_processes=dump_processes,
         get_data=dump_data,
         filter_by_last_dump_time=filter_by_last_dump_time,

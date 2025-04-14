@@ -220,6 +220,9 @@ class ProcessDumper(BaseDumper):
             )
 
             self.dump_logger = self.set_dump_logger(dump_logger=self.dump_logger)
+            current_mapping = self.dump_logger.build_current_group_node_mapping()
+            self.dump_logger.group_node_mapping = current_mapping
+
 
         if isinstance(process_node, orm.CalculationNode):
             self._dump_calculation(

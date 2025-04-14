@@ -13,13 +13,13 @@ import copy
 import pytest
 
 from aiida.tools.dumping.config import (
-    DumpCollectorConfig,
+    DumpDbCollectorConfig,
     DumpPaths,
     ProfileDumperConfig,
 )
 from aiida.tools.dumping.profile import ProfileDumper
 
-from .utils import compare_tree
+from aiida.tools.dumping.utils import compare_tree, compare_tree_dirs_only
 
 profile_dump_label = 'profile-dump'
 add_group_label = 'add-group'
@@ -864,7 +864,7 @@ class TestProfileDumper:
         # Now, also dump the two additional nodes in incremental mode
         profile_dumper = ProfileDumper(
             dump_paths=dump_paths,
-            dump_collector_config=DumpCollectorConfig(filter_by_last_dump_time=False),
+            dump_collector_config=DumpDbCollectorConfig(filter_by_last_dump_time=False),
             config=ProfileDumperConfig(also_ungrouped=True),
         )
         profile_dumper.dump()
@@ -963,16 +963,10 @@ class TestProfileDumper:
             config=ProfileDumperConfig(delete_missing=True),
         )
         profile_dumper.dump()
-        # TODO: This deletes too much:
-        # └── profile-dump
-        #     ├── .aiida_dump_log.json
-        #     ├── .aiida_dump_safeguard
-        #     └── groups
-        #         └── multiply-add-group
-        #             ├── .aiida_dump_safeguard
-        #             └── workflows
 
         print(tmp_path)
+
+        assert False
 
         # compare_tree(
         #     expected=tree_profile_delete_missing_nodes,
@@ -1035,7 +1029,7 @@ class TestProfileDumper:
         setup_multiply_add_group
         setup_add_group
         dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        dump_collector_config = DumpCollectorConfig(only_top_level_calcs=False)
+        dump_collector_config = DumpDbCollectorConfig(only_top_level_calcs=False)
         profile_dumper = ProfileDumper(dump_paths=dump_paths, dump_collector_config=dump_collector_config)
 
         profile_dumper.dump()
@@ -1054,7 +1048,7 @@ class TestProfileDumper:
         setup_multiply_add_group
         setup_add_group
         dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        dump_collector_config = DumpCollectorConfig(only_top_level_calcs=False)
+        dump_collector_config = DumpDbCollectorConfig(only_top_level_calcs=False)
         profile_dumper = ProfileDumper(dump_paths=dump_paths, dump_collector_config=dump_collector_config)
 
         profile_dumper.dump()

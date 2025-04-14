@@ -13,13 +13,13 @@ from __future__ import annotations
 
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.base import BaseDumper
-from aiida.tools.dumping.collector import DumpCollector
-from aiida.tools.dumping.config import DumpCollectorConfig, DumpMode, DumpPaths, DumpStoreKeys
+from aiida.tools.dumping.collector import DumpDbCollector
+from aiida.tools.dumping.config import DumpDbCollectorConfig, DumpMode, DumpPaths, DumpStoreKeys
 from aiida.tools.dumping.logger import DumpLogger, DumpLogStore
 from aiida.tools.dumping.store import DumpNodeStore
 from aiida.tools.dumping.utils import StoreNameType, safe_delete_dir
 
-logger = AIIDA_LOGGER.getChild('tools.dump.group')
+logger = AIIDA_LOGGER.getChild('tools.dumping.group')
 
 
 class BaseCollectionDumper(BaseDumper):
@@ -28,7 +28,7 @@ class BaseCollectionDumper(BaseDumper):
         dump_mode: DumpMode,
         dump_paths: DumpPaths,
         dump_logger: DumpLogger | None = None,
-        dump_collector_config: DumpCollectorConfig | None = None,
+        dump_collector_config: DumpDbCollectorConfig | None = None,
     ):
         super().__init__(
             dump_mode=dump_mode,
@@ -36,7 +36,7 @@ class BaseCollectionDumper(BaseDumper):
             # dump_logger=dump_logger,
         )
 
-        self.dump_collector_config = dump_collector_config or DumpCollectorConfig()
+        self.dump_collector_config = dump_collector_config or DumpDbCollectorConfig()
 
         # The problem is that the dump_logger is not a singleton, but is passed around and attached to various
         # classes. During dumping with the `overwrite` option, it gets reset for every `ProcessDump` instantiation.
@@ -50,11 +50,11 @@ class BaseCollectionDumper(BaseDumper):
         self.dump_logger = self.set_dump_logger(dump_logger=dump_logger, top_level_caller=True)
 
         # Initialize dump_collector as None - it will be properly set by child classes
-        self.dump_collector: DumpCollector | None = None
+        self.dump_collector: DumpDbCollector | None = None
 
     # ! This shouldn't be here, because the `dump_collector` only is required for collections of nodes
-    def set_dump_collector(self, dump_logger: DumpLogger) -> DumpCollector:
-        dump_collector = DumpCollector(
+    def set_dump_collector(self, dump_logger: DumpLogger) -> DumpDbCollector:
+        dump_collector = DumpDbCollector(
             dump_logger=dump_logger,
             config=self.dump_collector_config,
         )
@@ -82,6 +82,7 @@ class BaseCollectionDumper(BaseDumper):
         delete_store: DumpNodeStore = self.dump_collector.collect_to_delete()
 
         # First, handle groups and collect deleted group labels
+        import ipdb; ipdb.set_trace()
         deleted_groups = self.group_store_delete(delete_store=delete_store)
 
         # Then handle direct node deletions
