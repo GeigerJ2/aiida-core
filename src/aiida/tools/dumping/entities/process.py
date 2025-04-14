@@ -26,15 +26,16 @@ from aiida.tools.archive.exceptions import ExportValidationError
 from aiida.tools.dumping.base import BaseDumper
 from aiida.tools.dumping.config import (
     DumpMode,
-    DumpPaths,
     ProcessDumperConfig,
 )
-from aiida.tools.dumping.logger import DumpLog, DumpLogger
+from aiida.tools.dumping.storage.logger import DumpLog, DumpLogger
 from aiida.tools.dumping.utils import (
     generate_process_default_dump_path,
     prepare_dump_path,
 )
+from aiida.tools.dumping.utils.paths import DumpPaths
 
+# TODO: See if I can always use name, or pass the dumping sub module explicitly
 logger = logging.getLogger(__name__)
 
 

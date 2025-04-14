@@ -8,9 +8,7 @@
 ###########################################################################
 """Modules related to the dumping of AiiDA data to disk."""
 
-from .group import GroupDumper
-from .logger import DumpLogger
-from .process import ProcessDumper
-from .profile import ProfileDumper
+from aiida.tools.dumping.config import DumpMode
+from aiida.tools.dumping.entities import GroupDumper, ProcessDumper, ProfileDumper
 
-__all__ = ('GroupDumper', 'DumpLogger', 'ProcessDumper', 'ProfileDumper')
+__all__ = ['DumpMode', 'GroupDumper', 'ProcessDumper', 'ProfileDumper']

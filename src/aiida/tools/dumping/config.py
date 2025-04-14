@@ -9,23 +9,14 @@
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass, fields
 from enum import Enum, auto
-from pathlib import Path
-from typing import Type
-
-from aiida import orm
-from aiida.common import timezone
 
 __all__ = (
     'BaseCollectionDumperConfig',
-    'GroupDumperConfig',
-    'DumpDbCollectorConfig',
+    'DumpCollectorConfig',
     'DumpMode',
-    'DumpPaths',
-    'DumpTimes',
+    'GroupDumperConfig',
     'NodeDumpGroupScope',
     'ProcessDumperConfig',
     'ProfileDumperConfig',
@@ -44,138 +35,117 @@ class NodeDumpGroupScope(Enum):
     NO_GROUP = auto()
 
 
-class DumpStoreKeys(str, Enum):
-    CALCULATIONS = 'calculations'
-    WORKFLOWS = 'workflows'
-    GROUPS = 'groups'
-    DATA = 'data'
-
-    @classmethod
-    def from_instance(cls, node_inst: orm.Node | orm.Group) -> str:
-        if isinstance(node_inst, orm.CalculationNode):
-            return cls.CALCULATIONS.value
-        elif isinstance(node_inst, orm.WorkflowNode):
-            return cls.WORKFLOWS.value
-        elif isinstance(node_inst, orm.Data):
-            return cls.DATA.value
-        elif isinstance(node_inst, orm.Group):
-            return cls.GROUPS.value
-        else:
-            msg = f'Dumping not implemented yet for node type: {type(node_inst)}'
-            raise NotImplementedError(msg)
-
-    @classmethod
-    def from_class(cls, orm_class: Type) -> str:
-        if issubclass(orm_class, orm.CalculationNode):
-            return cls.CALCULATIONS.value
-        elif issubclass(orm_class, orm.WorkflowNode):
-            return cls.WORKFLOWS.value
-        elif issubclass(orm_class, orm.Data):
-            return cls.DATA.value
-        elif issubclass(orm_class, orm.Group):
-            return cls.GROUPS.value
-        else:
-            msg = f'Dumping not implemented yet for node type: {orm_class}'
-            raise NotImplementedError(msg)
-
-    @classmethod
-    def to_class(cls, key: 'DumpStoreKeys') -> Type:
-        mapping = {
-            cls.CALCULATIONS: orm.CalculationNode,
-            cls.WORKFLOWS: orm.WorkflowNode,
-            cls.DATA: orm.Data,
-            cls.GROUPS: orm.Group,
-        }
-        if key in mapping:
-            return mapping[key]
-        else:
-            msg = f'No node type mapping exists for key: {key}'
-            raise ValueError(msg)
-
-
-# NOTE: Should this be a singleton?
 @dataclass
-class DumpTimes:
-    _instance = None
-    last: datetime | None = None
-    # Fixed time set at instantiation
-    _current: datetime = field(default_factory=timezone.now)
-    # start: datetime | None = field(default_factory=timezone.now)
-    range_start: datetime | None = None
-    range_end: datetime | None = None
+class DumpConfig:
+    """Unified configuration for all dump operations."""
 
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    # Global options
+    dump_mode: DumpMode = DumpMode.INCREMENTAL
 
-    @property
-    def current(self) -> datetime:
-        """
-        Returns the fixed time that was set upon instantiation of the class.
-        """
-        return self._current
+    # Node collection options
+    get_processes: bool = True
+    get_data: bool = False
+    filter_by_last_dump_time: bool = True
+    only_top_level_calcs: bool = True
+    only_top_level_workflows: bool = True
+    group_scope: NodeDumpGroupScope = NodeDumpGroupScope.IN_GROUP
+
+    # Process dump options
+    include_inputs: bool = True
+    include_outputs: bool = False
+    include_attributes: bool = True
+    include_extras: bool = True
+    flat: bool = False
+    dump_unsealed: bool = False
+    symlink_calcs: bool = False
+
+    # Group options
+    delete_missing: bool = False
+
+    # Profile options
+    organize_by_groups: bool = True
+    also_ungrouped: bool = False
+    update_groups: bool = False
+    symlink_between_groups: bool = False
+
+    def get_collector_config(self) -> DumpCollectorConfig:
+        """Extract configuration for DumpCollector."""
+        return DumpCollectorConfig(
+            get_processes=self.get_processes,
+            get_data=self.get_data,
+            filter_by_last_dump_time=self.filter_by_last_dump_time,
+            only_top_level_calcs=self.only_top_level_calcs,
+            only_top_level_workflows=self.only_top_level_workflows,
+            group_scope=self.group_scope,
+        )
+
+    def get_process_config(self) -> ProcessDumperConfig:
+        """Extract configuration for ProcessDumper."""
+        return ProcessDumperConfig(
+            include_inputs=self.include_inputs,
+            include_outputs=self.include_outputs,
+            include_attributes=self.include_attributes,
+            include_extras=self.include_extras,
+            flat=self.flat,
+            dump_unsealed=self.dump_unsealed,
+            symlink_calcs=self.symlink_calcs,
+        )
+
+    def get_group_config(self) -> GroupDumperConfig:
+        """Extract configuration for GroupDumper."""
+        return GroupDumperConfig(symlink_calcs=self.symlink_calcs, delete_missing=self.delete_missing)
+
+    def get_profile_config(self) -> ProfileDumperConfig:
+        """Extract configuration for ProfileDumper."""
+        return ProfileDumperConfig(
+            symlink_calcs=self.symlink_calcs,
+            delete_missing=self.delete_missing,
+            organize_by_groups=self.organize_by_groups,
+            also_ungrouped=self.also_ungrouped,
+            update_groups=self.update_groups,
+            symlink_between_groups=self.symlink_between_groups,
+        )
 
     @classmethod
-    def from_file(cls, dump_paths: 'DumpPaths') -> 'DumpTimes':
-        try:
-            with dump_paths.log_path.open('r', encoding='utf-8') as f:
-                prev_dump_data = json.load(f)
-                return cls(last=datetime.fromisoformat(prev_dump_data['last_dump_time']))
-        except:
-            raise
+    def from_component_configs(
+        cls,
+        process_config: ProcessDumperConfig | None = None,
+        group_config: GroupDumperConfig | None = None,
+        profile_config: ProfileDumperConfig | None = None,
+        collector_config: DumpCollectorConfig | None = None,
+    ) -> 'DumpConfig':
+        """Construct a unified config from component configs."""
+        config = cls()
 
+        # Update from process config if provided
+        if process_config:
+            for field in fields(ProcessDumperConfig):
+                if hasattr(process_config, field.name):
+                    setattr(config, field.name, getattr(process_config, field.name))
 
-@dataclass
-class DumpPaths:
-    parent: Path = field(default_factory=Path.cwd)
-    child: Path = field(default_factory=lambda: Path('aiida-dump'))
-    top_level: Path = field(default=None, init=True)  # Added top_level property
+        # Update from group config if provided
+        if group_config:
+            for field in fields(GroupDumperConfig):
+                if hasattr(group_config, field.name):
+                    setattr(config, field.name, getattr(group_config, field.name))
 
-    safeguard_file = '.aiida_dump_safeguard'
+        # Update from profile config if provided
+        if profile_config:
+            for field in fields(ProfileDumperConfig):
+                if hasattr(profile_config, field.name):
+                    setattr(config, field.name, getattr(profile_config, field.name))
 
-    def __post_init__(self):
-        # Set top_level during initialization if not provided
-        if self.top_level is None:
-            self.top_level = self.parent / self.child # Default to parent if not specified
+        # Update from collector config if provided
+        if collector_config:
+            for field in fields(DumpCollectorConfig):
+                if hasattr(collector_config, field.name):
+                    setattr(config, field.name, getattr(collector_config, field.name))
 
-    @classmethod
-    def from_path(cls, path: Path):
-        return cls(parent=path.parent, child=Path(path.name))
-
-    @property
-    def absolute(self) -> Path:
-        """Returns the absolute path by joining parent and child."""
-        return self.parent / self.child
-
-    @property
-    def safeguard_path(self) -> Path:
-        """Returns the path to a safeguard file."""
-        return self.absolute / self.safeguard_file
-
-    @property
-    def log_path(self) -> Path:
-        from aiida.tools.dumping.logger import DumpLogger
-
-        """Returns the path of the logger JSON."""
-        return self.absolute / DumpLogger.DUMP_LOG_FILE
-
-    # NOTE: Should this return a new instance?
-    def extend_paths(self, subdir: str) -> 'DumpPaths':
-        """
-        Creates a new DumpPaths instance with an additional subdirectory.
-
-        Args:
-            subdir: The name of the subdirectory to add
-
-        Returns:
-            A new DumpPaths instance with the updated path structure
-        """
-        return DumpPaths(parent=self.absolute, child=Path(subdir))
+        return config
 
 
 @dataclass
-class DumpDbCollectorConfig:
+class DumpCollectorConfig:
     """Shared arguments for dumping of collections of nodes."""
 
     get_processes: bool = True

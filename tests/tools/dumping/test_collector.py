@@ -12,15 +12,11 @@ import copy
 import pytest
 
 from aiida import orm
-from aiida.tools.graph.deletions import delete_nodes
-from aiida.tools.dumping.collector import DumpDbCollector
 from aiida.tools.dumping.config import (
-    DumpDbCollectorConfig,
-    DumpPaths,
-    DumpTimes,
     NodeDumpGroupScope,
 )
-from aiida.tools.dumping.logger import DumpLog, DumpLogger
+from aiida.tools.dumping.storage.logger import DumpLog, DumpLogger
+from aiida.tools.graph.deletions import delete_nodes
 
 
 class TestDumpNodeCollector:

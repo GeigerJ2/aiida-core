@@ -379,7 +379,7 @@ def profile_dump(
     profile_dumper = ProfileDumper(
         profile=profile,
         dump_mode=dump_mode,
-        dump_paths=dump_paths,
+        output_path=dump_paths,
         dump_collector_config=dump_collector_config,
         process_dump_config=process_dump_config,
         config=profile_dump_config,

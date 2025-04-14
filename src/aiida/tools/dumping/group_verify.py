@@ -161,7 +161,7 @@ class GroupDumpVerifier:
 
         logger.report(f"Processing {len(modified_groups)} modified groups")
 
-        from aiida.tools.dumping.group_mapping import GroupNodeMappingManager
+        from aiida.tools.dumping.mapping import GroupNodeMappingManager
 
         # Create a mapping manager to handle the updates
         mapping_manager = GroupNodeMappingManager(self.dump_logger)

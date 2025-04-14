@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import json
 
-from aiida.tools.dumping.config import DumpMode, DumpPaths, DumpTimes
-from aiida.tools.dumping.logger import DumpLogger
+from aiida.tools.dumping.config import DumpMode
+from aiida.tools.dumping.storage.logger import DumpLogger
+from aiida.tools.dumping.utils.paths import DumpPaths
+from aiida.tools.dumping.utils.time import DumpTimes
 
 
 class BaseDumper:

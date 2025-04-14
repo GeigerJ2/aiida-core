@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.dumping.config import DumpStoreKeys
-from aiida.tools.dumping.utils import StoreNameType
+from aiida.tools.dumping.storage.keys import DumpStoreKeys
+from aiida.tools.dumping.utils.types import StoreNameType
 
 logger = AIIDA_LOGGER.getChild('tools.dumping.collector')
 

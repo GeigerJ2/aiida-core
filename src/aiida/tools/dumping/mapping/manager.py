@@ -6,9 +6,7 @@ from typing import Dict, List
 
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
-
-# Import from base_types to avoid circular imports
-from aiida.tools.dumping.group_mapping import GroupNodeMapping
+from aiida.tools.dumping.mapping.mapping import GroupNodeMapping
 
 logger = AIIDA_LOGGER.getChild('tools.dump.group_mapper')
 

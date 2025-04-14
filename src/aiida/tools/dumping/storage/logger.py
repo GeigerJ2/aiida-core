@@ -18,11 +18,11 @@ from typing import Dict, List, Optional
 
 from aiida.common.exceptions import NotExistent
 from aiida.common.log import AIIDA_LOGGER
-
-# Import the base types module to avoid circular imports
-from aiida.tools.dumping.group_mapping import GroupNodeMapping
-from aiida.tools.dumping.config import DumpPaths, DumpStoreKeys, DumpTimes
-from aiida.tools.dumping.utils import StoreNameType
+from aiida.tools.dumping.mapping import GroupNodeMapping
+from aiida.tools.dumping.storage.store import DumpStoreKeys
+from aiida.tools.dumping.utils.paths import DumpPaths
+from aiida.tools.dumping.utils.time import DumpTimes
+from aiida.tools.dumping.utils.types import StoreNameType
 
 # TODO: Possibly dump hierarchy of dumped directory inside json file
 # TODO: Currently, json file has only top-level "groups", "workflows", and "calculations"
@@ -162,7 +162,6 @@ class DumpLogStoreCollection:
 
 class DumpLogger:
     """Main Logger class for data dumping."""
-    DUMP_LOG_FILE: str = '.aiida_dump_log.json'
 
     def __init__(
         self,
@@ -324,7 +323,7 @@ class DumpLogger:
                 if 'group_node_mapping' in prev_dump_data:
                     try:
                         # Import here to avoid circular imports
-                        from aiida.tools.dumping.group_mapping import GroupNodeMapping
+                        from aiida.tools.dumping.mapping import GroupNodeMapping
                         group_node_mapping = GroupNodeMapping.from_dict(prev_dump_data['group_node_mapping'])
                         instance._group_node_mapping = group_node_mapping
                     except Exception as e:
@@ -431,7 +430,7 @@ class DumpLogger:
     def build_current_group_node_mapping(self) -> GroupNodeMapping:
         """Build a group-node mapping from the current database state."""
         # Import locally to avoid circular imports
-        from aiida.tools.dumping.group_mapping import GroupNodeMapping
+        from aiida.tools.dumping.mapping import GroupNodeMapping
         return GroupNodeMapping.build_from_db()
 
     def verify_group_structure(self) -> Dict:
