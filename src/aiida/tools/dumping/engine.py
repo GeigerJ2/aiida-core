@@ -18,6 +18,8 @@ from aiida.tools.dumping.utils.time import DumpTimes
 
 class DumpEngine:
     """Core engine that orchestrates the dump process."""
+    # TODO: Either, overwrite not passed through, or log file not properly deleted beforehand -> Somehow before manually
+    # TODO: removing the directory, the `changes` where always empty
 
     def __init__(self, config: DumpConfig, dump_paths: DumpPaths):
         self.config = config
@@ -38,6 +40,7 @@ class DumpEngine:
     def dump(self, entity=None) -> None:
         """Main dump entry point that handles all types of entities."""
         # Handle special case for deletion
+        # TODO: This is broken
         if self.config.delete_missing:
             self._handle_deleted_nodes()
             return
@@ -57,10 +60,13 @@ class DumpEngine:
             self._handle_process_dump(entity)
         else:
             # Assume profile dump
-            changes = self.detector.detect_changes()
-            self._handle_profile_dump(changes)
+            # TODO: See if I even need this for top level changes
+            # changes = self.detector.detect_changes()
+            # self._handle_profile_dump(changes)
+            self._handle_profile_dump()
 
         # Save the log
+        # import ipdb; ipdb.set_trace()
         self.dump_logger.save_log()
 
     def _handle_group_dump(self, group: orm.Group, changes: dict) -> None:
@@ -72,23 +78,26 @@ class DumpEngine:
         # Dump new nodes
         self._dump_nodes(changes['new_nodes'], group)
 
+
     def _handle_process_dump(self, process: orm.ProcessNode) -> None:
         """Handle dumping for a specific process."""
         from aiida.tools.dumping.entities.process import ProcessDumper
+
         process_dumper = ProcessDumper(
             process_node=process,
             dump_mode=self.config.dump_mode,
             dump_paths=self.dump_paths,
             dump_logger=self.dump_logger,
-            config=self._create_process_config()
+            config=self._create_process_config(),
         )
         process_dumper.dump()
 
-    def _handle_profile_dump(self, changes: dict) -> None:
+    def _handle_profile_dump(self, global_changes: dict | None = None) -> None:
         """Handle dumping for a profile."""
         # Update group structure if needed
-        if self.config.update_groups:
-            self._update_group_structure(changes['group_changes'])
+        # TODO: Properly implement the group changes implementation
+        # if self.config.update_groups:
+        #     self._update_group_structure(global_changes['group_changes'])
 
         # Handle group dumps
         self._handle_groups()
@@ -97,8 +106,10 @@ class DumpEngine:
         if self.config.also_ungrouped:
             self._handle_ungrouped_nodes()
 
+
     def _handle_groups(self) -> None:
-        """Handle dumping for all groups."""
+        # TODO: Allow specifying groups manually
+        # TODO: Possibl move the group handling to the top-level handle profile dump method
         qb = orm.QueryBuilder()
         qb.append(orm.Group)
         groups = qb.all(flat=True)
@@ -108,51 +119,17 @@ class DumpEngine:
             group_detector = DumpChangeDetector(
                 self.dump_logger,
                 # Create config with IN_GROUP scope
-                DumpConfig(**{**self.config.__dict__, 'group_scope': NodeDumpGroupScope.IN_GROUP})
+                DumpConfig(**{**self.config.__dict__, 'group_scope': NodeDumpGroupScope.IN_GROUP}),
             )
 
-            group_path = self._get_group_path(group)
+
             group_changes = group_detector.detect_changes(group=group)
+            import ipdb; ipdb.set_trace()
 
-            # Create group dump paths
-            group_dump_paths = DumpPaths(
-                parent=group_path.parent,
-                child=group_path.name
-            )
-
-            # Create group engine with the group-specific scope
-            group_engine = DumpEngine(
-                config=DumpConfig(**{**self.config.__dict__, 'group_scope': NodeDumpGroupScope.IN_GROUP}),
-                dump_paths=group_dump_paths
-            )
+            group_engine = DumpEngine(config=self.config, dump_paths=self.dump_paths)
 
             # Dump the group
             group_engine._handle_group_dump(group, group_changes)
-
-    # def _handle_groups(self) -> None:
-    #     """Handle dumping for all groups."""
-    #     qb = orm.QueryBuilder()
-    #     qb.append(orm.Group)
-    #     groups = qb.all(flat=True)
-
-    #     for group in groups:
-    #         group_path = self._get_group_path(group)
-    #         group_changes = self.detector.detect_changes(group=group)
-
-    #         # Create group dump paths
-    #         group_dump_paths = DumpPaths(
-    #             parent=group_path.parent,
-    #             child=group_path.name
-    #         )
-
-    #         # Create group engine
-    #         group_engine = DumpEngine(
-    #             config=self.config,
-    #             dump_paths=group_dump_paths
-    #         )
-
-    #         # Dump the group
-    #         group_engine._handle_group_dump(group, group_changes)
 
     def _update_group_structure(self, group_changes: dict) -> None:
         """Update dump structure based on group changes."""
@@ -187,6 +164,7 @@ class DumpEngine:
         # Dump calculations and workflows with progress reporting
         try:
             from aiida.common.progress_reporter import get_progress_reporter, set_progress_bar_tqdm
+
             set_progress_bar_tqdm()
 
             for process_type in ('calculations', 'workflows'):
@@ -219,11 +197,12 @@ class DumpEngine:
         from aiida.tools.dumping.storage import DumpStoreKeys
 
         if group:
-            process_path = self._get_group_path(group)
+            group_path = self._get_group_path(group)
+            # (group_path / self.dump_paths.safeguard_file).touch()
             if isinstance(process, orm.CalculationNode):
-                process_path = process_path / 'calculations'
+                process_path = group_path / 'calculations'
             else:
-                process_path = process_path / 'workflows'
+                process_path = group_path / 'workflows'
         else:
             process_path = self.dump_paths.absolute
 
@@ -235,8 +214,7 @@ class DumpEngine:
         # Get store instances for current and other type
         current_store_key = DumpStoreKeys.from_instance(node_inst=process)
         other_store_key = (
-            DumpStoreKeys.CALCULATIONS if current_store_key == DumpStoreKeys.WORKFLOWS
-            else DumpStoreKeys.WORKFLOWS
+            DumpStoreKeys.CALCULATIONS if current_store_key == DumpStoreKeys.WORKFLOWS else DumpStoreKeys.WORKFLOWS
         )
 
         current_store = self.dump_logger.get_store_by_name(name=current_store_key)
@@ -249,7 +227,7 @@ class DumpEngine:
                 dump_mode=self.config.dump_mode,
                 dump_paths=process_paths,
                 dump_logger=self.dump_logger,
-                config=self._create_process_config()
+                config=self._create_process_config(),
             )
             process_dumper.dump(top_level_caller=False)
         else:
@@ -275,12 +253,13 @@ class DumpEngine:
                     dump_mode=self.config.dump_mode,
                     dump_paths=process_paths,
                     dump_logger=self.dump_logger,
-                    config=self._create_process_config()
+                    config=self._create_process_config(),
                 )
                 process_dumper.dump(top_level_caller=False)
 
         # This happens regardless of which case was executed
         current_store.add_entry(uuid=process.uuid, entry=DumpLog(path=process_path))
+
     # def _dump_process(self, process: orm.ProcessNode, group: orm.Group | None = None) -> None:
     #     """Dump a single process."""
     #     from aiida.tools.dumping.entities import ProcessDumper
@@ -295,7 +274,6 @@ class DumpEngine:
 
     #     process_name = generate_process_default_dump_path(process)
     #     process_path = process_path / process_name
-
 
     #     process_dumper = ProcessDumper(
     #         process_node=process,
@@ -316,7 +294,7 @@ class DumpEngine:
             include_extras=self.config.include_extras,
             flat=self.config.flat,
             dump_unsealed=self.config.dump_unsealed,
-            symlink_calcs=self.config.symlink_calcs
+            symlink_calcs=self.config.symlink_calcs,
         )
 
     def create_symlink_from_store(self, process_uuid: str, store_instance, process_dump_path: Path) -> bool:
@@ -337,14 +315,14 @@ class DumpEngine:
 
         return True
 
-    # In DumpEngine._handle_ungrouped_nodes (new method)
+    # TODO: This doesn't respect `calculations` and `workflows` subdirectories
     def _handle_ungrouped_nodes(self) -> None:
         """Handle dumping of ungrouped nodes."""
         # Create a detector specifically for ungrouped nodes
         ungrouped_detector = DumpChangeDetector(
             self.dump_logger,
             # Create config with NO_GROUP scope
-            DumpConfig(**{**self.config.__dict__, 'group_scope': NodeDumpGroupScope.NO_GROUP})
+            DumpConfig(**{**self.config.__dict__, 'group_scope': NodeDumpGroupScope.NO_GROUP}),
         )
 
         # Get path for ungrouped nodes
@@ -357,19 +335,13 @@ class DumpEngine:
         ungrouped_changes = ungrouped_detector.detect_changes()
 
         # Create dump paths
-        no_group_dump_paths = DumpPaths(
-            parent=no_group_path.parent,
-            child=no_group_path.name
-        )
+        no_group_dump_paths = DumpPaths(parent=no_group_path.parent, child=no_group_path.name)
 
         # Create an engine for ungrouped nodes
         ungrouped_engine = DumpEngine(
             config=DumpConfig(**{**self.config.__dict__, 'group_scope': NodeDumpGroupScope.NO_GROUP}),
-            dump_paths=no_group_dump_paths
+            dump_paths=no_group_dump_paths,
         )
-
-        # Get changes for ungrouped nodes
-        ungrouped_changes = ungrouped_detector.detect_changes()
 
         # Handle the dumping
         ungrouped_engine._dump_nodes(ungrouped_changes['new_nodes'], group=None)

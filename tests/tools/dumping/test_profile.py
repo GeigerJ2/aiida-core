@@ -8,56 +8,49 @@
 ###########################################################################
 """Tests for the dumping of profile data to disk."""
 
-import copy
-
 import pytest
 
-from aiida.tools.dumping.config import (
-    DumpDbCollectorConfig,
-    DumpPaths,
-    ProfileDumperConfig,
-)
-from aiida.tools.dumping.profile import ProfileDumper
+from aiida.tools.dumping.config import DumpConfig
+from aiida.tools.dumping.entities.profile import ProfileDumper
+from aiida.tools.dumping.storage.logger import DumpLogger
+from aiida.tools.dumping.utils.tree import compare_tree
 
-from aiida.tools.dumping.utils import compare_tree, compare_tree_dirs_only
-
-profile_dump_label = 'profile-dump'
-add_group_label = 'add-group'
-multiply_add_group_label = 'multiply-add-group'
+profile_dump_label = "profile-dump"
+add_group_label = "add-group"
+multiply_add_group_label = "multiply-add-group"
 
 tree_profile_group_add = {
     profile_dump_label: [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'groups': [
+            "groups": [
                 {
                     add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'calculations': [
+                            "calculations": [
                                 {
-                                    'ArithmeticAddCalculation-4': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "ArithmeticAddCalculation-4": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
                                                 {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
                                                     ]
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
+                                        {"node_inputs": []},
                                         {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
                                             ]
                                         },
                                     ]
@@ -73,49 +66,48 @@ tree_profile_group_add = {
 
 tree_profile_group_multiply_add = {
     profile_dump_label: [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'groups': [
+            "groups": [
                 {
                     multiply_add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'workflows': [
+                            "workflows": [
                                 {
-                                    'MultiplyAddWorkChain-5': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "MultiplyAddWorkChain-5": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            '01-multiply-6': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
-                                                {'inputs': ['source_file']},
-                                                {'node_inputs': []},
+                                            "01-multiply-6": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
+                                                {"inputs": ["source_file"]},
+                                                {"node_inputs": []},
                                             ]
                                         },
                                         {
-                                            '02-ArithmeticAddCalculation-8': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
+                                            "02-ArithmeticAddCalculation-8": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
                                                 {
-                                                    'inputs': [
-                                                        '_aiidasubmit.sh',
-                                                        'aiida.in',
+                                                    "inputs": [
+                                                        "_aiidasubmit.sh",
+                                                        "aiida.in",
                                                         {
-                                                            '.aiida': [
-                                                                'calcinfo.json',
-                                                                'job_tmpl.json',
+                                                            ".aiida": [
+                                                                "calcinfo.json",
+                                                                "job_tmpl.json",
                                                             ]
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
+                                                {"node_inputs": []},
                                                 {
-                                                    'outputs': [
-                                                        '_scheduler-stderr.txt',
-                                                        '_scheduler-stdout.txt',
-                                                        'aiida.out',
+                                                    "outputs": [
+                                                        "_scheduler-stderr.txt",
+                                                        "_scheduler-stdout.txt",
+                                                        "aiida.out",
                                                     ]
                                                 },
                                             ]
@@ -133,37 +125,36 @@ tree_profile_group_multiply_add = {
 
 tree_profile_groups_add_multiply_add = {
     profile_dump_label: [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'groups': [
+            "groups": [
                 {
                     add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'calculations': [
+                            "calculations": [
                                 {
-                                    'ArithmeticAddCalculation-4': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "ArithmeticAddCalculation-4": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
                                                 {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
                                                     ]
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
+                                        {"node_inputs": []},
                                         {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
                                             ]
                                         },
                                     ]
@@ -174,43 +165,42 @@ tree_profile_groups_add_multiply_add = {
                 },
                 {
                     multiply_add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'workflows': [
+                            "workflows": [
                                 {
-                                    'MultiplyAddWorkChain-12': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "MultiplyAddWorkChain-12": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            '01-multiply-13': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
-                                                {'inputs': ['source_file']},
-                                                {'node_inputs': []},
+                                            "01-multiply-13": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
+                                                {"inputs": ["source_file"]},
+                                                {"node_inputs": []},
                                             ]
                                         },
                                         {
-                                            '02-ArithmeticAddCalculation-15': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
+                                            "02-ArithmeticAddCalculation-15": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
                                                 {
-                                                    'inputs': [
-                                                        '_aiidasubmit.sh',
-                                                        'aiida.in',
+                                                    "inputs": [
+                                                        "_aiidasubmit.sh",
+                                                        "aiida.in",
                                                         {
-                                                            '.aiida': [
-                                                                'calcinfo.json',
-                                                                'job_tmpl.json',
+                                                            ".aiida": [
+                                                                "calcinfo.json",
+                                                                "job_tmpl.json",
                                                             ]
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
+                                                {"node_inputs": []},
                                                 {
-                                                    'outputs': [
-                                                        '_scheduler-stderr.txt',
-                                                        '_scheduler-stdout.txt',
-                                                        'aiida.out',
+                                                    "outputs": [
+                                                        "_scheduler-stderr.txt",
+                                                        "_scheduler-stdout.txt",
+                                                        "aiida.out",
                                                     ]
                                                 },
                                             ]
@@ -228,37 +218,36 @@ tree_profile_groups_add_multiply_add = {
 
 tree_profile_groups_multiply_add_add = {
     profile_dump_label: [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'groups': [
+            "groups": [
                 {
                     add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'calculations': [
+                            "calculations": [
                                 {
-                                    'ArithmeticAddCalculation-4': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "ArithmeticAddCalculation-4": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
                                                 {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
                                                     ]
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
+                                        {"node_inputs": []},
                                         {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
                                             ]
                                         },
                                     ]
@@ -269,43 +258,42 @@ tree_profile_groups_multiply_add_add = {
                 },
                 {
                     multiply_add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'workflows': [
+                            "workflows": [
                                 {
-                                    'MultiplyAddWorkChain-12': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "MultiplyAddWorkChain-12": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            '01-multiply-13': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
-                                                {'inputs': ['source_file']},
-                                                {'node_inputs': []},
+                                            "01-multiply-13": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
+                                                {"inputs": ["source_file"]},
+                                                {"node_inputs": []},
                                             ]
                                         },
                                         {
-                                            '02-ArithmeticAddCalculation-15': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
+                                            "02-ArithmeticAddCalculation-15": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
                                                 {
-                                                    'inputs': [
-                                                        '_aiidasubmit.sh',
-                                                        'aiida.in',
+                                                    "inputs": [
+                                                        "_aiidasubmit.sh",
+                                                        "aiida.in",
                                                         {
-                                                            '.aiida': [
-                                                                'calcinfo.json',
-                                                                'job_tmpl.json',
+                                                            ".aiida": [
+                                                                "calcinfo.json",
+                                                                "job_tmpl.json",
                                                             ]
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
+                                                {"node_inputs": []},
                                                 {
-                                                    'outputs': [
-                                                        '_scheduler-stderr.txt',
-                                                        '_scheduler-stdout.txt',
-                                                        'aiida.out',
+                                                    "outputs": [
+                                                        "_scheduler-stderr.txt",
+                                                        "_scheduler-stdout.txt",
+                                                        "aiida.out",
                                                     ]
                                                 },
                                             ]
@@ -323,27 +311,27 @@ tree_profile_groups_multiply_add_add = {
 
 tree_profile_no_organize_by_groups = {
     profile_dump_label: [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'calculations': [
+            "calculations": [
                 {
-                    'ArithmeticAddCalculation-4': [
-                        '.aiida_dump_safeguard',
-                        '.aiida_node_metadata.yaml',
+                    "ArithmeticAddCalculation-4": [
+                        ".aiida_dump_safeguard",
+                        ".aiida_node_metadata.yaml",
                         {
-                            'inputs': [
-                                '_aiidasubmit.sh',
-                                'aiida.in',
-                                {'.aiida': ['calcinfo.json', 'job_tmpl.json']},
+                            "inputs": [
+                                "_aiidasubmit.sh",
+                                "aiida.in",
+                                {".aiida": ["calcinfo.json", "job_tmpl.json"]},
                             ]
                         },
-                        {'node_inputs': []},
+                        {"node_inputs": []},
                         {
-                            'outputs': [
-                                '_scheduler-stderr.txt',
-                                '_scheduler-stdout.txt',
-                                'aiida.out',
+                            "outputs": [
+                                "_scheduler-stderr.txt",
+                                "_scheduler-stdout.txt",
+                                "aiida.out",
                             ]
                         },
                     ]
@@ -351,36 +339,36 @@ tree_profile_no_organize_by_groups = {
             ]
         },
         {
-            'workflows': [
+            "workflows": [
                 {
-                    'MultiplyAddWorkChain-12': [
-                        '.aiida_dump_safeguard',
-                        '.aiida_node_metadata.yaml',
+                    "MultiplyAddWorkChain-12": [
+                        ".aiida_dump_safeguard",
+                        ".aiida_node_metadata.yaml",
                         {
-                            '01-multiply-13': [
-                                '.aiida_node_metadata.yaml',
-                                '.aiida_dump_safeguard',
-                                {'inputs': ['source_file']},
-                                {'node_inputs': []},
+                            "01-multiply-13": [
+                                ".aiida_node_metadata.yaml",
+                                ".aiida_dump_safeguard",
+                                {"inputs": ["source_file"]},
+                                {"node_inputs": []},
                             ]
                         },
                         {
-                            '02-ArithmeticAddCalculation-15': [
-                                '.aiida_node_metadata.yaml',
-                                '.aiida_dump_safeguard',
+                            "02-ArithmeticAddCalculation-15": [
+                                ".aiida_node_metadata.yaml",
+                                ".aiida_dump_safeguard",
                                 {
-                                    'inputs': [
-                                        '_aiidasubmit.sh',
-                                        'aiida.in',
-                                        {'.aiida': ['calcinfo.json', 'job_tmpl.json']},
+                                    "inputs": [
+                                        "_aiidasubmit.sh",
+                                        "aiida.in",
+                                        {".aiida": ["calcinfo.json", "job_tmpl.json"]},
                                     ]
                                 },
-                                {'node_inputs': []},
+                                {"node_inputs": []},
                                 {
-                                    'outputs': [
-                                        '_scheduler-stderr.txt',
-                                        '_scheduler-stdout.txt',
-                                        'aiida.out',
+                                    "outputs": [
+                                        "_scheduler-stderr.txt",
+                                        "_scheduler-stdout.txt",
+                                        "aiida.out",
                                     ]
                                 },
                             ]
@@ -394,37 +382,36 @@ tree_profile_no_organize_by_groups = {
 
 tree_profile_also_ungrouped = {
     profile_dump_label: [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'groups': [
+            "groups": [
                 {
                     add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'calculations': [
+                            "calculations": [
                                 {
-                                    'ArithmeticAddCalculation-4': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "ArithmeticAddCalculation-4": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
                                                 {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
                                                     ]
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
+                                        {"node_inputs": []},
                                         {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
                                             ]
                                         },
                                     ]
@@ -435,43 +422,42 @@ tree_profile_also_ungrouped = {
                 },
                 {
                     multiply_add_group_label: [
-                        '.aiida_dump_safeguard',
                         {
-                            'workflows': [
+                            "workflows": [
                                 {
-                                    'MultiplyAddWorkChain-12': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "MultiplyAddWorkChain-12": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            '01-multiply-13': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
-                                                {'inputs': ['source_file']},
-                                                {'node_inputs': []},
+                                            "01-multiply-13": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
+                                                {"inputs": ["source_file"]},
+                                                {"node_inputs": []},
                                             ]
                                         },
                                         {
-                                            '02-ArithmeticAddCalculation-15': [
-                                                '.aiida_node_metadata.yaml',
-                                                '.aiida_dump_safeguard',
+                                            "02-ArithmeticAddCalculation-15": [
+                                                ".aiida_node_metadata.yaml",
+                                                ".aiida_dump_safeguard",
                                                 {
-                                                    'inputs': [
-                                                        '_aiidasubmit.sh',
-                                                        'aiida.in',
+                                                    "inputs": [
+                                                        "_aiidasubmit.sh",
+                                                        "aiida.in",
                                                         {
-                                                            '.aiida': [
-                                                                'calcinfo.json',
-                                                                'job_tmpl.json',
+                                                            ".aiida": [
+                                                                "calcinfo.json",
+                                                                "job_tmpl.json",
                                                             ]
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
+                                                {"node_inputs": []},
                                                 {
-                                                    'outputs': [
-                                                        '_scheduler-stderr.txt',
-                                                        '_scheduler-stdout.txt',
-                                                        'aiida.out',
+                                                    "outputs": [
+                                                        "_scheduler-stderr.txt",
+                                                        "_scheduler-stdout.txt",
+                                                        "aiida.out",
                                                     ]
                                                 },
                                             ]
@@ -485,32 +471,31 @@ tree_profile_also_ungrouped = {
             ]
         },
         {
-            'no-group': [
-                '.aiida_dump_safeguard',
+            "no-group": [
                 {
-                    'calculations': [
+                    "calculations": [
                         {
-                            'ArithmeticAddCalculation-22': [
-                                '.aiida_dump_safeguard',
-                                '.aiida_node_metadata.yaml',
+                            "ArithmeticAddCalculation-22": [
+                                ".aiida_dump_safeguard",
+                                ".aiida_node_metadata.yaml",
                                 {
-                                    'inputs': [
-                                        '_aiidasubmit.sh',
-                                        'aiida.in',
+                                    "inputs": [
+                                        "_aiidasubmit.sh",
+                                        "aiida.in",
                                         {
-                                            '.aiida': [
-                                                'calcinfo.json',
-                                                'job_tmpl.json',
+                                            ".aiida": [
+                                                "calcinfo.json",
+                                                "job_tmpl.json",
                                             ]
                                         },
                                     ]
                                 },
-                                {'node_inputs': []},
+                                {"node_inputs": []},
                                 {
-                                    'outputs': [
-                                        '_scheduler-stderr.txt',
-                                        '_scheduler-stdout.txt',
-                                        'aiida.out',
+                                    "outputs": [
+                                        "_scheduler-stderr.txt",
+                                        "_scheduler-stdout.txt",
+                                        "aiida.out",
                                     ]
                                 },
                             ]
@@ -518,41 +503,41 @@ tree_profile_also_ungrouped = {
                     ]
                 },
                 {
-                    'workflows': [
+                    "workflows": [
                         {
-                            'MultiplyAddWorkChain-30': [
-                                '.aiida_dump_safeguard',
-                                '.aiida_node_metadata.yaml',
+                            "MultiplyAddWorkChain-30": [
+                                ".aiida_dump_safeguard",
+                                ".aiida_node_metadata.yaml",
                                 {
-                                    '01-multiply-31': [
-                                        '.aiida_node_metadata.yaml',
-                                        '.aiida_dump_safeguard',
-                                        {'inputs': ['source_file']},
-                                        {'node_inputs': []},
+                                    "01-multiply-31": [
+                                        ".aiida_node_metadata.yaml",
+                                        ".aiida_dump_safeguard",
+                                        {"inputs": ["source_file"]},
+                                        {"node_inputs": []},
                                     ]
                                 },
                                 {
-                                    '02-ArithmeticAddCalculation-33': [
-                                        '.aiida_node_metadata.yaml',
-                                        '.aiida_dump_safeguard',
+                                    "02-ArithmeticAddCalculation-33": [
+                                        ".aiida_node_metadata.yaml",
+                                        ".aiida_dump_safeguard",
                                         {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
                                                 {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
                                                     ]
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
+                                        {"node_inputs": []},
                                         {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
                                             ]
                                         },
                                     ]
@@ -567,38 +552,37 @@ tree_profile_also_ungrouped = {
 }
 
 tree_profile_no_only_top_level_calcs = {
-    'profile-dump': [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+    "profile-dump": [
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'groups': [
+            "groups": [
                 {
-                    'add-group': [
-                        '.aiida_dump_safeguard',
+                    "add-group": [
                         {
-                            'calculations': [
+                            "calculations": [
                                 {
-                                    'ArithmeticAddCalculation-4': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "ArithmeticAddCalculation-4": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
                                                 {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
                                                     ]
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
+                                        {"node_inputs": []},
                                         {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
                                             ]
                                         },
                                     ]
@@ -608,82 +592,81 @@ tree_profile_no_only_top_level_calcs = {
                     ]
                 },
                 {
-                    'multiply-add-group': [
-                        '.aiida_dump_safeguard',
+                    "multiply-add-group": [
                         {
-                            'calculations': [
+                            "calculations": [
                                 {
-                                    'ArithmeticAddCalculation-15': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "ArithmeticAddCalculation-15": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
+                                            "inputs": [
+                                                "_aiidasubmit.sh",
+                                                "aiida.in",
                                                 {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
+                                                    ".aiida": [
+                                                        "calcinfo.json",
+                                                        "job_tmpl.json",
                                                     ]
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
+                                        {"node_inputs": []},
                                         {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
+                                            "outputs": [
+                                                "_scheduler-stderr.txt",
+                                                "_scheduler-stdout.txt",
+                                                "aiida.out",
                                             ]
                                         },
                                     ]
                                 },
                                 {
-                                    'multiply-13': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
-                                        {'inputs': ['source_file']},
-                                        {'node_inputs': []},
+                                    "multiply-13": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
+                                        {"inputs": ["source_file"]},
+                                        {"node_inputs": []},
                                     ]
                                 },
                             ]
                         },
                         {
-                            'workflows': [
+                            "workflows": [
                                 {
-                                    'MultiplyAddWorkChain-12': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "MultiplyAddWorkChain-12": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            '01-multiply-13': [
-                                                '.aiida_dump_safeguard',
-                                                '.aiida_node_metadata.yaml',
-                                                {'inputs': ['source_file']},
-                                                {'node_inputs': []},
+                                            "01-multiply-13": [
+                                                ".aiida_dump_safeguard",
+                                                ".aiida_node_metadata.yaml",
+                                                {"inputs": ["source_file"]},
+                                                {"node_inputs": []},
                                             ]
                                         },
                                         {
-                                            '02-ArithmeticAddCalculation-15': [
-                                                '.aiida_dump_safeguard',
-                                                '.aiida_node_metadata.yaml',
+                                            "02-ArithmeticAddCalculation-15": [
+                                                ".aiida_dump_safeguard",
+                                                ".aiida_node_metadata.yaml",
                                                 {
-                                                    'inputs': [
-                                                        '_aiidasubmit.sh',
-                                                        'aiida.in',
+                                                    "inputs": [
+                                                        "_aiidasubmit.sh",
+                                                        "aiida.in",
                                                         {
-                                                            '.aiida': [
-                                                                'calcinfo.json',
-                                                                'job_tmpl.json',
+                                                            ".aiida": [
+                                                                "calcinfo.json",
+                                                                "job_tmpl.json",
                                                             ]
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
+                                                {"node_inputs": []},
                                                 {
-                                                    'outputs': [
-                                                        '_scheduler-stderr.txt',
-                                                        '_scheduler-stdout.txt',
-                                                        'aiida.out',
+                                                    "outputs": [
+                                                        "_scheduler-stderr.txt",
+                                                        "_scheduler-stdout.txt",
+                                                        "aiida.out",
                                                     ]
                                                 },
                                             ]
@@ -700,51 +683,50 @@ tree_profile_no_only_top_level_calcs = {
 }
 
 tree_profile_delete_missing_nodes = {
-    'profile-dump': [
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
+    "profile-dump": [
+        ".aiida_dump_log.json",
+        ".aiida_dump_safeguard",
         {
-            'groups': [
-                {'add-group': ['.aiida_dump_safeguard', {'calculations': []}]},
+            "groups": [
+                {"add-group": [{"calculations": []}]},
                 {
-                    'multiply-add-group': [
-                        '.aiida_dump_safeguard',
+                    "multiply-add-group": [
                         {
-                            'workflows': [
+                            "workflows": [
                                 {
-                                    'MultiplyAddWorkChain-12': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
+                                    "MultiplyAddWorkChain-12": [
+                                        ".aiida_dump_safeguard",
+                                        ".aiida_node_metadata.yaml",
                                         {
-                                            '01-multiply-13': [
-                                                '.aiida_dump_safeguard',
-                                                '.aiida_node_metadata.yaml',
-                                                {'inputs': ['source_file']},
-                                                {'node_inputs': []},
+                                            "01-multiply-13": [
+                                                ".aiida_dump_safeguard",
+                                                ".aiida_node_metadata.yaml",
+                                                {"inputs": ["source_file"]},
+                                                {"node_inputs": []},
                                             ]
                                         },
                                         {
-                                            '02-ArithmeticAddCalculation-15': [
-                                                '.aiida_dump_safeguard',
-                                                '.aiida_node_metadata.yaml',
+                                            "02-ArithmeticAddCalculation-15": [
+                                                ".aiida_dump_safeguard",
+                                                ".aiida_node_metadata.yaml",
                                                 {
-                                                    'inputs': [
-                                                        '_aiidasubmit.sh',
-                                                        'aiida.in',
+                                                    "inputs": [
+                                                        "_aiidasubmit.sh",
+                                                        "aiida.in",
                                                         {
-                                                            '.aiida': [
-                                                                'calcinfo.json',
-                                                                'job_tmpl.json',
+                                                            ".aiida": [
+                                                                "calcinfo.json",
+                                                                "job_tmpl.json",
                                                             ]
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
+                                                {"node_inputs": []},
                                                 {
-                                                    'outputs': [
-                                                        '_scheduler-stderr.txt',
-                                                        '_scheduler-stdout.txt',
-                                                        'aiida.out',
+                                                    "outputs": [
+                                                        "_scheduler-stderr.txt",
+                                                        "_scheduler-stdout.txt",
+                                                        "aiida.out",
                                                     ]
                                                 },
                                             ]
@@ -762,11 +744,11 @@ tree_profile_delete_missing_nodes = {
 
 
 class TestProfileDumper:
-    @pytest.mark.usefixtures('aiida_profile_clean')
+    @pytest.mark.usefixtures("aiida_profile_clean")
     def test_dump_add_group(self, tmp_path, setup_add_group):
         setup_add_group
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths)
+        DumpLogger.reset_instance()
+        profile_dumper = ProfileDumper(output_path=tmp_path / profile_dump_label)
         profile_dumper.dump()
 
         compare_tree(
@@ -774,23 +756,25 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
+    @pytest.mark.usefixtures("aiida_profile_clean")
     def test_dump_multiply_add_group(self, tmp_path, setup_multiply_add_group):
         setup_multiply_add_group
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths)
+        DumpLogger.reset_instance()
+        profile_dumper = ProfileDumper(output_path=tmp_path / profile_dump_label)
         profile_dumper.dump()
         compare_tree(
             expected=tree_profile_group_multiply_add,
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_dump_add_multiply_add_groups(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_add_multiply_add_groups(
+        self, tmp_path, setup_add_group, setup_multiply_add_group
+    ):
         setup_multiply_add_group
         setup_add_group
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths)
+        DumpLogger.reset_instance()
+        profile_dumper = ProfileDumper(output_path=tmp_path / profile_dump_label)
         profile_dumper.dump()
 
         compare_tree(
@@ -798,12 +782,14 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_dump_multiply_add_add_groups(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_multiply_add_add_groups(
+        self, tmp_path, setup_add_group, setup_multiply_add_group
+    ):
         setup_add_group
         setup_multiply_add_group
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths)
+        DumpLogger.reset_instance()
+        profile_dumper = ProfileDumper(output_path=tmp_path / profile_dump_label)
         profile_dumper.dump()
 
         compare_tree(
@@ -811,13 +797,17 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_dump_no_organize_by_groups(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_no_organize_by_groups(
+        self, tmp_path, setup_add_group, setup_multiply_add_group
+    ):
         setup_add_group
         setup_multiply_add_group
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        config = ProfileDumperConfig(organize_by_groups=False)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths, config=config)
+        DumpLogger.reset_instance()
+        config = DumpConfig(organize_by_groups=False)
+        profile_dumper = ProfileDumper(
+            output_path=tmp_path / profile_dump_label, config=config
+        )
         profile_dumper.dump()
 
         compare_tree(
@@ -825,7 +815,7 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
+    @pytest.mark.usefixtures("aiida_profile_clean")
     def test_dump_also_ungrouped(
         self,
         tmp_path,
@@ -836,15 +826,17 @@ class TestProfileDumper:
     ):
         setup_add_group
         setup_multiply_add_group
+        DumpLogger.reset_instance()
 
         # Create additional ArithmeticAdd and MultiplyAdd nodes
         _ = generate_calculation_node_add()
         _ = generate_workchain_multiply_add()
 
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
+        output_path = tmp_path / profile_dump_label
+
         profile_dumper = ProfileDumper(
-            dump_paths=dump_paths,
-            config=ProfileDumperConfig(also_ungrouped=False),
+            output_path=output_path,
+            config=DumpConfig(also_ungrouped=False),
         )
         profile_dumper.dump()
 
@@ -863,9 +855,8 @@ class TestProfileDumper:
 
         # Now, also dump the two additional nodes in incremental mode
         profile_dumper = ProfileDumper(
-            dump_paths=dump_paths,
-            dump_collector_config=DumpDbCollectorConfig(filter_by_last_dump_time=False),
-            config=ProfileDumperConfig(also_ungrouped=True),
+            output_path=output_path,
+            config=DumpConfig(also_ungrouped=True, filter_by_last_dump_time=False),
         )
         profile_dumper.dump()
 
@@ -882,7 +873,7 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
+    @pytest.mark.usefixtures("aiida_profile_clean")
     def test_dump_delete_missing_nodes(
         self,
         tmp_path,
@@ -893,9 +884,10 @@ class TestProfileDumper:
 
         add_group = setup_add_group
         setup_multiply_add_group
+        DumpLogger.reset_instance()
 
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths)
+        output_path = tmp_path / profile_dump_label
+        profile_dumper = ProfileDumper(output_path=output_path)
         profile_dumper.dump()
 
         # Full dump
@@ -914,8 +906,8 @@ class TestProfileDumper:
         _ = delete_nodes(pks=[add_node.pk], dry_run=False)
 
         profile_dumper = ProfileDumper(
-            dump_paths=dump_paths,
-            config=ProfileDumperConfig(delete_missing=True),
+            output_path=output_path,
+            config=DumpConfig(delete_missing=True),
         )
         profile_dumper.dump()
 
@@ -929,7 +921,7 @@ class TestProfileDumper:
                 base_path=tmp_path,
             )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
+    @pytest.mark.usefixtures("aiida_profile_clean")
     def test_dump_delete_missing_groups(
         self,
         tmp_path,
@@ -940,9 +932,10 @@ class TestProfileDumper:
 
         add_group = setup_add_group
         setup_multiply_add_group
+        DumpLogger.reset_instance()
 
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths)
+        output_path = output_path=tmp_path / profile_dump_label
+        profile_dumper = ProfileDumper()
         profile_dumper.dump()
 
         # Full dump
@@ -959,8 +952,8 @@ class TestProfileDumper:
         orm.Group.collection.delete(add_group.pk)
 
         profile_dumper = ProfileDumper(
-            dump_paths=dump_paths,
-            config=ProfileDumperConfig(delete_missing=True),
+            output_path=output_path,
+            config=DumpConfig(delete_missing=True),
         )
         profile_dumper.dump()
 
@@ -988,7 +981,6 @@ class TestProfileDumper:
     #     add_group = setup_add_group
     #     new_label = 'xadd-group'
 
-    #     dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
     #     profile_dumper = ProfileDumper(dump_paths=dump_paths)
     #     profile_dumper.dump()
 
@@ -1001,7 +993,7 @@ class TestProfileDumper:
     #     # Rename the group
     #     add_group.label = new_label
 
-    #     config = ProfileDumperConfig(update_groups=True)
+    #     config = DumpConfig(update_groups=True)
     #     profile_dumper = ProfileDumper(dump_paths=dump_paths, config=config)
     #     profile_dumper.dump()
 
@@ -1022,15 +1014,19 @@ class TestProfileDumper:
     #         base_path=tmp_path,
     #     )
 
-        # TODO: Also verify the log update
+    # TODO: Also verify the log update
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_dump_no_only_top_level_calcs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_no_only_top_level_calcs(
+        self, tmp_path, setup_add_group, setup_multiply_add_group
+    ):
         setup_multiply_add_group
         setup_add_group
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        dump_collector_config = DumpDbCollectorConfig(only_top_level_calcs=False)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths, dump_collector_config=dump_collector_config)
+        DumpLogger.reset_instance()
+        profile_dumper = ProfileDumper(
+            config=DumpConfig(only_top_level_calcs=False),
+            output_path=tmp_path / profile_dump_label,
+        )
 
         profile_dumper.dump()
         compare_tree(
@@ -1038,18 +1034,24 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_dump_no_only_top_level_wfs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_no_only_top_level_wfs(
+        self, tmp_path, setup_add_group, setup_multiply_add_group
+    ):
         ...
         # TODO: We currently have no workchain in AiiDA core to test this, or at least I haven't found it
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_dump_symlink_calcs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_no_only_top_level_calcs(
+        self, tmp_path, setup_add_group, setup_multiply_add_group
+    ):
         setup_multiply_add_group
         setup_add_group
-        dump_paths = DumpPaths.from_path(tmp_path / profile_dump_label)
-        dump_collector_config = DumpDbCollectorConfig(only_top_level_calcs=False)
-        profile_dumper = ProfileDumper(dump_paths=dump_paths, dump_collector_config=dump_collector_config)
+        DumpLogger.reset_instance()
+        profile_dumper = ProfileDumper(
+            output_path=tmp_path / profile_dump_label,
+            config=DumpConfig(only_top_level_calcs=True),
+        )
 
         profile_dumper.dump()
         compare_tree(
@@ -1057,8 +1059,10 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures('aiida_profile_clean')
-    def test_dump_symlink_wfs(self, tmp_path, setup_add_group, setup_multiply_add_group):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_symlink_wfs(
+        self, tmp_path, setup_add_group, setup_multiply_add_group
+    ):
         ...
         # TODO: This is not implemented yet, and not sure if it's necessary
 

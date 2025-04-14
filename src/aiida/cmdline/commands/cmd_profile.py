@@ -322,8 +322,8 @@ def profile_dump(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.dumping import ProfileDumper
-    from aiida.tools.dumping.config import DumpDbCollectorConfig, DumpMode, ProcessDumperConfig, ProfileDumperConfig
-    from aiida.tools.dumping.utils import resolve_click_path_for_dump
+    from aiida.tools.dumping.config import DumpConfig, DumpMode
+    from aiida.tools.dumping.utils.paths import resolve_click_path_for_dump, DumpPaths
 
     profile = ctx.obj['profile']
 
@@ -331,10 +331,11 @@ def profile_dump(
         msg = '`--update-groups` selected, even though `--organize-by-groups` is set to False.'
         echo.echo_critical(msg)
 
+    # output_path = path or DumpPaths()
     dump_paths = resolve_click_path_for_dump(path=path, entity=profile)
-    output_path_absolute = dump_paths.absolute
+    output_path = dump_paths.absolute
 
-    msg = f'Dumping data of profile `{profile.name}` at path `{output_path_absolute.name}`.'
+    msg = f'Dumping data of profile `{profile.name}` at path `{output_path.name}`.'
     echo.echo_report(msg)
 
     if overwrite:
@@ -350,24 +351,18 @@ def profile_dump(
         echo.echo_critical(msg)
 
     # Create config options that hold the various settings for dumping data
-    dump_collector_config = DumpDbCollectorConfig(
+    config = DumpConfig(
         get_processes=dump_processes,
         get_data=dump_data,
         filter_by_last_dump_time=filter_by_last_dump_time,
         only_top_level_calcs=only_top_level_calcs,
         only_top_level_workflows=only_top_level_workflows,
-    )
-
-    process_dump_config = ProcessDumperConfig(
         include_inputs=include_inputs,
         include_outputs=include_outputs,
         include_attributes=include_attributes,
         include_extras=include_extras,
         flat=flat,
         dump_unsealed=dump_unsealed,
-    )
-
-    profile_dump_config = ProfileDumperConfig(
         symlink_calcs=symlink_calcs,
         delete_missing=delete_missing,
         organize_by_groups=organize_by_groups,
@@ -378,12 +373,8 @@ def profile_dump(
 
     profile_dumper = ProfileDumper(
         profile=profile,
-        dump_mode=dump_mode,
-        output_path=dump_paths,
-        dump_collector_config=dump_collector_config,
-        process_dump_config=process_dump_config,
-        config=profile_dump_config,
-        groups=groups,
+        output_path=output_path,
+        config=config,
     )
 
     # # FIXME: This doesn't respect the -G --groups selection

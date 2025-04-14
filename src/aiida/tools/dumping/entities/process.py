@@ -180,7 +180,6 @@ class ProcessDumper(BaseDumper):
         node_label = node_label.replace('CALL-', '')
         return node_label.replace('None-', '')
 
-    # TODO: Make the ProcessNode an attribute of the class?
     def dump(
         self,
         io_dump_paths: list[str | Path] | None = None,
@@ -197,7 +196,6 @@ class ProcessDumper(BaseDumper):
             Default: ['inputs', 'outputs', 'node_inputs', 'node_outputs']
         :raises: ExportValidationError if the node is not sealed and dump_unsealed is False.
         """
-
         process_node = self.process_node
 
         if not process_node.is_sealed and not self.config.dump_unsealed:
@@ -223,7 +221,6 @@ class ProcessDumper(BaseDumper):
             self.dump_logger = self.set_dump_logger(dump_logger=self.dump_logger)
             current_mapping = self.dump_logger.build_current_group_node_mapping()
             self.dump_logger.group_node_mapping = current_mapping
-
 
         if isinstance(process_node, orm.CalculationNode):
             self._dump_calculation(
@@ -296,6 +293,7 @@ class ProcessDumper(BaseDumper):
                 calculation_store = self.dump_logger.stores.calculations
 
                 # TODO: Could add a `uuid_in_store` or similarly named method
+                # import ipdb; ipdb.set_trace()
                 if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
                     self._dump_calculation(
                         calculation_node=child_node,
@@ -343,9 +341,7 @@ class ProcessDumper(BaseDumper):
 
         self._write_node_yaml(process_node=calculation_node, output_path=output_path)
 
-        io_dump_mapping = self._generate_calculation_io_mapping(
-            io_dump_paths=io_dump_paths, flat=self.config.flat
-        )
+        io_dump_mapping = self._generate_calculation_io_mapping(io_dump_paths=io_dump_paths, flat=self.config.flat)
 
         # Dump the repository contents of the node
         calculation_node.base.repository.copy_tree(output_path.resolve() / io_dump_mapping.repository)
