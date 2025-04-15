@@ -22,6 +22,7 @@ class DumpStoreKeys(str, Enum):
         elif isinstance(node_inst, orm.Group):
             return cls.GROUPS.value
         else:
+            import ipdb; ipdb.set_trace()
             msg = f'Dumping not implemented yet for node type: {type(node_inst)}'
             raise NotImplementedError(msg)
 
@@ -36,6 +37,7 @@ class DumpStoreKeys(str, Enum):
         elif issubclass(orm_class, orm.Group):
             return cls.GROUPS.value
         else:
+            import ipdb; ipdb.set_trace()
             msg = f'Dumping not implemented yet for node type: {orm_class}'
             raise NotImplementedError(msg)
 

@@ -51,8 +51,6 @@ class ProfileDumper:
             dump_paths=self.dump_paths
         )
 
-    def _load_profile(self, profile):
-        """Load the AiiDA profile."""
     def _load_profile(self, profile: str | Profile | None) -> Profile:
         """Load the AiiDA profile from string or Profile object."""
         if isinstance(profile, str):
@@ -66,8 +64,6 @@ class ProfileDumper:
 
         assert loaded_profile is not None
         return loaded_profile
-        # Implementation as before
-        pass
 
     def dump(self):
         """Perform the dump operation."""
