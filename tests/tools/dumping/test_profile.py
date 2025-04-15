@@ -851,7 +851,9 @@ tree_profile_group_add_copy = {
                                 }
                             ]
                         },
-                    ],
+                    ]
+                },
+                {
                     'add-group-copy': [
                         {
                             "calculations": [
@@ -886,7 +888,7 @@ tree_profile_group_add_copy = {
                     ]
                 }
             ]
-        },
+        }
     ]
 }
 
@@ -1167,36 +1169,37 @@ class TestProfileDumper:
             )
 
     # TODO: Make pass
-    # @pytest.mark.usefixtures("aiida_profile_clean")
-    # def test_dump_add_group_copy(
-    #     self,
-    #     tmp_path,
-    #     setup_add_group,
-    # ):
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_add_group_copy(
+        self,
+        tmp_path,
+        setup_add_group,
+    ):
 
-    #     from aiida import orm
+        from aiida import orm
 
-    #     add_group = setup_add_group
-    #     dest_group, created = orm.Group.collection.get_or_create(label='add-group-copy')
-    #     dest_group.add_nodes(list(add_group.nodes))
+        add_group = setup_add_group
+        dest_group, created = orm.Group.collection.get_or_create(label='add-group-copy')
+        dest_group.add_nodes(list(add_group.nodes))
 
-    #     DumpLogger.reset_instance()
+        DumpLogger.reset_instance()
 
-    #     output_path = output_path=tmp_path / profile_dump_label
-    #     profile_dumper = ProfileDumper(output_path=output_path)
-    #     profile_dumper.dump()
+        output_path = output_path=tmp_path / profile_dump_label
+        profile_dumper = ProfileDumper(output_path=output_path)
+        profile_dumper.dump()
 
-    #     # Duplicated group dumped
-    #     compare_tree(
-    #         expected=tree_profile_group_add_copy,
-    #         base_path=tmp_path,
-    #     )
-    #     # Folder without duplicated group excepts
-    #     with pytest.raises(AssertionError):
-    #         compare_tree(
-    #             expected=tree_profile_group_add,
-    #             base_path=tmp_path,
-    #         )
+        # Duplicated group dumped
+        compare_tree(
+            expected=tree_profile_group_add_copy,
+            base_path=tmp_path,
+        )
+
+        # Folder without duplicated group excepts
+        # with pytest.raises(AssertionError):
+        #     compare_tree(
+        #         expected=tree_profile_group_add,
+        #         base_path=tmp_path,
+        #     )
 
     # NOTE: This will be part of the GroupDumpVerifyer
     # @pytest.mark.usefixtures('aiida_profile_clean')
