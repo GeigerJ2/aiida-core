@@ -30,3 +30,9 @@ class LogDeserializationError(LoggingError):
 
 class MappingValidationError(DumpError):
     """Raised when group-node mapping validation fails"""
+
+# class NodeDumpError(DumpError):
+#     """Raised when group-node mapping validation fails"""
+
+# class GroupUpdateError(DumpError):
+#     """Raised when group-node mapping validation fails"""

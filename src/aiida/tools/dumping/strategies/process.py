@@ -31,6 +31,6 @@ class ProcessDumpStrategy(DumpStrategy):
             dump_mode=self.engine.config.dump_mode,
             dump_paths=self.engine.dump_paths,
             dump_logger=self.engine.dump_logger,
-            config=self.engine._create_process_config(),
+            config=self.engine.config.get_process_config()
         )
         process_dumper.dump()

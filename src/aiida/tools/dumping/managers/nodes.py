@@ -1,23 +1,29 @@
+from __future__ import annotations
+
 from aiida import orm
 from aiida.tools.dumping.entities.process import ProcessDumper
 from aiida.tools.dumping.storage import DumpStoreKeys
 from aiida.tools.dumping.utils.paths import generate_process_default_dump_path
 from aiida.tools.dumping.storage import DumpLog
 from typing import TYPE_CHECKING
+from aiida.tools.dumping.utils.groups import get_group_subpath
 
 if TYPE_CHECKING:
     from aiida.tools.dumping.config import DumpConfig
+    from aiida.tools.dumping.utils.paths import DumpPaths
+    from aiida.tools.dumping.storage.logger import DumpLogger, DumpLogStore
+    from aiida.tools.dumping.storage.store import DumpNodeStore
 
 
-class NodeProcessor:
+class NodeManager:
     """Handles the processing and dumping of individual nodes"""
     
-    def __init__(self, config, dump_paths, dump_logger):
+    def __init__(self, config: DumpConfig, dump_paths: DumpPaths, dump_logger: DumpLogger):
         self.config: DumpConfig = config
-        self.dump_paths = dump_paths
-        self.dump_logger = dump_logger
+        self.dump_paths: DumpPaths = dump_paths
+        self.dump_logger: DumpLogger = dump_logger
     
-    def dump_nodes(self, node_store, group=None):
+    def dump_nodes(self, node_store: DumpNodeStore, group=None):
         """Dump a collection of nodes from a node store"""
         from aiida.common.progress_reporter import get_progress_reporter, set_progress_bar_tqdm
         
@@ -36,12 +42,12 @@ class NodeProcessor:
 
         if group:
             # Use the group manager to get the proper path
+            # TODO: `group_manager` attribute is never set?
             if hasattr(self, 'group_manager'):
                 group_path = self.group_manager.get_group_path(group)
             else:
                 # Fallback if group_manager not available
                 if self.config.organize_by_groups:
-                    from aiida.tools.dumping.utils.groups import get_group_subpath
                     group_path = self.dump_paths.absolute / 'groups' / get_group_subpath(group)
                 else:
                     group_path = self.dump_paths.absolute

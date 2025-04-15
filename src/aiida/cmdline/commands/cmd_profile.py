@@ -352,6 +352,7 @@ def profile_dump(
 
     # Create config options that hold the various settings for dumping data
     config = DumpConfig(
+        dump_mode=dump_mode,
         get_processes=dump_processes,
         get_data=dump_data,
         filter_by_last_dump_time=filter_by_last_dump_time,
