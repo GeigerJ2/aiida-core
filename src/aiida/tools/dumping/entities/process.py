@@ -436,7 +436,7 @@ class ProcessDumper(BaseDumper):
             'node_outputs',
         ]
         if flat and io_dump_paths is None:
-            logger.info(
+            logger.report(
                 'Flat set to True and no `io_dump_paths`. Dumping in a flat directory, files might be overwritten.'
             )
             empty_calculation_io_dump_paths = [''] * 4
@@ -444,16 +444,17 @@ class ProcessDumper(BaseDumper):
             return SimpleNamespace(**dict(zip(aiida_entities_to_dump, empty_calculation_io_dump_paths)))
 
         if not flat and io_dump_paths is None:
-            logger.info(
+            msg = (
                 'Flat set to False but no `io_dump_paths` provided. '
                 + f'Will use the defaults {default_calculation_io_dump_paths}.'
             )
+            logger.debug(msg)
             io_dump_paths = default_calculation_io_dump_paths
 
         elif flat:
-            logger.info('Flat set to True but `io_dump_paths` provided. These will be used, but `inputs` not nested.')
+            logger.report('Flat set to True but `io_dump_paths` provided. These will be used, but `inputs` not nested.')
         else:
-            logger.info(
+            logger.report(
                 'Flat set to False but no `io_dump_paths` provided. These will be used, but `node_inputs` flattened.'
             )
 

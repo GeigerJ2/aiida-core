@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from aiida import orm
 from aiida.tools.dumping.entities.process import ProcessDumper
-from aiida.tools.dumping.storage import DumpStoreKeys
+from aiida.tools.dumping.utils.types import DumpStoreKeys
 from aiida.tools.dumping.utils.paths import generate_process_default_dump_path
 from aiida.tools.dumping.storage import DumpLog
 from typing import TYPE_CHECKING
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from aiida.tools.dumping.config import DumpConfig
     from aiida.tools.dumping.utils.paths import DumpPaths
     from aiida.tools.dumping.storage.logger import DumpLogger, DumpLogStore
-    from aiida.tools.dumping.storage.store import DumpNodeStore
+    from aiida.tools.dumping.utils.types import DumpNodeStore
 
 
 class NodeManager:

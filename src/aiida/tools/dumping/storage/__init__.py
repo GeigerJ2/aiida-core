@@ -1,5 +1,4 @@
-from aiida.tools.dumping.storage.keys import DumpStoreKeys
 from aiida.tools.dumping.storage.logger import DumpLog, DumpLogger, DumpLogStore
-from aiida.tools.dumping.storage.store import DumpNodeStore
+from aiida.tools.dumping.utils.types import DumpNodeStore
 
-__all__ = ['DumpLog', 'DumpLogStore', 'DumpLogger', 'DumpNodeStore', 'DumpStoreKeys']
+__all__ = ['DumpLog', 'DumpLogStore', 'DumpLogger', 'DumpNodeStore']

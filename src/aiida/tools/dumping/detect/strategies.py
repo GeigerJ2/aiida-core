@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.dumping.storage.keys import DumpStoreKeys
+from aiida.tools.dumping.utils.types import DumpStoreKeys
 
 logger = AIIDA_LOGGER.getChild("tools.dumping.detect.query")
 

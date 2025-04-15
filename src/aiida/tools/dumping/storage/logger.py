@@ -19,7 +19,7 @@ from typing import Dict, List, Optional
 from aiida.common.exceptions import NotExistent
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.mapping import GroupNodeMapping
-from aiida.tools.dumping.storage.store import DumpStoreKeys
+from aiida.tools.dumping.utils.types import DumpStoreKeys
 from aiida.tools.dumping.utils.paths import DumpPaths
 from aiida.tools.dumping.utils.time import DumpTimes
 from aiida.tools.dumping.utils.types import StoreNameType
@@ -258,8 +258,6 @@ class DumpLogger:
 
         return instance
 
-    # Rest of your existing methods...
-
     @property
     def group_node_mapping(self) -> GroupNodeMapping:
         """Get the group-node mapping, building it if needed."""
@@ -384,7 +382,6 @@ class DumpLogger:
                 container.add_entry(uuid, DumpLog(path=path, symlinks=symlinks))
 
         return container
-
 
     def get_store_by_uuid(self, uuid: str) -> DumpLogStore:
         """Find the store that contains the given UUID."""

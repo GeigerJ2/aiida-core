@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Set
 
 from aiida import orm
+from aiida.tools.dumping.utils.types import GroupInfo, GroupModificationInfo, NodeMembershipChange, GroupChangeInfo
 
 
 @dataclass
@@ -120,96 +121,7 @@ class GroupNodeMapping:
                         mapping.node_to_groups[node_uuid].add(group_uuid)
 
         return mapping
-
-    def diff(self, other: 'GroupNodeMapping') -> Dict:
-        """
-        Calculate differences between this mapping and another.
-
-        Returns:
-            Dict with the following keys:
-            - deleted_groups: groups that exist in self but not in other
-            - new_groups: groups that exist in other but not in self
-            - modified_groups: groups that exist in both but have different node membership
-            - deleted_nodes: nodes that exist in self but not in other
-            - new_nodes: nodes that exist in other but not in self
-            - nodes_membership_changes: detailed membership changes for nodes
-        """
-        result = {
-            'deleted_groups': [],
-            'new_groups': [],
-            'modified_groups': [],
-            'deleted_nodes': [],
-            'new_nodes': [],
-            'nodes_membership_changes': {}
-        }
-
-        # Check for deleted and new groups
-        self_group_uuids = set(self.group_to_nodes.keys())
-        other_group_uuids = set(other.group_to_nodes.keys())
-
-        # Groups that exist in self but not in other
-        for group_uuid in self_group_uuids - other_group_uuids:
-            result['deleted_groups'].append({
-                'uuid': group_uuid,
-                'node_count': len(self.group_to_nodes.get(group_uuid, [])),
-            })
-
-        # Groups that exist in other but not in self
-        for group_uuid in other_group_uuids - self_group_uuids:
-            result['new_groups'].append({
-                'uuid': group_uuid,
-                'node_count': len(other.group_to_nodes.get(group_uuid, [])),
-            })
-
-        # Check for modified groups (those with different node membership)
-        for group_uuid in self_group_uuids & other_group_uuids:
-            self_nodes = self.group_to_nodes.get(group_uuid, set())
-            other_nodes = other.group_to_nodes.get(group_uuid, set())
-
-            # Check if node membership has changed
-            added_nodes = other_nodes - self_nodes
-            removed_nodes = self_nodes - other_nodes
-
-            if added_nodes or removed_nodes:
-                result['modified_groups'].append({
-                    'uuid': group_uuid,
-                    'nodes_added': list(added_nodes),
-                    'nodes_added_count': len(added_nodes),
-                    'nodes_removed': list(removed_nodes),
-                    'nodes_removed_count': len(removed_nodes),
-                })
-
-                # Track detailed node membership changes
-                for node_uuid in added_nodes:
-                    if node_uuid not in result['nodes_membership_changes']:
-                        result['nodes_membership_changes'][node_uuid] = {'added_to': [], 'removed_from': []}
-                    result['nodes_membership_changes'][node_uuid]['added_to'].append(group_uuid)
-
-                for node_uuid in removed_nodes:
-                    if node_uuid not in result['nodes_membership_changes']:
-                        result['nodes_membership_changes'][node_uuid] = {'added_to': [], 'removed_from': []}
-                    result['nodes_membership_changes'][node_uuid]['removed_from'].append(group_uuid)
-
-        # Check for deleted and new nodes
-        self_node_uuids = set(self.node_to_groups.keys())
-        other_node_uuids = set(other.node_to_groups.keys())
-
-        # Nodes that exist in self but not in other
-        for node_uuid in self_node_uuids - other_node_uuids:
-            result['deleted_nodes'].append({
-                'uuid': node_uuid,
-                'groups': list(self.node_to_groups.get(node_uuid, [])),
-            })
-
-        # Nodes that exist in other but not in self
-        for node_uuid in other_node_uuids - self_node_uuids:
-            result['new_nodes'].append({
-                'uuid': node_uuid,
-                'groups': list(other.node_to_groups.get(node_uuid, [])),
-            })
-
-        return result
-
+    
     @classmethod
     def build_from_db(cls) -> 'GroupNodeMapping':
         """Build a mapping from the current database state."""
@@ -224,3 +136,66 @@ class GroupNodeMapping:
             mapping.add_node_to_group(group_uuid, node_uuid)
 
         return mapping
+
+    def diff(self, other: 'GroupNodeMapping') -> GroupChangeInfo:
+        """
+        Calculate differences between this mapping and another.
+
+        Returns:
+            GroupChangeInfo object with detailed group changes.
+        """
+        deleted_groups_info = []
+        new_groups_info = []
+        modified_groups_info = []
+        node_membership_changes = {}
+
+        self_group_uuids = set(self.group_to_nodes.keys())
+        other_group_uuids = set(other.group_to_nodes.keys())
+
+        # Deleted groups
+        for group_uuid in self_group_uuids - other_group_uuids:
+            deleted_groups_info.append(GroupInfo(
+                uuid=group_uuid,
+                node_count=len(self.group_to_nodes.get(group_uuid, set())),
+            ))
+
+        # New groups
+        for group_uuid in other_group_uuids - self_group_uuids:
+            new_groups_info.append(GroupInfo(
+                uuid=group_uuid,
+                node_count=len(other.group_to_nodes.get(group_uuid, set())),
+            ))
+
+        # Modified groups
+        for group_uuid in self_group_uuids & other_group_uuids:
+            self_nodes = self.group_to_nodes.get(group_uuid, set())
+            other_nodes = other.group_to_nodes.get(group_uuid, set())
+
+            added_nodes = list(other_nodes - self_nodes)
+            removed_nodes = list(self_nodes - other_nodes)
+
+            if added_nodes or removed_nodes:
+                modified_groups_info.append(GroupModificationInfo(
+                    uuid=group_uuid,
+                    nodes_added=added_nodes,
+                    nodes_removed=removed_nodes,
+                ))
+
+                # Track detailed node membership changes
+                for node_uuid in added_nodes:
+                    if node_uuid not in node_membership_changes:
+                        node_membership_changes[node_uuid] = NodeMembershipChange()
+                    node_membership_changes[node_uuid].added_to.append(group_uuid)
+
+                for node_uuid in removed_nodes:
+                    if node_uuid not in node_membership_changes:
+                        node_membership_changes[node_uuid] = NodeMembershipChange()
+                    node_membership_changes[node_uuid].removed_from.append(group_uuid)
+
+        # Construct and return the GroupChangeInfo object
+        return GroupChangeInfo(
+            deleted=deleted_groups_info,
+            new=new_groups_info,
+            modified=modified_groups_info,
+            node_membership=node_membership_changes
+        )

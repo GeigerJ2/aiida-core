@@ -1,5 +1,4 @@
 from __future__ import annotations
-import os
 from pathlib import Path
 
 from aiida import orm
@@ -9,18 +8,22 @@ from aiida.tools.dumping.storage import DumpLog
 from aiida.tools.dumping.utils.groups import get_group_subpath
 from aiida.tools.dumping.utils.paths import safe_delete_dir, DumpPaths
 from aiida.tools.dumping.detect.detector import DumpChangeDetector
+from aiida.tools.dumping.utils.types import (
+    GroupChangeInfo,
+    GroupModificationInfo,
+)
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiida.tools.dumping.utils.paths import DumpPaths
     from aiida.tools.dumping.config import DumpConfig
     from aiida.tools.dumping.storage.logger import DumpLogger
-    from aiida.tools.dumping.managers.nodes import NodeManager
+    from managers.node import NodeManager
 
 logger = AIIDA_LOGGER.getChild("tools.dumping.group_manager")
 
 
-class GroupDumpManager:
+class GroupManager:
     """Handles group-related operations during dumping"""
 
     def __init__(
@@ -82,6 +85,7 @@ class GroupDumpManager:
                 logger.report(msg)
 
                 # Handle this group
+                import ipdb; ipdb.set_trace()
                 self.handle_group_dump(group, group_changes)
             else:
                 logger.report(
@@ -270,27 +274,153 @@ class GroupDumpManager:
 
         return group_path
 
-    # TODO: This method should not be needed?
-    # def ensure_group_registered(self, group):
-    #     """
-    #     Ensure a group is registered in the logger.
+    def handle_group_changes(self, group_changes: GroupChangeInfo):
+        logger.report("Processing group changes...")
 
-    #     Args:
-    #         group: The AiiDA Group object to register
+        # 1. Handle Deleted Groups (Directory deletion handled by DeletionManager)
+        # We might still need to log this or perform other cleanup
+        if group_changes.deleted:
+            logger.report(
+                f"Detected {len(group_changes.deleted)} deleted groups (deletion handled elsewhere)."
+            )
 
-    #     Returns:
-    #         Path object representing the directory for the group
-    #     """
-    #     group_path = self.get_group_path(group)
+        # 2. Handle New Groups
+        if group_changes.new:
+            logger.report(f"Processing {len(group_changes.new)} new groups.")
+            for group_info in group_changes.new:
+                # Ensure the group directory exists and is logged
+                try:
+                    group = orm.load_group(uuid=group_info.uuid)
+                    self.ensure_group_registered(group)
+                    # Dumping nodes within this new group will happen if they
+                    # are picked up by the NodeChanges detection based on config.
+                except Exception as e:
+                    logger.warning(
+                        f"Could not process new group {group_info.uuid}: {e}"
+                    )
 
-    #     # If the group is not in the logger, register it
-    #     import ipdb
+        # 3. Handle Modified Groups (Membership changes)
+        if group_changes.modified:
+            logger.report(f"Processing {len(group_changes.modified)} modified groups.")
+            for mod_info in group_changes.modified:
+                self.update_group_membership(mod_info)
 
-    #     ipdb.set_trace()
-    #     if group.uuid not in self.dump_logger.groups.entries:
-    #         self.dump_logger.groups.add_entry(
-    #             uuid=group.uuid, entry=DumpLog(path=group_path)
-    #         )
-    #         logger.debug(f"Registered group {group.label} in logger")
+        # 4. Handle Node Membership Changes (Alternative perspective, might overlap with modified)
+        # This provides info per-node if needed, but modified_groups usually covers it.
+        # if group_changes.node_membership:
+        #      logger.report(f"Processing node membership changes for {len(group_changes.node_membership)} nodes.")
+        #      for node_uuid, changes in group_changes.node_membership.items():
+        #           # Logic to handle specific node's add/remove across groups
+        #           pass
 
-    #     return group_path
+    def update_group_membership(self, mod_info: GroupModificationInfo):
+        """Update dump structure for a group with added/removed nodes."""
+        logger.report(
+            f"Updating group {mod_info.uuid}: {len(mod_info.nodes_added)} added, {len(mod_info.nodes_removed)} removed."
+        )
+        try:
+            group = orm.load_group(uuid=mod_info.uuid)
+        except Exception as e:
+            logger.error(f"Cannot load group {mod_info.uuid} for update: {e}")
+            return
+
+        # Ensure group directory exists and is logged
+        group_path = self.ensure_group_registered(group)
+
+        # Handle added nodes (trigger dump/symlink if needed)
+        # Note: These nodes might *also* be in changes.nodes.new_or_modified
+        # The NodeProcessor.dump_process should handle potential duplicate dumping.
+        for node_uuid in mod_info.nodes_added:
+            try:
+                node = orm.load_node(uuid=node_uuid)
+                logger.debug(
+                    f"Node {node_uuid} added to group {group.label}. Ensuring it's dumped."
+                )
+                # Let NodeProcessor handle the actual dumping logic
+                # It will determine the correct path based on the group context
+                # We might not need to explicitly call dump here if the main loop does it,
+                # but ensure the node processor logic correctly places it in the group dir.
+                # self.node_processor.dump_process(node, group) # If node_processor is aware
+            except Exception as e:
+                logger.warning(
+                    f"Could not process node {node_uuid} added to group {group.label}: {e}"
+                )
+
+        # Handle removed nodes (remove symlink/copy from this group's dir)
+        for node_uuid in mod_info.nodes_removed:
+            logger.debug(
+                f"Node {node_uuid} removed from group {group.label}. Cleaning up."
+            )
+            self.remove_node_from_group_dir(group_path, node_uuid)
+
+    def ensure_group_registered(self, group: orm.Group) -> Path:
+        """Ensure group exists in logger and return its path."""
+        group_path = self.get_group_path(group)  # Get path using existing logic
+        if group.uuid not in self.dump_logger.groups.entries:
+            msg = f"Registering group '{group.label}' ({group.uuid}) in logger."
+            logger.debug(msg)
+
+            self.dump_logger.add_entry(
+                self.dump_logger.groups,  # Access the groups store
+                uuid=group.uuid,
+                entry=DumpLog(path=group_path),
+            )
+
+        group_path.mkdir(parents=True, exist_ok=True)
+        (group_path / DumpPaths.safeguard_file).touch()
+
+        return group_path
+
+    def remove_node_from_group_dir(self, group_path: Path, node_uuid: str):
+        """Find and remove a node's dump dir/symlink within a specific group path."""
+        node_path_in_logger = self.dump_logger.get_dump_path_by_uuid(node_uuid)
+        if not node_path_in_logger:
+            logger.warning(
+                f"Cannot find logger path for node {node_uuid} to remove from group."
+            )
+            return
+
+        # Construct potential paths within the group dir
+        possible_paths = [
+            group_path / "calculations" / node_path_in_logger.name,
+            group_path / "workflows" / node_path_in_logger.name,
+            group_path / node_path_in_logger.name,  # If not in subdirs
+        ]
+
+        for potential_path in possible_paths:
+            if potential_path.exists():  # Check if it exists (could be dir or symlink)
+                # Check if it's a symlink *to the logged path* or the actual logged path itself
+                # This logic needs refinement based on symlinking strategy
+                is_symlink_to_target = (
+                    potential_path.is_symlink()
+                )  # and os.readlink(potential_path) == str(node_path_in_logger)
+                is_target_dir = potential_path == node_path_in_logger
+
+                # Decide whether to remove the symlink or the directory
+                # This example just removes whatever exists at the potential path
+                # CAUTION: Be careful not to delete the *original* dump if only removing from group
+                logger.report(
+                    f"Removing '{potential_path.name}' from group directory '{group_path.name}'."
+                )
+                if potential_path.is_symlink():
+                    potential_path.unlink()
+                    # Also update logger if symlinks are tracked per entry
+                    # self.dump_logger.remove_symlink(...)
+                elif potential_path.is_dir() and not is_target_dir:
+                    # If it's a directory copy within the group, remove it safely
+
+                    safe_delete_dir(
+                        potential_path, safeguard_file=".aiida_node_metadata.yaml"
+                    )  # Use node safeguard
+                elif is_target_dir:
+                    # If this *is* the primary dump path, removing from a group
+                    # shouldn't delete it entirely unless the node itself is deleted.
+                    logger.debug(
+                        f"Node {node_uuid} removed from group, but its primary dump path {potential_path} is not deleted here."
+                    )
+                else:
+                    logger.warning(
+                        f"Cannot determine how to handle removed node path: {potential_path}"
+                    )
+
+                break  # Assume found
