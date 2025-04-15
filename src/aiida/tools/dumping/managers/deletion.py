@@ -16,6 +16,7 @@ class DeletionManager:
     def handle_deleted_nodes(self):
         """Process and delete nodes that no longer exist in the database."""
         logger.report("Checking for deleted nodes...")
+        # import ipdb; ipdb.set_trace()
 
         # Create a detector to find deleted nodes
         detector = DumpChangeDetector(self.dump_logger, self.config)
@@ -50,9 +51,6 @@ class DeletionManager:
         for store_name in ["calculations", "workflows", "data", "groups"]:
             for uuid in getattr(deleted_nodes, store_name):
                 self.delete_node_from_logger(store_name, uuid)
-
-        # Save the updated log
-        self.dump_logger.save_log()
 
     def delete_node_from_logger(self, store_name, uuid):
         """Remove a node from the logger and delete its directory if it exists."""

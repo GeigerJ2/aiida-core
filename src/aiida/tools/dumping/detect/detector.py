@@ -16,7 +16,7 @@ from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.config import NodeDumpGroupScope
 from aiida.tools.dumping.storage.keys import DumpStoreKeys
-from aiida.tools.dumping.storage.store import DumpNodeStore
+from aiida.tools.dumping.storage.store import DumpNodeStore, DeletedEntityStore
 from aiida.tools.dumping.detect.strategies import (
     GroupNodeQueryStrategy,
     AnyNodeQueryStrategy,
@@ -59,7 +59,6 @@ class DumpChangeDetector:
             "deleted_nodes": self.detect_deleted_nodes(),
             "group_changes": self.detect_group_changes(group),
         }
-        import ipdb; ipdb.set_trace()
 
         return all_changes
 
@@ -101,7 +100,7 @@ class DumpChangeDetector:
 
     def detect_deleted_nodes(self):
         """Detect nodes that have been deleted from the database"""
-        delete_node_container = DumpNodeStore()
+        delete_node_container = DeletedEntityStore()
 
         for orm_type in (orm.CalculationNode, orm.WorkflowNode, orm.Data, orm.Group):
             store_name = DumpStoreKeys.from_class(orm_class=orm_type)

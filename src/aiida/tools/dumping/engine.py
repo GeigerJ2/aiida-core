@@ -47,7 +47,6 @@ class DumpEngine:
         # Handle special case for deletion
         if self.config.delete_missing:
             self.deletion_manager.handle_deleted_nodes()
-            return
 
         # Prepare the dump path
         prepare_dump_path(

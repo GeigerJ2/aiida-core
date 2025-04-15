@@ -102,6 +102,14 @@ class GroupDumpManager:
 
         group_path = self.get_group_path(group)
 
+        # Ensure the group directory exists
+        group_path.mkdir(parents=True, exist_ok=True)
+
+        # Add the safeguard file if it doesn't exist
+        safeguard_path = group_path / DumpPaths.safeguard_file
+        if not safeguard_path.exists():
+            safeguard_path.touch()
+
         # Dump new nodes
         if self.node_manager:
             self.node_manager.dump_nodes(changes["new_nodes"], group)
@@ -109,6 +117,7 @@ class GroupDumpManager:
             msg = "No node processor provided, skipping node dumping"
             logger.warning(msg)
 
+        # Finally, add to the logger
         if group.uuid not in self.dump_logger.groups.entries:
             self.dump_logger.groups.add_entry(
                 uuid=group.uuid, entry=DumpLog(path=group_path)
@@ -258,14 +267,6 @@ class GroupDumpManager:
             group_path = self.dump_paths.absolute / "groups" / get_group_subpath(group)
         else:
             group_path = self.dump_paths.absolute
-
-        # Ensure the group directory exists
-        group_path.mkdir(parents=True, exist_ok=True)
-
-        # Add the safeguard file if it doesn't exist
-        safeguard_path = group_path / DumpPaths.safeguard_file
-        if not safeguard_path.exists():
-            safeguard_path.touch()
 
         return group_path
 
