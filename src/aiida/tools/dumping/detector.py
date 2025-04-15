@@ -50,6 +50,7 @@ class DumpChangeDetector:
             "deleted_nodes": self.detect_deleted_nodes(),  # no group argument
             "group_changes": self.detect_group_changes(),  # specific_group=group
         }
+        import ipdb; ipdb.set_trace()
 
         return all_changes
 

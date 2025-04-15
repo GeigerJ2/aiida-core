@@ -13,8 +13,10 @@ from aiida.tools.dumping.utils.paths import (
     prepare_dump_path,
     safe_delete_dir,
 )
+from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.utils.time import DumpTimes
 
+logger = AIIDA_LOGGER.getChild("tools.dumping.engine")
 
 class DumpEngine:
     """Core engine that orchestrates the dump process."""
@@ -124,7 +126,7 @@ class DumpEngine:
 
 
             group_changes = group_detector.detect_changes(group=group)
-            import ipdb; ipdb.set_trace()
+            # import ipdb; ipdb.set_trace()
 
             group_engine = DumpEngine(config=self.config, dump_paths=self.dump_paths)
 
@@ -140,6 +142,79 @@ class DumpEngine:
         # Handle modified groups
         for group_info in group_changes['modified_groups']:
             self._update_group(group_info)
+    
+    def _update_group(self, group_info: dict) -> None:
+        """Update a group's dump based on membership changes."""
+        group_uuid = group_info['uuid']
+        
+        try:
+            # Load the group
+            group = orm.load_group(uuid=group_uuid)
+            
+            # Get the group entry from the logger
+            group_entry = self.dump_logger.groups.get_entry(group_uuid)
+            if group_entry is None:
+                # Group exists in DB but not in log - skip
+                msg = f"Group {group.label} found in DB but not in log - skipping update"
+                logger.warning(msg)
+                return
+                
+            group_path = group_entry.path
+            
+            # Handle nodes added to this group
+            if 'nodes_added' in group_info:
+                logger.report(f"Updating {len(group_info['nodes_added'])} nodes added to group {group.label}")
+                
+                for node_uuid in group_info['nodes_added']:
+                    try:
+                        # Get the node
+                        node = orm.load_node(uuid=node_uuid)
+                        
+                        # Create appropriate path for this node
+                        if isinstance(node, orm.CalculationNode):
+                            node_type_path = group_path / 'calculations'
+                        elif isinstance(node, orm.WorkflowNode):
+                            node_type_path = group_path / 'workflows'
+                        else:
+                            # Skip other node types
+                            continue
+                            
+                        # Dump the node
+                        self._dump_process(node, group)
+                        
+                    except Exception as e:
+                        logger.warning(f"Error processing node {node_uuid} added to group: {e}")
+            
+            # Handle nodes removed from this group
+            if 'nodes_removed' in group_info:
+                logger.report(f"Cleaning up {len(group_info['nodes_removed'])} nodes removed from group {group.label}")
+                
+                for node_uuid in group_info['nodes_removed']:
+                    # Try to find the node path in the logger
+                    try:
+                        node_path = self.dump_logger.get_dump_path_by_uuid(uuid=node_uuid)
+                        
+                        # Check if the path exists and is within this group's directory
+                        if node_path and str(group_path) in str(node_path):
+                            # Delete the directory
+                            safe_delete_dir(path=node_path, safeguard_file=DumpPaths.safeguard_file)
+                            
+                            # Remove from logger
+                            store_key = None
+                            for key in ['calculations', 'workflows', 'data']:
+                                store = getattr(self.dump_logger, key)
+                                if node_uuid in store.entries:
+                                    store_key = key
+                                    break
+                                    
+                            if store_key:
+                                store = getattr(self.dump_logger, store_key)
+                                self.dump_logger.del_entry(store=store, uuid=node_uuid)
+                    except Exception as e:
+                        logger.warning(f"Error cleaning up node {node_uuid} removed from group: {e}")
+                        
+        except Exception as e:
+            logger.warning(f"Error updating group {group_uuid}: {e}")
 
     def _delete_group(self, group_info: dict) -> None:
         """Delete a group's dump directory."""
