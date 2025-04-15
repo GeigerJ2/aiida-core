@@ -17,7 +17,7 @@ from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.config import NodeDumpGroupScope
 from aiida.tools.dumping.storage.keys import DumpStoreKeys
 from aiida.tools.dumping.storage.store import DumpNodeStore
-from aiida.tools.dumping.detect.query import (
+from aiida.tools.dumping.detect.strategies import (
     GroupNodeQueryStrategy,
     AnyNodeQueryStrategy,
     UngroupedNodeQueryStrategy,
@@ -53,14 +53,14 @@ class DumpChangeDetector:
 
         # Collect changes
         all_changes = {
-            "new_nodes": self._detect_new_nodes(query_strategy),
-            "deleted_nodes": self._detect_deleted_nodes(),
-            "group_changes": self._detect_group_changes(group),
+            "new_nodes": self.detect_new_nodes(query_strategy),
+            "deleted_nodes": self.detect_deleted_nodes(),
+            "group_changes": self.detect_group_changes(group),
         }
 
         return all_changes
 
-    def _detect_new_nodes(self, query_strategy):
+    def detect_new_nodes(self, query_strategy):
         """Detect new nodes using the provided query strategy"""
         node_store = DumpNodeStore()
 
@@ -83,7 +83,7 @@ class DumpChangeDetector:
 
             # Add descendant calculations from workflows if needed
             if workflows and not self.config.only_top_level_calcs:
-                descendant_calcs = self._get_workflow_descendants(
+                descendant_calcs = self.get_workflow_descendants(
                     workflows, target_type=orm.CalculationNode
                 )
                 calculations = list(set(calculations + descendant_calcs))
@@ -96,7 +96,7 @@ class DumpChangeDetector:
 
         return node_store
 
-    def _detect_deleted_nodes(self):
+    def detect_deleted_nodes(self):
         """Detect nodes that have been deleted from the database"""
         delete_node_container = DumpNodeStore()
 
@@ -119,7 +119,7 @@ class DumpChangeDetector:
 
         return delete_node_container
 
-    def _detect_group_changes(self, specific_group=None):
+    def detect_group_changes(self, specific_group=None):
         """Detect changes in group membership"""
         # Get current mapping from DB
         current_mapping = self.dump_logger.build_current_group_node_mapping()
@@ -132,11 +132,11 @@ class DumpChangeDetector:
 
         # Filter for specific group if needed
         if specific_group:
-            return self._filter_diff_for_group(diff_result, specific_group.uuid)
+            return self.filter_diff_for_group(diff_result, specific_group.uuid)
 
         return diff_result
 
-    def _filter_diff_for_group(self, diff_result, group_uuid):
+    def filter_diff_for_group(self, diff_result, group_uuid):
         """Filter diff results for a specific group"""
         filtered_diff = {
             "deleted_groups": [
@@ -166,7 +166,7 @@ class DumpChangeDetector:
 
         return filtered_diff
 
-    def _get_workflow_descendants(self, workflows, target_type):
+    def get_workflow_descendants(self, workflows, target_type):
         """Get descendants of workflows matching the target type"""
         descendants = []
         for workflow in workflows:

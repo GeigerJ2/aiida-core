@@ -60,7 +60,7 @@ class DumpConfig:
     symlink_calcs: bool = False
 
     # Group options
-    delete_missing: bool = False
+    delete_missing: bool = True
 
     # Profile options
     organize_by_groups: bool = True
@@ -170,22 +170,18 @@ class ProcessDumperConfig:
 
 
 @dataclass
-class BaseCollectionDumperConfig:
-    symlink_calcs: bool = False
-    delete_missing: bool = False  # TODO
-
-
-@dataclass
-class GroupDumperConfig(BaseCollectionDumperConfig):
+class GroupDumperConfig:
     """Arguments for dumping group data."""
-
-    ...
+    symlink_calcs: bool = False
+    delete_missing: bool = True
 
 
 @dataclass
-class ProfileDumperConfig(BaseCollectionDumperConfig):
+class ProfileDumperConfig:
     """Arguments for dumping profile data."""
 
+    symlink_calcs: bool = False
+    delete_missing: bool = True
     organize_by_groups: bool = True
     also_ungrouped: bool = False
     update_groups: bool = False
