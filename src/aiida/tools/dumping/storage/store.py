@@ -111,5 +111,3 @@ class DumpNodeStore:
 
         attr = DumpStoreKeys.from_class(node_type)
         return getattr(self, attr)
-
-    # def get_store_by_instance(self, node_instance: Any) -> list: ...

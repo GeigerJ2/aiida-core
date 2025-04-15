@@ -35,7 +35,7 @@ from aiida.tools.dumping.utils.types import StoreNameType
 # NOTE: Problem with general `node_mtime` is that `Group`s don't have an `mtime` attribute
 
 
-logger = AIIDA_LOGGER.getChild('tools.dumping.logger')
+logger = AIIDA_LOGGER.getChild("tools.dumping.logger")
 
 
 @dataclass
@@ -47,18 +47,18 @@ class DumpLog:
 
     def to_dict(self) -> dict:
         return {
-            'path': str(self.path),
-            'symlinks': [str(path) for path in self.symlinks] if self.symlinks else [],
+            "path": str(self.path),
+            "symlinks": [str(path) for path in self.symlinks] if self.symlinks else [],
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'DumpLog':
+    def from_dict(cls, data: dict) -> "DumpLog":
         symlinks = []
-        if data.get('symlinks'):
-            symlinks = [Path(path) for path in data['symlinks']]
+        if data.get("symlinks"):
+            symlinks = [Path(path) for path in data["symlinks"]]
 
         return cls(
-            path=Path(data['path']),
+            path=Path(data["path"]),
             symlinks=symlinks,
         )
 
@@ -118,12 +118,12 @@ class DumpLogStore:
         return {uuid: entry.to_dict() for uuid, entry in self.entries.items()}
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'DumpLogStore':
+    def from_dict(cls, data: Dict) -> "DumpLogStore":
         store = cls()
 
         for uuid, entry_data in data.items():
             # Handle old format (backward compatibility)
-            if isinstance(entry_data, dict) and 'path' in entry_data:
+            if isinstance(entry_data, dict) and "path" in entry_data:
                 store.entries[uuid] = DumpLog.from_dict(entry_data)
             else:
                 # Old format had just the path as a string
@@ -133,10 +133,10 @@ class DumpLogStore:
 
     def update_paths(self, old_str: str, new_str: str) -> None:
         """Update all paths in the store by replacing exact occurrences of old_str with new_str."""
-        if not old_str.startswith('/'):
-            old_str = f'/{old_str}'
-        if not new_str.startswith('/'):
-            new_str = f'/{new_str}'
+        if not old_str.startswith("/"):
+            old_str = f"/{old_str}"
+        if not new_str.startswith("/"):
+            new_str = f"/{new_str}"
 
         for uuid, entry in self.entries.items():
             # Check if old_str exists in the path
@@ -161,52 +161,6 @@ class DumpLogStoreCollection:
     workflows: DumpLogStore
     groups: DumpLogStore
     data: DumpLogStore
-
-
-# class DumpLogger:
-#     """Main Logger class for data dumping."""
-
-#     _instance = None
-
-#     def __new__(cls, dump_paths: DumpPaths, dump_times: DumpTimes, **kwargs):
-#         if cls._instance is None:
-#             cls._instance = super(DumpLogger, cls).__new__(cls)
-#             # Initialize the instance
-#             cls._instance.__init__(dump_paths, dump_times, **kwargs)
-#         return cls._instance
-
-#     @classmethod
-#     def from_file(cls, dump_paths: DumpPaths) -> 'DumpLogger':
-#         if cls._instance is None:
-#             instance = super(DumpLogger, cls).__new__(cls)
-#             # Rest of your existing from_file implementation
-#             cls._instance = instance
-#         return cls._instance
-
-#     # Rest of your existing class implementation
-
-
-#     def __init__(
-#         self,
-#         dump_paths: DumpPaths,
-#         dump_times: DumpTimes,
-#         calculations: Optional[DumpLogStore] = None,
-#         workflows: Optional[DumpLogStore] = None,
-#         groups: Optional[DumpLogStore] = None,
-#         data: Optional[DumpLogStore] = None,
-#         last_dump_time: Optional[datetime] = None,
-#         group_node_mapping: Optional[GroupNodeMapping] = None,
-#     ) -> None:
-#         self.dump_paths = dump_paths
-#         self.dump_times = dump_times
-#         self.calculations = calculations or DumpLogStore()
-#         self.workflows = workflows or DumpLogStore()
-#         self.groups = groups or DumpLogStore()
-#         self.data = data or DumpLogStore()
-#         self.last_dump_time = last_dump_time
-
-#         # Initialize group node mapping
-#         self._group_node_mapping = group_node_mapping
 
 
 class DumpLogger:
@@ -253,7 +207,7 @@ class DumpLogger:
         self._initialized = True
 
     @classmethod
-    def from_file(cls, dump_paths: DumpPaths) -> 'DumpLogger':
+    def from_file(cls, dump_paths: DumpPaths) -> "DumpLogger":
         # Get or create the singleton instance
         instance = cls._instance if cls._instance else cls(dump_paths, DumpTimes())
 
@@ -261,35 +215,45 @@ class DumpLogger:
             return instance
 
         try:
-            with dump_paths.log_path.open('r', encoding='utf-8') as f:
+            with dump_paths.log_path.open("r", encoding="utf-8") as f:
                 prev_dump_data = json.load(f)
 
                 # Load dump times
-                if 'last_dump_time' in prev_dump_data:
-                    instance.last_dump_time = datetime.fromisoformat(prev_dump_data['last_dump_time'])
+                if "last_dump_time" in prev_dump_data:
+                    instance.last_dump_time = datetime.fromisoformat(
+                        prev_dump_data["last_dump_time"]
+                    )
                     dump_times = DumpTimes.from_file(dump_paths=dump_paths)
                     instance.dump_times = dump_times
 
                 # Load group-node mapping if present
-                if 'group_node_mapping' in prev_dump_data:
+                if "group_node_mapping" in prev_dump_data:
                     try:
                         from aiida.tools.dumping.mapping import GroupNodeMapping
 
-                        group_node_mapping = GroupNodeMapping.from_dict(prev_dump_data['group_node_mapping'])
+                        group_node_mapping = GroupNodeMapping.from_dict(
+                            prev_dump_data["group_node_mapping"]
+                        )
                         instance._group_node_mapping = group_node_mapping
                     except Exception as e:
-                        logger.warning(f'Error loading group-node mapping: {e!s}')
+                        logger.warning(f"Error loading group-node mapping: {e!s}")
 
                 # Load store data
                 instance.calculations = cls.deserialize_logs(
-                    prev_dump_data.get('calculations', {}), dump_paths=dump_paths
+                    prev_dump_data.get("calculations", {}), dump_paths=dump_paths
                 )
-                instance.workflows = cls.deserialize_logs(prev_dump_data.get('workflows', {}), dump_paths=dump_paths)
-                instance.groups = cls.deserialize_logs(prev_dump_data.get('groups', {}), dump_paths=dump_paths)
-                instance.data = cls.deserialize_logs(prev_dump_data.get('data', {}), dump_paths=dump_paths)
+                instance.workflows = cls.deserialize_logs(
+                    prev_dump_data.get("workflows", {}), dump_paths=dump_paths
+                )
+                instance.groups = cls.deserialize_logs(
+                    prev_dump_data.get("groups", {}), dump_paths=dump_paths
+                )
+                instance.data = cls.deserialize_logs(
+                    prev_dump_data.get("data", {}), dump_paths=dump_paths
+                )
 
         except (json.JSONDecodeError, OSError) as e:
-            logger.warning(f'Error loading dump log: {e!s}')
+            logger.warning(f"Error loading dump log: {e!s}")
             raise
 
         return instance
@@ -316,7 +280,9 @@ class DumpLogger:
         """Add a log entry for a node."""
         store.add_entry(uuid, entry)
 
-    def add_entries(self, store: DumpLogStore, uuids: List[str], entries: List[DumpLog]) -> None:
+    def add_entries(
+        self, store: DumpLogStore, uuids: List[str], entries: List[DumpLog]
+    ) -> None:
         """Add multiple log entries."""
         for uuid, entry in zip(uuids, entries):
             store.add_entry(uuid, entry)
@@ -346,18 +312,18 @@ class DumpLogger:
     def save_log(self) -> None:
         """Save the log to a JSON file."""
         log_dict = {
-            'calculations': self.serialize_logs(self.calculations),
-            'workflows': self.serialize_logs(self.workflows),
-            'groups': self.serialize_logs(self.groups),
-            'data': self.serialize_logs(self.data),
-            'last_dump_time': self.dump_times.current.isoformat(),
+            "calculations": self.serialize_logs(self.calculations),
+            "workflows": self.serialize_logs(self.workflows),
+            "groups": self.serialize_logs(self.groups),
+            "data": self.serialize_logs(self.data),
+            "last_dump_time": self.dump_times.current.isoformat(),
         }
 
         # Save the group-node mapping if available
         if self._group_node_mapping:
-            log_dict['group_node_mapping'] = self._group_node_mapping.to_dict()
+            log_dict["group_node_mapping"] = self._group_node_mapping.to_dict()
 
-        with self.dump_paths.log_path.open('w', encoding='utf-8') as f:
+        with self.dump_paths.log_path.open("w", encoding="utf-8") as f:
             json.dump(log_dict, f, indent=4)
 
     def serialize_logs(self, container: DumpLogStore) -> Dict:
@@ -368,16 +334,27 @@ class DumpLogger:
                 # Convert to relative paths for storage
                 relative_path = entry.path.relative_to(self.dump_paths.parent)
                 relative_symlinks = (
-                    [path.relative_to(self.dump_paths.parent) for path in entry.symlinks] if entry.symlinks else []
+                    [
+                        path.relative_to(self.dump_paths.parent)
+                        for path in entry.symlinks
+                    ]
+                    if entry.symlinks
+                    else []
                 )
 
                 serialized[uuid] = {
-                    'path': str(relative_path),
-                    'symlinks': [str(path) for path in relative_symlinks] if relative_symlinks else [],
+                    "path": str(relative_path),
+                    "symlinks": (
+                        [str(path) for path in relative_symlinks]
+                        if relative_symlinks
+                        else []
+                    ),
                 }
             except ValueError:
                 # If path is not relative to parent (shouldn't happen)
-                logger.warning(f'Path {entry.path} is not relative to {self.dump_paths.parent}')
+                logger.warning(
+                    f"Path {entry.path} is not relative to {self.dump_paths.parent}"
+                )
                 serialized[uuid] = entry.to_dict()
 
         return serialized
@@ -390,72 +367,24 @@ class DumpLogger:
         for uuid, entry_data in category_data.items():
             # Handle old format where entry is just a string path
             if isinstance(entry_data, str):
-                container.add_entry(uuid, DumpLog(path=dump_paths.parent / Path(entry_data)))
+                container.add_entry(
+                    uuid, DumpLog(path=dump_paths.parent / Path(entry_data))
+                )
             # Handle new format
-            elif isinstance(entry_data, dict) and 'path' in entry_data:
-                path = dump_paths.parent / Path(entry_data['path'])
+            elif isinstance(entry_data, dict) and "path" in entry_data:
+                path = dump_paths.parent / Path(entry_data["path"])
 
                 symlinks = []
-                if entry_data.get('symlinks'):
-                    symlinks = [dump_paths.parent / Path(path) for path in entry_data['symlinks']]
+                if entry_data.get("symlinks"):
+                    symlinks = [
+                        dump_paths.parent / Path(path)
+                        for path in entry_data["symlinks"]
+                    ]
 
                 container.add_entry(uuid, DumpLog(path=path, symlinks=symlinks))
 
         return container
 
-    # @classmethod
-    # def from_file(cls, dump_paths: DumpPaths) -> 'DumpLogger':
-    #     """Alternative constructor to load from an existing JSON file."""
-    #     # Initialize with default values
-    #     dump_times = DumpTimes()
-    #     instance = cls(dump_paths=dump_paths, dump_times=dump_times)
-
-    #     if not dump_paths.log_path.exists():
-    #         return instance
-
-    #     try:
-    #         with dump_paths.log_path.open('r', encoding='utf-8') as f:
-    #             prev_dump_data = json.load(f)
-
-    #             # Load dump times
-    #             if 'last_dump_time' in prev_dump_data:
-    #                 instance.last_dump_time = datetime.fromisoformat(prev_dump_data['last_dump_time'])
-    #                 dump_times = DumpTimes.from_file(dump_paths=dump_paths)
-    #                 instance.dump_times = dump_times
-
-    #             # Load group-node mapping if present
-    #             if 'group_node_mapping' in prev_dump_data:
-    #                 try:
-    #                     # Import here to avoid circular imports
-    #                     from aiida.tools.dumping.mapping import GroupNodeMapping
-    #                     group_node_mapping = GroupNodeMapping.from_dict(prev_dump_data['group_node_mapping'])
-    #                     instance._group_node_mapping = group_node_mapping
-    #                 except Exception as e:
-    #                     logger.warning(f"Error loading group-node mapping: {e!s}")
-
-    #             # Load store data
-    #             instance.calculations = cls.deserialize_logs(
-    #                 prev_dump_data.get('calculations', {}),
-    #                 dump_paths=dump_paths
-    #             )
-    #             instance.workflows = cls.deserialize_logs(
-    #                 prev_dump_data.get('workflows', {}),
-    #                 dump_paths=dump_paths
-    #             )
-    #             instance.groups = cls.deserialize_logs(
-    #                 prev_dump_data.get('groups', {}),
-    #                 dump_paths=dump_paths
-    #             )
-    #             instance.data = cls.deserialize_logs(
-    #                 prev_dump_data.get('data', {}),
-    #                 dump_paths=dump_paths
-    #             )
-
-    #     except (json.JSONDecodeError, OSError) as e:
-    #         logger.warning(f"Error loading dump log: {e!s}")
-    #         raise
-
-    #     return instance
 
     def get_store_by_uuid(self, uuid: str) -> DumpLogStore:
         """Find the store that contains the given UUID."""
@@ -465,14 +394,14 @@ class DumpLogger:
             if uuid in store.entries:
                 return store
 
-        msg = f'No corresponding `DumpLogStore` found for UUID: `{uuid}`.'
+        msg = f"No corresponding `DumpLogStore` found for UUID: `{uuid}`."
         raise NotExistent(msg)
 
     def get_store_by_name(self, name: StoreNameType) -> DumpLogStore:
         """Get the store by its string literal."""
         store_names = [field.name for field in fields(self.stores)]
         if name not in store_names:
-            msg = f'Wrong key <{name}> selected. Choose one of {store_names}.'
+            msg = f"Wrong key <{name}> selected. Choose one of {store_names}."
             raise ValueError(msg)
 
         return getattr(self.stores, name)
@@ -487,16 +416,16 @@ class DumpLogger:
         except NotExistent:
             return None
         except Exception as e:
-            logger.warning(f'Error getting dump path for UUID {uuid}: {e!s}')
+            logger.warning(f"Error getting dump path for UUID {uuid}: {e!s}")
             return None
 
     def to_dict(self) -> Dict:
         """Convert the DumpLogger state to a dictionary format."""
         return {
-            'calculations': self.calculations.to_dict(),
-            'workflows': self.workflows.to_dict(),
-            'groups': self.groups.to_dict(),
-            'data': self.data.to_dict(),
+            "calculations": self.calculations.to_dict(),
+            "workflows": self.workflows.to_dict(),
+            "groups": self.groups.to_dict(),
+            "data": self.data.to_dict(),
         }
 
     def get_store_by_orm(self, orm_type) -> DumpLogStore:
@@ -508,21 +437,25 @@ class DumpLogger:
         updates = {}
 
         # Normalize the strings
-        if not old_str.startswith('/'):
-            old_str = f'/{old_str}'
-        if not new_str.startswith('/'):
-            new_str = f'/{new_str}'
+        if not old_str.startswith("/"):
+            old_str = f"/{old_str}"
+        if not new_str.startswith("/"):
+            new_str = f"/{new_str}"
 
         # Update each store
-        for store_name in ['calculations', 'workflows', 'groups', 'data']:
+        for store_name in ["calculations", "workflows", "groups", "data"]:
             store: DumpLogStore = getattr(self, store_name)
-            count_before = sum(1 for uuid, entry in store.entries.items() if old_str in str(entry.path))
+            count_before = sum(
+                1 for uuid, entry in store.entries.items() if old_str in str(entry.path)
+            )
 
             store.update_paths(old_str, new_str)
 
-            count_after = sum(1 for uuid, entry in store.entries.items() if new_str in str(entry.path))
+            count_after = sum(
+                1 for uuid, entry in store.entries.items() if new_str in str(entry.path)
+            )
 
-            updates[store_name] = {'before': count_before, 'after': count_after}
+            updates[store_name] = {"before": count_before, "after": count_after}
 
         return updates
 

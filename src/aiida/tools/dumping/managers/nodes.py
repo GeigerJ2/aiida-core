@@ -3,13 +3,17 @@ from aiida.tools.dumping.entities.process import ProcessDumper
 from aiida.tools.dumping.storage import DumpStoreKeys
 from aiida.tools.dumping.utils.paths import generate_process_default_dump_path
 from aiida.tools.dumping.storage import DumpLog
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aiida.tools.dumping.config import DumpConfig
 
 
 class NodeProcessor:
     """Handles the processing and dumping of individual nodes"""
     
     def __init__(self, config, dump_paths, dump_logger):
-        self.config = config
+        self.config: DumpConfig = config
         self.dump_paths = dump_paths
         self.dump_logger = dump_logger
     

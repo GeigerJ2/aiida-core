@@ -46,24 +46,3 @@ class ProfileDumpStrategy(DumpStrategy):
         if ungrouped_changes['new_nodes']:
             logger.report(f"Processing ungrouped nodes")
             self.engine.node_processor.dump_nodes(ungrouped_changes['new_nodes'])
-
-# from aiida.common.log import AIIDA_LOGGER
-# from aiida.tools.dumping.strategies.base import DumpStrategy
-
-# logger = AIIDA_LOGGER.getChild("tools.dumping.engine")
-
-
-# class ProfileDumpStrategy(DumpStrategy):
-#     """Strategy for dumping an entire profile"""
-    
-#     def dump(self):
-#         # Update group-node mapping
-#         current_mapping = self.engine.dump_logger.build_current_group_node_mapping()
-#         self.engine.dump_logger.group_node_mapping = current_mapping
-        
-#         # Handle all groups
-#         self.engine._handle_groups()
-        
-#         # Handle ungrouped nodes if needed
-#         if self.engine.config.also_ungrouped:
-#             self.engine._handle_ungrouped_nodes()

@@ -8,7 +8,7 @@ from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.mapping.mapping import GroupNodeMapping
 
-logger = AIIDA_LOGGER.getChild('tools.dump.group_mapper')
+logger = AIIDA_LOGGER.getChild("tools.dump.group_mapper")
 
 
 class GroupNodeMappingManager:
@@ -58,20 +58,25 @@ class GroupNodeMappingManager:
             diff_result: The result of the mapping comparison
         """
         # Log the changes
-        if diff_result['deleted_groups']:
+        if diff_result["deleted_groups"]:
             logger.report(f"Found {len(diff_result['deleted_groups'])} deleted groups")
 
-        if diff_result['new_groups']:
+        if diff_result["new_groups"]:
             logger.report(f"Found {len(diff_result['new_groups'])} new groups")
 
-        if diff_result['modified_groups']:
-            logger.report(f"Found {len(diff_result['modified_groups'])} modified groups")
+        if diff_result["modified_groups"]:
+            logger.report(
+                f"Found {len(diff_result['modified_groups'])} modified groups"
+            )
 
             # Update paths for nodes that changed group membership
-            self._update_paths_for_modified_groups(diff_result['modified_groups'],
-                                                 diff_result['nodes_membership_changes'])
+            self._update_paths_for_modified_groups(
+                diff_result["modified_groups"], diff_result["nodes_membership_changes"]
+            )
 
-    def _update_paths_for_modified_groups(self, modified_groups: List[Dict], node_changes: Dict) -> None:
+    def _update_paths_for_modified_groups(
+        self, modified_groups: List[Dict], node_changes: Dict
+    ) -> None:
         """
         Update paths for nodes that changed group membership.
 
@@ -82,7 +87,7 @@ class GroupNodeMappingManager:
         from aiida.tools.dumping.utils import safe_delete_dir
 
         for group_info in modified_groups:
-            group_uuid = group_info['uuid']
+            group_uuid = group_info["uuid"]
 
             try:
                 # Get the group object
@@ -92,25 +97,29 @@ class GroupNodeMappingManager:
                 # Get the group entry from the logger
                 group_entry = self.dump_logger.groups.get_entry(group_uuid)
                 if group_entry is None:
-                    logger.warning(f"Group {group_uuid} not found in logger - skipping updates")
+                    logger.warning(
+                        f"Group {group_uuid} not found in logger - skipping updates"
+                    )
                     continue
 
                 group_path = group_entry.path
 
                 # Handle nodes added to the group
-                for node_uuid in group_info.get('nodes_added', []):
+                for node_uuid in group_info.get("nodes_added", []):
                     # Find if node is already dumped elsewhere
                     try:
-                        node_path = self.dump_logger.get_dump_path_by_uuid(uuid=node_uuid)
+                        node_path = self.dump_logger.get_dump_path_by_uuid(
+                            uuid=node_uuid
+                        )
                         if node_path:
                             # Node is already dumped, create symlink or copy to the group directory
                             # This assumes group has a calculations/ or workflows/ subdirectory
                             node = orm.load_node(uuid=node_uuid)
                             if isinstance(node, orm.CalculationNode):
-                                target_dir = group_path / 'calculations'
+                                target_dir = group_path / "calculations"
                                 target_dir.mkdir(exist_ok=True)
                             elif isinstance(node, orm.WorkflowNode):
-                                target_dir = group_path / 'workflows'
+                                target_dir = group_path / "workflows"
                                 target_dir.mkdir(exist_ok=True)
                             else:
                                 # Skip other node types for now
@@ -120,36 +129,49 @@ class GroupNodeMappingManager:
                             # Implementation depends on your config options for symlinking
                             # Here we assume just creating the symlink
                             import os
+
                             target_path = target_dir / node_path.name
                             if not target_path.exists():
                                 os.symlink(node_path, target_path)
                     except Exception as e:
-                        logger.warning(f"Error updating node {node_uuid} for group {group_label}: {e!s}")
+                        logger.warning(
+                            f"Error updating node {node_uuid} for group {group_label}: {e!s}"
+                        )
 
                 # Handle nodes removed from the group
-                for node_uuid in group_info.get('nodes_removed', []):
+                for node_uuid in group_info.get("nodes_removed", []):
                     try:
                         # Find the node path within the group directory
-                        for node_type in ['calculations', 'workflows']:
+                        for node_type in ["calculations", "workflows"]:
                             type_dir = group_path / node_type
                             if type_dir.exists():
                                 for node_dir in type_dir.iterdir():
                                     # Check if this directory corresponds to the removed node
                                     # This is a simplified approach and might need refinement
-                                    metadata_file = node_dir / '.aiida_node_metadata.yaml'
+                                    metadata_file = (
+                                        node_dir / ".aiida_node_metadata.yaml"
+                                    )
                                     if metadata_file.exists():
                                         import yaml
-                                        with open(metadata_file, 'r') as f:
+
+                                        with open(metadata_file, "r") as f:
                                             metadata = yaml.safe_load(f)
-                                            if metadata.get('Node data', {}).get('uuid') == node_uuid:
+                                            if (
+                                                metadata.get("Node data", {}).get(
+                                                    "uuid"
+                                                )
+                                                == node_uuid
+                                            ):
                                                 # Found the node directory, remove it
                                                 safe_delete_dir(
                                                     path=node_dir,
-                                                    safeguard_file='.aiida_dump_safeguard'
+                                                    safeguard_file=".aiida_dump_safeguard",
                                                 )
                                                 break
                     except Exception as e:
-                        logger.warning(f"Error removing node {node_uuid} from group {group_label}: {e!s}")
+                        logger.warning(
+                            f"Error removing node {node_uuid} from group {group_label}: {e!s}"
+                        )
 
             except Exception as e:
                 logger.warning(f"Error updating group {group_uuid}: {e!s}")
@@ -161,7 +183,7 @@ class GroupNodeMappingManager:
         """Update directory structure and mappings when group labels change."""
         # Get all groups from the database
         qb = orm.QueryBuilder()
-        qb.append(orm.Group, project=['uuid', 'label'])
+        qb.append(orm.Group, project=["uuid", "label"])
         current_groups = {uuid: label for uuid, label in qb.all()}
 
         # Check each group in the logger
@@ -173,8 +195,12 @@ class GroupNodeMappingManager:
 
                 # If the label has changed, update paths
                 if old_label != current_label:
-                    logger.report(f"Updating group label from '{old_label}' to '{current_label}'")
-                    self.dump_logger.update_paths(old_str=old_label, new_str=current_label)
+                    logger.report(
+                        f"Updating group label from '{old_label}' to '{current_label}'"
+                    )
+                    self.dump_logger.update_paths(
+                        old_str=old_label, new_str=current_label
+                    )
 
     def save_mapping(self) -> None:
         """Save the current mapping to the logger."""
