@@ -27,15 +27,17 @@ logger = AIIDA_LOGGER.getChild("tools.dumping.detect.detector")
 
 
 if TYPE_CHECKING:
-    pass
-
+    from aiida.tools.dumping.config import DumpConfig
+    from aiida.tools.dumping.utils.paths import DumpPaths
+    from aiida.tools.dumping.storage.logger import DumpLogger, DumpLogStore
+    from aiida.tools.dumping.storage.store import DumpNodeStore
 
 class DumpChangeDetector:
     """Detects changes in the database since the last dump"""
 
-    def __init__(self, dump_logger, config):
-        self.dump_logger = dump_logger
-        self.config = config
+    def __init__(self, dump_logger: DumpLogger, config: DumpConfig) -> None:
+        self.dump_logger: DumpLogger = dump_logger
+        self.config: DumpConfig = config
 
     def detect_changes(self, group=None):
         """Detect all changes since last dump"""
@@ -57,6 +59,7 @@ class DumpChangeDetector:
             "deleted_nodes": self.detect_deleted_nodes(),
             "group_changes": self.detect_group_changes(group),
         }
+        import ipdb; ipdb.set_trace()
 
         return all_changes
 

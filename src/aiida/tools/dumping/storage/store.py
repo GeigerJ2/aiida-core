@@ -16,13 +16,14 @@ from typing import Any
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.storage.keys import DumpStoreKeys
 from aiida.tools.dumping.utils.types import StoreNameType
+from typing import Set
 
 logger = AIIDA_LOGGER.getChild('tools.dumping.collector')
 
 # TODO: Limit to only sealed nodes
 # NOTE: Not sure if this is even necessary, or I can just use lists?
 
-__all__ = ('DumpNodeStore',)
+__all__ = ('DumpNodeStore', 'DeletedEntityStore')
 
 
 @dataclass
@@ -111,3 +112,13 @@ class DumpNodeStore:
 
         attr = DumpStoreKeys.from_class(node_type)
         return getattr(self, attr)
+
+@dataclass
+class DeletedEntityStore:
+    calculations: Set[str] = field(default_factory=set)
+    workflows: Set[str] = field(default_factory=set)
+    data: Set[str] = field(default_factory=set)
+    groups: Set[str] = field(default_factory=set)
+
+    def __len__(self) -> int:
+         return len(self.calculations) + len(self.workflows) + len(self.data) + len(self.groups)

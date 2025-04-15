@@ -88,7 +88,7 @@ class GroupDumpManager:
                     f"No changes detected for group '{group.label}', skipping"
                 )
 
-    def handle_group_dump(self, group, changes):
+    def handle_group_dump(self, group: orm.Group, changes):
         """
         Handle dumping for a specific group.
 
@@ -109,7 +109,6 @@ class GroupDumpManager:
             msg = "No node processor provided, skipping node dumping"
             logger.warning(msg)
 
-        import ipdb; ipdb.set_trace()
         if group.uuid not in self.dump_logger.groups.entries:
             self.dump_logger.groups.add_entry(
                 uuid=group.uuid, entry=DumpLog(path=group_path)

@@ -24,13 +24,9 @@ class BaseDumper:
         self,
         dump_mode: DumpMode | None = None,
         dump_paths: DumpPaths | None = None,
-        # dump_logger: DumpLogger | None = None,
-        # dump_collector_config: DumpCollectorConfig | None = None,
     ):
         self.dump_mode = dump_mode or DumpMode.INCREMENTAL
         self.dump_paths = dump_paths or DumpPaths()
-        # self.dump_logger = dump_logger
-        # self.dump_collector_config = dump_collector_config or DumpCollectorConfig()
 
     def set_dump_logger(
         self, dump_logger: DumpLogger | None = None, top_level_caller: bool = False
