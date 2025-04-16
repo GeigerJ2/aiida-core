@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,23 +20,21 @@ import yaml
 from aiida import orm
 from aiida.common import LinkType
 from aiida.common.exceptions import NotExistentAttributeError
+from aiida.common.log import AIIDA_LOGGER
 from aiida.orm.utils import LinkTriple
 from aiida.tools.archive.exceptions import ExportValidationError
 from aiida.tools.dumping.base import BaseDumper
 from aiida.tools.dumping.config import (
     DumpMode,
-    ProcessDumperConfig,
+    ProcessDumpConfig,
 )
 from aiida.tools.dumping.storage.logger import DumpLog, DumpLogger
-from aiida.tools.dumping.utils import (
-    generate_process_default_dump_path,
-    prepare_dump_path,
-)
-from aiida.tools.dumping.utils.paths import DumpPaths
+from aiida.tools.dumping.utils.paths import DumpPaths, prepare_dump_path
+from aiida.tools.dumping.utils.time import DumpTimes
 
 # TODO: See if I can always use name, or pass the dumping sub module explicitly
-logger = logging.getLogger(__name__)
 
+logger = AIIDA_LOGGER.getChild("tools.dumping.logger")
 
 class ProcessDumper(BaseDumper):
     """Class to handle dumping of an AiiDA process."""
@@ -45,24 +42,32 @@ class ProcessDumper(BaseDumper):
     def __init__(
         self,
         process_node: orm.ProcessNode,
+        # TODO: This is now part of the global config. Here, still only ProcessDumperConfig available, so needed. Could
+        # change.
+        dump_paths: DumpPaths,
+        dump_logger: DumpLogger,
+        config: ProcessDumpConfig,
+        dump_times: DumpTimes,
         dump_mode: DumpMode = DumpMode.INCREMENTAL,
-        dump_paths: DumpPaths | None = None,
-        dump_logger: DumpLogger | None = None,
-        config: ProcessDumperConfig | None = None,
     ) -> None:
         """Initialize the ProcessDump."""
 
         self.process_node = process_node
+        self.dump_logger = dump_logger
+        self.dump_paths = dump_paths
+        self.config = config
+        self.dump_times = dump_times
+        # self.config = config or ProcessDumperConfig()
 
         super().__init__(
             dump_mode=dump_mode,
             dump_paths=dump_paths,
-            # dump_logger=dump_logger,
         )
 
-        if dump_paths is None:
-            default_dump_path = generate_process_default_dump_path(process_node=self.process_node)
-            self.dump_paths = DumpPaths(child=default_dump_path)
+        # NOTE: Removed
+        # if dump_paths is None:
+        #     default_dump_path = generate_process_default_dump_path(process_node=self.process_node)
+        #     self.dump_paths = DumpPaths(child=default_dump_path)
 
         # The problem is that the dump_logger is not a singleton, but is passed around and attached to various
         # classes. During dumping with the `overwrite` option, it gets reset for every `ProcessDump` instantiation.
@@ -70,13 +75,10 @@ class ProcessDumper(BaseDumper):
         # `dump_logger` from the JSON file of the previous run attached...
         # Solve by deleting the log file in overwrite mode here, or making pre_dump a `classmethod` that's executed
         # before instantiation??
-        if dump_mode == DumpMode.OVERWRITE and self.dump_paths.log_path.exists():
-            self.dump_paths.log_path.unlink()
+        # if dump_mode == DumpMode.OVERWRITE and self.dump_paths.log_path.exists():
+        #     self.dump_paths.log_path.unlink()
 
-        self.dump_logger = self.set_dump_logger(dump_logger=dump_logger, top_level_caller=True)
-
-        self.config = config or ProcessDumperConfig()
-
+        # NOTE: Removed
         # Unpack arguments for easier access
         # self.include_inputs = self.config.include_inputs
         # self.include_outputs = self.config.include_outputs
@@ -218,9 +220,8 @@ class ProcessDumper(BaseDumper):
                 top_level_caller=top_level_caller,
             )
 
-            self.dump_logger = self.set_dump_logger(dump_logger=self.dump_logger)
-            current_mapping = self.dump_logger.build_current_group_node_mapping()
-            self.dump_logger.group_node_mapping = current_mapping
+            # current_mapping = self.dump_logger.build_current_group_node_mapping()
+            # self.dump_logger.group_node_mapping = current_mapping
 
         if isinstance(process_node, orm.CalculationNode):
             self._dump_calculation(
@@ -239,7 +240,7 @@ class ProcessDumper(BaseDumper):
         if top_level_caller:
             # When should the logger ever be None?
             assert self.dump_logger is not None
-            self.dump_logger.save_log()
+            self.dump_logger.save(current_dump_time=self.dump_times.current)
 
     def _dump_workflow(
         self,
@@ -263,11 +264,10 @@ class ProcessDumper(BaseDumper):
         (output_path / DumpPaths.safeguard_file).touch()
 
         if self.dump_logger is not None:
-            workflow_store = self.dump_logger.stores.workflows
+            workflow_store = self.dump_logger.get_store_by_name('workflows')
 
-            # import ipdb; ipdb.set_trace()
-            self.dump_logger.add_entry(
-                store=workflow_store,
+
+            workflow_store.add_entry(
                 uuid=workflow_node.uuid,
                 entry=DumpLog(path=output_path.resolve()),
             )
@@ -290,10 +290,10 @@ class ProcessDumper(BaseDumper):
 
             # Once a `CalculationNode` as child reached, dump it
             elif isinstance(child_node, orm.CalculationNode):
-                calculation_store = self.dump_logger.stores.calculations
+                calculation_store = self.dump_logger.get_store_by_name('calculations')
 
                 # TODO: Could add a `uuid_in_store` or similarly named method
-                # import ipdb; ipdb.set_trace()
+
                 if not self.config.symlink_calcs or child_node.uuid not in calculation_store.entries.keys():
                     self._dump_calculation(
                         calculation_node=child_node,
@@ -375,12 +375,10 @@ class ProcessDumper(BaseDumper):
             )
 
         if self.dump_logger is not None:
-            calculation_store = self.dump_logger.stores.calculations
+            calculation_store = self.dump_logger.get_store_by_name('calculations')
 
             if calculation_node.uuid not in calculation_store.entries:
-                # import ipdb; ipdb.set_trace()
-                self.dump_logger.add_entry(
-                    store=calculation_store,
+                calculation_store.add_entry(
                     uuid=calculation_node.uuid,
                     entry=DumpLog(
                         path=output_path,

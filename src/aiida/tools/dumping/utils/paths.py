@@ -7,7 +7,17 @@ from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration import Profile
 from aiida.tools.dumping.config import DumpMode
 
-logger = AIIDA_LOGGER.getChild("tools.dumping.utils")
+logger = AIIDA_LOGGER.getChild("tools.dumping.utils.paths")
+
+__all__ = (
+    "DumpPaths",
+    "generate_group_default_dump_path",
+    "generate_process_default_dump_path",
+    "generate_profile_default_dump_path",
+    "prepare_dump_path",
+    "resolve_click_path_for_dump",
+    "safe_delete_dir",
+)
 
 
 @dataclass

@@ -1,5 +1,4 @@
 
-from aiida.tools.dumping.mapping.manager import GroupNodeMappingManager
-from aiida.tools.dumping.mapping.mapping import GroupNodeMapping
+from aiida.tools.dumping.mapping.group import GroupNodeMapping
 
-__all__ = ['GroupNodeMapping', 'GroupNodeMappingManager']
+__all__ = ['GroupNodeMapping']

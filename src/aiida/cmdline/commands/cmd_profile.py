@@ -323,7 +323,7 @@ def profile_dump(
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.dumping import ProfileDumper
     from aiida.tools.dumping.config import DumpConfig, DumpMode
-    from aiida.tools.dumping.utils.paths import resolve_click_path_for_dump, DumpPaths
+    from aiida.tools.dumping.utils.paths import resolve_click_path_for_dump
 
     profile = ctx.obj['profile']
 

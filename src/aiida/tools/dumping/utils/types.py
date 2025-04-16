@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Literal, Set, Type, Any
+from typing import Any, Dict, List, Literal, Set, Type
 
 from aiida import orm
 
@@ -149,7 +149,7 @@ class NodeMembershipChange:
 
 # --- Main Dataclasses for Change Representation ---
 @dataclass
-class GroupChangeInfo:
+class GroupChanges:
     """Holds all changes related to group lifecycle and membership."""
 
     deleted: List[GroupInfo] = field(default_factory=list)
@@ -176,7 +176,7 @@ class DumpChanges:
     """Represents all detected changes for a dump cycle (Recommended Structure)."""
 
     nodes: NodeChanges = field(default_factory=NodeChanges)
-    groups: GroupChangeInfo = field(default_factory=GroupChangeInfo)
+    groups: GroupChanges = field(default_factory=GroupChanges)
 
 
 class DumpStoreKeys(str, Enum):
@@ -186,7 +186,7 @@ class DumpStoreKeys(str, Enum):
     DATA = "data"
 
     @classmethod
-    def from_instance(cls, node_inst: orm.Node | orm.Group) -> str:
+    def from_instance(cls, node_inst: orm.Node | orm.Group) -> StoreNameType:
         if isinstance(node_inst, orm.CalculationNode):
             return cls.CALCULATIONS.value
         elif isinstance(node_inst, orm.WorkflowNode):
@@ -200,7 +200,7 @@ class DumpStoreKeys(str, Enum):
             raise NotImplementedError(msg)
 
     @classmethod
-    def from_class(cls, orm_class: Type) -> str:
+    def from_class(cls, orm_class: Type) -> StoreNameType:
         if issubclass(orm_class, orm.CalculationNode):
             return cls.CALCULATIONS.value
         elif issubclass(orm_class, orm.WorkflowNode):

@@ -12,14 +12,15 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 from enum import Enum, auto
 
+# TODO: Rename DumperConfig -> DumpConfig
+
 __all__ = (
-    'BaseCollectionDumperConfig',
     'DumpCollectorConfig',
     'DumpMode',
-    'GroupDumperConfig',
+    'GroupDumpConfig',
     'NodeDumpGroupScope',
-    'ProcessDumperConfig',
-    'ProfileDumperConfig',
+    'ProcessDumpConfig',
+    'ProfileDumpConfig',
 )
 
 
@@ -79,9 +80,9 @@ class DumpConfig:
             group_scope=self.group_scope,
         )
 
-    def get_process_config(self) -> ProcessDumperConfig:
+    def get_process_config(self) -> ProcessDumpConfig:
         """Extract configuration for ProcessDumper."""
-        return ProcessDumperConfig(
+        return ProcessDumpConfig(
             include_inputs=self.include_inputs,
             include_outputs=self.include_outputs,
             include_attributes=self.include_attributes,
@@ -91,13 +92,13 @@ class DumpConfig:
             symlink_calcs=self.symlink_calcs,
         )
 
-    def get_group_config(self) -> GroupDumperConfig:
+    def get_group_config(self) -> GroupDumpConfig:
         """Extract configuration for GroupDumper."""
-        return GroupDumperConfig(symlink_calcs=self.symlink_calcs, delete_missing=self.delete_missing)
+        return GroupDumpConfig(symlink_calcs=self.symlink_calcs, delete_missing=self.delete_missing)
 
-    def get_profile_config(self) -> ProfileDumperConfig:
+    def get_profile_config(self) -> ProfileDumpConfig:
         """Extract configuration for ProfileDumper."""
-        return ProfileDumperConfig(
+        return ProfileDumpConfig(
             symlink_calcs=self.symlink_calcs,
             delete_missing=self.delete_missing,
             organize_by_groups=self.organize_by_groups,
@@ -109,9 +110,9 @@ class DumpConfig:
     @classmethod
     def from_component_configs(
         cls,
-        process_config: ProcessDumperConfig | None = None,
-        group_config: GroupDumperConfig | None = None,
-        profile_config: ProfileDumperConfig | None = None,
+        process_config: ProcessDumpConfig | None = None,
+        group_config: GroupDumpConfig | None = None,
+        profile_config: ProfileDumpConfig | None = None,
         collector_config: DumpCollectorConfig | None = None,
     ) -> 'DumpConfig':
         """Construct a unified config from component configs."""
@@ -119,19 +120,19 @@ class DumpConfig:
 
         # Update from process config if provided
         if process_config:
-            for field in fields(ProcessDumperConfig):
+            for field in fields(ProcessDumpConfig):
                 if hasattr(process_config, field.name):
                     setattr(config, field.name, getattr(process_config, field.name))
 
         # Update from group config if provided
         if group_config:
-            for field in fields(GroupDumperConfig):
+            for field in fields(GroupDumpConfig):
                 if hasattr(group_config, field.name):
                     setattr(config, field.name, getattr(group_config, field.name))
 
         # Update from profile config if provided
         if profile_config:
-            for field in fields(ProfileDumperConfig):
+            for field in fields(ProfileDumpConfig):
                 if hasattr(profile_config, field.name):
                     setattr(config, field.name, getattr(profile_config, field.name))
 
@@ -157,7 +158,7 @@ class DumpCollectorConfig:
 
 
 @dataclass
-class ProcessDumperConfig:
+class ProcessDumpConfig:
     """Arguments for dumping process data."""
 
     include_inputs: bool = True
@@ -170,14 +171,14 @@ class ProcessDumperConfig:
 
 
 @dataclass
-class GroupDumperConfig:
+class GroupDumpConfig:
     """Arguments for dumping group data."""
     symlink_calcs: bool = False
     delete_missing: bool = False
 
 
 @dataclass
-class ProfileDumperConfig:
+class ProfileDumpConfig:
     """Arguments for dumping profile data."""
 
     symlink_calcs: bool = False

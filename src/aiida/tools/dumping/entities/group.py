@@ -17,7 +17,6 @@ from aiida.common.exceptions import NotExistent
 from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.config import DumpConfig
 from aiida.tools.dumping.engine import DumpEngine
-from aiida.tools.dumping.utils.groups import load_given_group, load_given_groups
 from aiida.tools.dumping.utils.paths import (
     DumpPaths,
     generate_group_default_dump_path,

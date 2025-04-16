@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Set
 
 from aiida import orm
-from aiida.tools.dumping.utils.types import GroupInfo, GroupModificationInfo, NodeMembershipChange, GroupChangeInfo
+from aiida.tools.dumping.utils.types import GroupChanges, GroupInfo, GroupModificationInfo, NodeMembershipChange
 
 
 @dataclass
@@ -121,7 +121,7 @@ class GroupNodeMapping:
                         mapping.node_to_groups[node_uuid].add(group_uuid)
 
         return mapping
-    
+
     @classmethod
     def build_from_db(cls) -> 'GroupNodeMapping':
         """Build a mapping from the current database state."""
@@ -137,7 +137,7 @@ class GroupNodeMapping:
 
         return mapping
 
-    def diff(self, other: 'GroupNodeMapping') -> GroupChangeInfo:
+    def diff(self, other: 'GroupNodeMapping') -> GroupChanges:
         """
         Calculate differences between this mapping and another.
 
@@ -193,7 +193,7 @@ class GroupNodeMapping:
                     node_membership_changes[node_uuid].removed_from.append(group_uuid)
 
         # Construct and return the GroupChangeInfo object
-        return GroupChangeInfo(
+        return GroupChanges(
             deleted=deleted_groups_info,
             new=new_groups_info,
             modified=modified_groups_info,

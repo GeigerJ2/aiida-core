@@ -26,7 +26,7 @@ from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration.profile import Profile
 from aiida.tools.dumping.config import DumpConfig
 from aiida.tools.dumping.engine import DumpEngine
-from aiida.tools.dumping.utils import (
+from aiida.tools.dumping.utils.paths import (
     DumpPaths,
     generate_profile_default_dump_path,
 )
