@@ -28,13 +28,14 @@ from aiida.tools.dumping.config import (
     DumpMode,
     ProcessDumpConfig,
 )
-from aiida.tools.dumping.storage.logger import DumpLog, DumpLogger
+from aiida.tools.dumping.logger import DumpLog, DumpLogger
 from aiida.tools.dumping.utils.paths import DumpPaths, prepare_dump_path
 from aiida.tools.dumping.utils.time import DumpTimes
 
 # TODO: See if I can always use name, or pass the dumping sub module explicitly
 
-logger = AIIDA_LOGGER.getChild("tools.dumping.logger")
+logger = AIIDA_LOGGER.getChild('tools.dumping.entities.process')
+
 
 class ProcessDumper(BaseDumper):
     """Class to handle dumping of an AiiDA process."""
@@ -63,29 +64,6 @@ class ProcessDumper(BaseDumper):
             dump_mode=dump_mode,
             dump_paths=dump_paths,
         )
-
-        # NOTE: Removed
-        # if dump_paths is None:
-        #     default_dump_path = generate_process_default_dump_path(process_node=self.process_node)
-        #     self.dump_paths = DumpPaths(child=default_dump_path)
-
-        # The problem is that the dump_logger is not a singleton, but is passed around and attached to various
-        # classes. During dumping with the `overwrite` option, it gets reset for every `ProcessDump` instantiation.
-        # However, the pre_dump is done before instantiation, so running the dump with `overwrite` still has the
-        # `dump_logger` from the JSON file of the previous run attached...
-        # Solve by deleting the log file in overwrite mode here, or making pre_dump a `classmethod` that's executed
-        # before instantiation??
-        # if dump_mode == DumpMode.OVERWRITE and self.dump_paths.log_path.exists():
-        #     self.dump_paths.log_path.unlink()
-
-        # NOTE: Removed
-        # Unpack arguments for easier access
-        # self.include_inputs = self.config.include_inputs
-        # self.include_outputs = self.config.include_outputs
-        # self.include_attributes = self.config.include_attributes
-        # self.include_extras = self.config.include_extras
-        # self.config.flat = self.config.flat
-        # self.config.dump_unsealed = self.config.dump_unsealed
 
     def _generate_readme(self) -> None:
         """Generate README.md file in main dumping directory.
@@ -265,7 +243,6 @@ class ProcessDumper(BaseDumper):
 
         if self.dump_logger is not None:
             workflow_store = self.dump_logger.get_store_by_name('workflows')
-
 
             workflow_store.add_entry(
                 uuid=workflow_node.uuid,

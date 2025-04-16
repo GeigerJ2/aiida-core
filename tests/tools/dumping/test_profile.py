@@ -480,7 +480,7 @@ tree_profile_also_ungrouped = {
             ]
         },
         {
-            "no-group": [
+            "ungrouped": [
                 # TODO: Question?
                 ".aiida_dump_safeguard",
                 {
@@ -976,159 +976,62 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    # TODO: Make pass
-    # @pytest.mark.usefixtures("aiida_profile_clean")
-    # def test_dump_also_ungrouped(
-    #     self,
-    #     tmp_path,
-    #     setup_add_group,
-    #     setup_multiply_add_group,
-    #     generate_calculation_node_add,
-    #     generate_workchain_multiply_add,
-    # ):
-    #     setup_add_group
-    #     setup_multiply_add_group
-    #
-    #     # Create additional ArithmeticAdd and MultiplyAdd nodes
-    #     _ = generate_calculation_node_add()
-    #     _ = generate_workchain_multiply_add()
+    @pytest.mark.usefixtures("aiida_profile_clean")
+    def test_dump_also_ungrouped(
+        self,
+        tmp_path,
+        setup_add_group,
+        setup_multiply_add_group,
+        generate_calculation_node_add,
+        generate_workchain_multiply_add,
+    ):
+        setup_add_group
+        setup_multiply_add_group
 
-    #     output_path = tmp_path / profile_dump_label
+        # Create additional ArithmeticAdd and MultiplyAdd nodes
+        _ = generate_calculation_node_add()
+        _ = generate_workchain_multiply_add()
 
-    #     profile_dumper = ProfileDumper(
-    #         output_path=output_path,
-    #         config=DumpConfig(also_ungrouped=False),
-    #     )
-    #     profile_dumper.dump()
+        output_path = tmp_path / profile_dump_label
 
-    #     # Only the tree with the groups should be created
-    #     compare_tree(
-    #         expected=tree_profile_groups_add_multiply_add,
-    #         base_path=tmp_path,
-    #     )
+        profile_dumper = ProfileDumper(
+            output_path=output_path,
+            config=DumpConfig(also_ungrouped=False),
+        )
+        profile_dumper.dump()
 
-    #     # Tree with extra nodes raises
-    #     with pytest.raises(AssertionError):
-    #         compare_tree(
-    #             expected=tree_profile_also_ungrouped,
-    #             base_path=tmp_path,
-    #         )
+        # Only the tree with the groups should be created
+        compare_tree(
+            expected=tree_profile_groups_add_multiply_add,
+            base_path=tmp_path,
+        )
 
-    #     # Now, also dump the two additional nodes in incremental mode
-    #     profile_dumper = ProfileDumper(
-    #         output_path=output_path,
-    #         config=DumpConfig(also_ungrouped=True, filter_by_last_dump_time=False),
-    #     )
-    #     profile_dumper.dump()
+        # Tree with extra nodes raises
+        with pytest.raises(AssertionError):
+            compare_tree(
+                expected=tree_profile_also_ungrouped,
+                base_path=tmp_path,
+            )
 
-    #     # The previous tree should raise, as we now have additional directories
-    #     with pytest.raises(AssertionError):
-    #         compare_tree(
-    #             expected=tree_profile_groups_add_multiply_add,
-    #             base_path=tmp_path,
-    #         )
+        # Now, also dump the two additional nodes in incremental mode
+        profile_dumper = ProfileDumper(
+            output_path=output_path,
+            config=DumpConfig(also_ungrouped=True, filter_by_last_dump_time=False),
+        )
+        profile_dumper.dump()
 
-    #     # Now compare with the actual tree
-    #     compare_tree(
-    #         expected=tree_profile_also_ungrouped,
-    #         base_path=tmp_path,
-    #     )
+        # The previous tree should raise, as we now have additional directories
+        with pytest.raises(AssertionError):
+            compare_tree(
+                expected=tree_profile_groups_add_multiply_add,
+                base_path=tmp_path,
+            )
 
-    # TODO: Make pass
-    # @pytest.mark.usefixtures("aiida_profile_clean")
-    # def test_dump_delete_missing_nodes(
-    #     self,
-    #     tmp_path,
-    #     setup_add_group,
-    #     setup_multiply_add_group,
-    # ):
-    #     from aiida.tools.graph.deletions import delete_nodes
-
-    #     add_group = setup_add_group
-    #     setup_multiply_add_group
-    #
-    #     output_path = tmp_path / profile_dump_label
-    #     profile_dumper = ProfileDumper(output_path=output_path)
-    #     profile_dumper.dump()
-
-    #     # Full dump
-    #     compare_tree(
-    #         expected=tree_profile_groups_add_multiply_add,
-    #         base_path=tmp_path,
-    #     )
-    #     with pytest.raises(AssertionError):
-    #         compare_tree(
-    #             expected=tree_profile_delete_missing_nodes,
-    #             base_path=tmp_path,
-    #         )
-
-    #     add_node = add_group.nodes[0]
-
-    #     _ = delete_nodes(pks=[add_node.pk], dry_run=False)
-
-    #     profile_dumper = ProfileDumper(
-    #         output_path=output_path,
-    #         config=DumpConfig(delete_missing=True),
-    #     )
-    #     profile_dumper.dump()
-
-    #     compare_tree(
-    #         expected=tree_profile_delete_missing_nodes,
-    #         base_path=tmp_path,
-    #     )
-    #     with pytest.raises(AssertionError):
-    #         compare_tree(
-    #             expected=tree_profile_groups_add_multiply_add,
-    #             base_path=tmp_path,
-    #         )
-
-    # TODO: Make pass (could've just failed bc of the assert False)
-    # @pytest.mark.usefixtures("aiida_profile_clean")
-    # def test_dump_delete_missing_groups(
-    #     self,
-    #     tmp_path,
-    #     setup_add_group,
-    #     setup_multiply_add_group,
-    # ):
-    #     from aiida import orm
-
-    #     add_group = setup_add_group
-    #     setup_multiply_add_group
-    #
-    #     output_path = tmp_path / profile_dump_label
-    #     profile_dumper = ProfileDumper(output_path=output_path)
-    #     profile_dumper.dump()
-
-    #     # Full dump
-    #     compare_tree(
-    #         expected=tree_profile_groups_add_multiply_add,
-    #         base_path=tmp_path,
-    #     )
-    #     # with pytest.raises(AssertionError):
-    #     #     compare_tree(
-    #     #         expected=,
-    #     #         base_path=tmp_path,
-    #     #     )
-
-    #     orm.Group.collection.delete(add_group.pk)
-
-    #     profile_dumper = ProfileDumper(
-    #         output_path=output_path,
-    #         config=DumpConfig(delete_missing=True),
-    #     )
-    #     profile_dumper.dump()
-
-    #     print(tmp_path)
-
-    # compare_tree(
-    #     expected=tree_profile_delete_missing_nodes,
-    #     base_path=tmp_path,
-    # )
-    # with pytest.raises(AssertionError):
-    #     compare_tree(
-    #         expected=tree_profile_groups_add_multiply_add,
-    #         base_path=tmp_path,
-    #     )
+        # Now compare with the actual tree
+        compare_tree(
+            expected=tree_profile_also_ungrouped,
+            base_path=tmp_path,
+        )
 
     @pytest.mark.usefixtures("aiida_profile_clean")
     def test_dump_add_node_to_group(
@@ -1244,6 +1147,102 @@ class TestProfileDumper:
         )
 
     # @pytest.mark.usefixtures("aiida_profile_clean")
+    # def test_dump_delete_missing_nodes(
+    #     self,
+    #     tmp_path,
+    #     setup_add_group,
+    #     setup_multiply_add_group,
+    # ):
+    #     from aiida.tools.graph.deletions import delete_nodes
+
+    #     add_group = setup_add_group
+    #     setup_multiply_add_group
+
+    #     output_path = tmp_path / profile_dump_label
+    #     profile_dumper = ProfileDumper(output_path=output_path)
+    #     profile_dumper.dump()
+
+    #     # Full dump
+    #     compare_tree(
+    #         expected=tree_profile_groups_add_multiply_add,
+    #         base_path=tmp_path,
+    #     )
+    #     with pytest.raises(AssertionError):
+    #         compare_tree(
+    #             expected=tree_profile_delete_missing_nodes,
+    #             base_path=tmp_path,
+    #         )
+
+    #     add_node = add_group.nodes[0]
+
+    #     _ = delete_nodes(pks=[add_node.pk], dry_run=False)
+
+    #     profile_dumper = ProfileDumper(
+    #         output_path=output_path,
+    #         config=DumpConfig(delete_missing=True),
+    #     )
+    #     profile_dumper.dump()
+
+    #     compare_tree(
+    #         expected=tree_profile_delete_missing_nodes,
+    #         base_path=tmp_path,
+    #     )
+    #     with pytest.raises(AssertionError):
+            # compare_tree(
+            #     expected=tree_profile_groups_add_multiply_add,
+            #     base_path=tmp_path,
+            # )
+
+    # TODO: Make pass (could've just failed bc of the assert False)
+    # @pytest.mark.usefixtures("aiida_profile_clean")
+    # def test_dump_delete_missing_groups(
+    #     self,
+    #     tmp_path,
+    #     setup_add_group,
+    #     setup_multiply_add_group,
+    # ):
+    #     from aiida import orm
+
+    #     add_group = setup_add_group
+    #     setup_multiply_add_group
+    #
+    #     output_path = tmp_path / profile_dump_label
+    #     profile_dumper = ProfileDumper(output_path=output_path)
+    #     profile_dumper.dump()
+
+    #     # Full dump
+    #     compare_tree(
+    #         expected=tree_profile_groups_add_multiply_add,
+    #         base_path=tmp_path,
+    #     )
+    #     # with pytest.raises(AssertionError):
+    #     #     compare_tree(
+    #     #         expected=,
+    #     #         base_path=tmp_path,
+    #     #     )
+
+    #     orm.Group.collection.delete(add_group.pk)
+
+    #     profile_dumper = ProfileDumper(
+    #         output_path=output_path,
+    #         config=DumpConfig(delete_missing=True),
+    #     )
+    #     profile_dumper.dump()
+
+    #     print(tmp_path)
+
+    # compare_tree(
+    #     expected=tree_profile_delete_missing_nodes,
+    #     base_path=tmp_path,
+    # )
+    # with pytest.raises(AssertionError):
+    #     compare_tree(
+    #         expected=tree_profile_groups_add_multiply_add,
+    #         base_path=tmp_path,
+    #     )
+
+
+    # @pytest.mark.usefixtures("aiida_profile_clean")
     # def test_dump_no_only_top_level_wfs(
     #     self, tmp_path, setup_add_group, setup_multiply_add_group
     # ):
@@ -1266,83 +1265,3 @@ class TestProfileDumper:
     #         expected=tree_profile_no_only_top_level_calcs,
     #         base_path=tmp_path,
     #     )
-
-    @pytest.mark.usefixtures("aiida_profile_clean")
-    def test_dump_symlink_wfs(
-        self, tmp_path, setup_add_group, setup_multiply_add_group
-    ):
-        ...
-        # TODO: This is not implemented yet, and not sure if it's necessary
-
-    def test_delete_missing_group_nodes_retained(self): ...
-
-    def test_delete_missing_group_nodes_deleted(self): ...
-
-    # @pytest.mark.usefixtures('aiida_profile_clean')
-    # def test_get_groups_to_delete(self, tmp_path):
-    #     # NOTE: `dump_logger` and `profile_dump.dump_loger` if I construct the `profile_dump` here and already
-    #     # attach the `dump_logger`...?
-    #     dump_paths = DumpPaths.from_path(tmp_path)
-    #     dump_logger = DumpLogger(dump_paths=dump_paths)
-    #     groups = []
-    #     for i in range(2):
-    #         group_label = f'group-{i}'
-    #         group = orm.Group(label=group_label)
-    #         group.store()
-    #         dump_logger.add_entry(
-    #             store=dump_logger.stores.groups,
-    #             uuid=group.uuid,
-    #             entry=DumpLog(path=tmp_path / group_label),
-    #         )
-    #         groups.append(group)
-
-    #     config = ProfileDumpConfig(delete_missing=True)
-    #     profile_dump = ProfileDump(dump_paths=dump_paths, dump_logger=dump_logger, config=config)
-    #     _ = orm.Group.collection.delete(groups[0].pk)
-
-    #     assert profile_dump.get_groups_to_delete() == [groups[0].uuid]
-
-    #     _ = orm.Group.collection.delete(groups[1].pk)
-    #     assert profile_dump.get_groups_to_delete() == [group.uuid for group in groups]
-
-    # @pytest.mark.usefixtures('aiida_profile_clean')
-    # def test_del_missing_groups(tmp_path):
-    #     # NOTE: `dump_logger` and `profile_dump.dump_loger` if I construct the `profile_dump` here and already
-    #     # attach the `dump_logger`...?
-    #     dump_paths = DumpPaths.from_path(tmp_path)
-    #     dump_logger = DumpLogger(dump_paths=dump_paths)
-    #     dump_times = DumpTimes()
-    #     group_store = dump_logger.stores.groups
-    #     groups = []
-    #     for i in range(2):
-    #         group_label = f'group-{i}'
-    #         group = orm.Group(label=group_label)
-    #         group.store()
-    #         dump_logger.add_entry(
-    #             store=dump_logger.stores.groups,
-    #             uuid=group.uuid,
-    #             entry=DumpLog(path=tmp_path / group_label),
-    #         )
-    #         groups.append(group)
-
-    #     config = ProfileDumpConfig(delete_missing=True)
-    #     profile_dump = ProfileDump(dump_paths=dump_paths, dump_logger=dump_logger, config=config)
-
-    #     path_to_del = group_store.get_entry(uuid=groups[0].uuid).path
-
-    #     _ = orm.Group.collection.delete(groups[0].pk)
-
-    #     profile_dump.delete_missing_groups()
-    #     assert path_to_del
-
-    #     # assert profile_dump.get_groups_to_delete() == [groups[0].uuid]
-
-    #     # _ = orm.Group.collection.delete(groups[1].pk)
-    #     # assert profile_dump.get_groups_to_delete() == [group.uuid for group in groups]
-
-    #     # to_delete_uuid = ProfileDump.get_groups_to_delete()
-    #     # assert to_delete_uuid[0] == group_uuid
-
-    #     # import ipdb
-
-    #     # profile_dump

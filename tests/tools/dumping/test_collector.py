@@ -15,7 +15,7 @@ from aiida import orm
 from aiida.tools.dumping.config import (
     NodeDumpGroupScope,
 )
-from aiida.tools.dumping.storage.logger import DumpLog, DumpLogger
+from aiida.tools.dumping.logger import DumpLog, DumpLogger
 from aiida.tools.dumping.utils.time import DumpTimes
 from aiida.tools.graph.deletions import delete_nodes
 

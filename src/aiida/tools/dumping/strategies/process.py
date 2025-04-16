@@ -9,7 +9,7 @@ from aiida.tools.dumping.utils.paths import (
 )
 from aiida.tools.dumping.utils.types import DumpChanges
 
-logger = AIIDA_LOGGER.getChild("tools.dumping.engine")
+logger = AIIDA_LOGGER.getChild("tools.dumping.strategies.process")
 
 
 class ProcessDumpStrategy(DumpStrategy):

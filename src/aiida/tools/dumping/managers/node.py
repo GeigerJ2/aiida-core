@@ -14,7 +14,7 @@ from aiida.tools.dumping.utils.types import DumpStoreKeys
 
 if TYPE_CHECKING:
     from aiida.tools.dumping.config import DumpConfig
-    from aiida.tools.dumping.storage.logger import DumpLogger
+    from aiida.tools.dumping.logger import DumpLogger
     from aiida.tools.dumping.utils.types import DumpNodeStore
 
 logger = AIIDA_LOGGER.getChild("tools.dumping.managers.node")
@@ -242,7 +242,8 @@ class NodeManager:
         node = process
 
         # --- Determine the correct parent path for the node's type subdirectory ---
-        if group and self.config.organize_by_groups:
+        # if group and self.config.organize_by_groups:
+        if self.config.organize_by_groups:
             # === Grouped & Organized Path ===
             # get_group_path ensures .../groups/group_label exists
             group_base_path = self.group_manager.prepare_group_path(group)

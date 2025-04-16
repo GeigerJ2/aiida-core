@@ -18,10 +18,10 @@ from aiida.tools.dumping.utils.types import DumpStoreKeys
 
 if TYPE_CHECKING:
     from aiida.tools.dumping.config import DumpConfig
-    from aiida.tools.dumping.storage.logger import DumpLogger, DumpLogStore
+    from aiida.tools.dumping.logger import DumpLogger, DumpLogStore
     from aiida.tools.dumping.utils.time import DumpTimes
 
-logger = AIIDA_LOGGER.getChild('tools.dumping.detect.query')
+logger = AIIDA_LOGGER.getChild('tools.dumping.detect.strategies')
 
 __all__ = (
     'AnyNodeQueryStrategy',

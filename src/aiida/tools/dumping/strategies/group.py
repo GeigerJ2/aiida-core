@@ -2,7 +2,7 @@ from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.strategies.base import DumpStrategy
 from aiida.tools.dumping.utils.types import DumpChanges
 
-logger = AIIDA_LOGGER.getChild("tools.dumping.engine")
+logger = AIIDA_LOGGER.getChild("tools.dumping.strategies.group")
 
 
 class GroupDumpStrategy(DumpStrategy):

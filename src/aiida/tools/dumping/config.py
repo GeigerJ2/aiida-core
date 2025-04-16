@@ -12,10 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 from enum import Enum, auto
 
-# TODO: Rename DumperConfig -> DumpConfig
-
 __all__ = (
-    'DumpCollectorConfig',
+    'DumpDetectionConfig',
     'DumpMode',
     'GroupDumpConfig',
     'NodeDumpGroupScope',
@@ -69,9 +67,9 @@ class DumpConfig:
     update_groups: bool = False
     symlink_between_groups: bool = False
 
-    def get_collector_config(self) -> DumpCollectorConfig:
+    def get_collector_config(self) -> DumpDetectionConfig:
         """Extract configuration for DumpCollector."""
-        return DumpCollectorConfig(
+        return DumpDetectionConfig(
             get_processes=self.get_processes,
             get_data=self.get_data,
             filter_by_last_dump_time=self.filter_by_last_dump_time,
@@ -113,7 +111,7 @@ class DumpConfig:
         process_config: ProcessDumpConfig | None = None,
         group_config: GroupDumpConfig | None = None,
         profile_config: ProfileDumpConfig | None = None,
-        collector_config: DumpCollectorConfig | None = None,
+        detection_config: DumpDetectionConfig | None = None,
     ) -> 'DumpConfig':
         """Construct a unified config from component configs."""
         config = cls()
@@ -137,16 +135,16 @@ class DumpConfig:
                     setattr(config, field.name, getattr(profile_config, field.name))
 
         # Update from collector config if provided
-        if collector_config:
-            for field in fields(DumpCollectorConfig):
-                if hasattr(collector_config, field.name):
-                    setattr(config, field.name, getattr(collector_config, field.name))
+        if detection_config:
+            for field in fields(DumpDetectionConfig):
+                if hasattr(detection_config, field.name):
+                    setattr(config, field.name, getattr(detection_config, field.name))
 
         return config
 
 
 @dataclass
-class DumpCollectorConfig:
+class DumpDetectionConfig:
     """Shared arguments for dumping of collections of nodes."""
 
     get_processes: bool = True
@@ -173,6 +171,7 @@ class ProcessDumpConfig:
 @dataclass
 class GroupDumpConfig:
     """Arguments for dumping group data."""
+
     symlink_calcs: bool = False
     delete_missing: bool = False
 

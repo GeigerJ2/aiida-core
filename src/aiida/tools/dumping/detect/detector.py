@@ -37,7 +37,7 @@ logger = AIIDA_LOGGER.getChild('tools.dumping.detect.detector')
 
 if TYPE_CHECKING:
     from aiida.tools.dumping.config import DumpConfig
-    from aiida.tools.dumping.storage.logger import DumpLogger
+    from aiida.tools.dumping.logger import DumpLogger
 
 
 class DumpChangeDetector:
