@@ -678,16 +678,17 @@ def group_dump(
 
     from aiida.tools.archive.exceptions import ExportValidationError
     from aiida.tools.dumping import GroupDumper
-    from aiida.tools.dumping.config import DumpDbCollectorConfig, DumpMode, GroupDumperConfig, ProcessDumperConfig
-    from aiida.tools.dumping.utils import resolve_click_path_for_dump
+    from aiida.tools.dumping.config import DumpConfig, DumpMode
+    from aiida.tools.dumping.utils.paths import resolve_click_path_for_dump
 
     # FIXME: If nodes not newly created since the last Dumping, but only added to the group, those are not picked up
     # during the incremental dumping
+    # TODO: Use loop to dump multiple groups, but, if multiple selected, disable path argument (raise if it is provided)
 
     dump_paths = resolve_click_path_for_dump(path=path, entity=group)
-    output_path = dump_paths.parent / dump_paths.child
+    output_path = dump_paths.absolute
 
-    msg = f'Dumping data of group `{group.label}` at path `{output_path.name}`.'
+    msg = f'Dumping data of group `{group.label}` at path `{dump_paths.child}`.'
     echo.echo_report(msg)
 
     if overwrite:
@@ -695,39 +696,31 @@ def group_dump(
     else:
         dump_mode = DumpMode.INCREMENTAL
 
-    dump_collector_config = DumpDbCollectorConfig(
+    config = DumpConfig(
+        dump_mode=dump_mode,
         get_processes=dump_processes,
         get_data=dump_data,
         filter_by_last_dump_time=filter_by_last_dump_time,
         only_top_level_calcs=only_top_level_calcs,
         only_top_level_workflows=only_top_level_workflows,
-    )
-
-    process_dump_config = ProcessDumperConfig(
         include_inputs=include_inputs,
         include_outputs=include_outputs,
         include_attributes=include_attributes,
         include_extras=include_extras,
         flat=flat,
         dump_unsealed=dump_unsealed,
-    )
-
-    group_dump_config = GroupDumperConfig(
         symlink_calcs=symlink_calcs,
         delete_missing=delete_missing,
     )
 
     group_dumper = GroupDumper(
         group=group,
-        dump_mode=dump_mode,
-        dump_paths=dump_paths,
-        dump_collector_config=dump_collector_config,
-        config=group_dump_config,
-        process_dump_config=process_dump_config,
+        config=config,
+        output_path=output_path
     )
 
     try:
-        _ = group_dumper.dump(top_level_caller=True)
+        _ = group_dumper.dump()
         # _ = group_dumper._generate_readme()
         msg = f'Raw files for group `{group.label}` <{group.pk}> dumped into folder `{output_path.name}`.'
         echo.echo_success(msg)

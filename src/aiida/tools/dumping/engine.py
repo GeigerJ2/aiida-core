@@ -1,25 +1,29 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.dumping.config import DumpConfig, DumpMode
+from aiida.tools.dumping.config import DumpMode
 from aiida.tools.dumping.detect.detector import DumpChangeDetector
 from aiida.tools.dumping.logger import DumpLogger
 from aiida.tools.dumping.managers.deletion import DeletionManager
 from aiida.tools.dumping.managers.group import GroupManager
 from aiida.tools.dumping.managers.node import NodeManager
-
-# Import mapping
-from aiida.tools.dumping.mapping import GroupNodeMapping
 from aiida.tools.dumping.strategies.base import DumpStrategy
 from aiida.tools.dumping.strategies.group import GroupDumpStrategy
 from aiida.tools.dumping.strategies.process import ProcessDumpStrategy
 from aiida.tools.dumping.strategies.profile import ProfileDumpStrategy
-from aiida.tools.dumping.utils.paths import DumpPaths, prepare_dump_path
+from aiida.tools.dumping.utils.paths import prepare_dump_path
 from aiida.tools.dumping.utils.time import DumpTimes
-
-# Import changes types
 from aiida.tools.dumping.utils.types import DumpChanges, GroupChanges
+
+if TYPE_CHECKING:
+    from aiida.manage import Profile
+    from aiida.tools.dumping.config import DumpConfig
+    from aiida.tools.dumping.mapping import GroupNodeMapping
+    from aiida.tools.dumping.utils.paths import DumpPaths
+
 
 logger = AIIDA_LOGGER.getChild('tools.dumping.engine')
 
@@ -36,7 +40,7 @@ class DumpEngine:
 
         # --- Initialize Managers (pass dependencies) ---
         # GroupManager might need DumpTimes if doing time-based logic internally
-        self.group_manager = GroupManager(config, dump_paths, self.dump_logger)  # Removed node_processor initially
+        self.group_manager = GroupManager(config, dump_paths, self.dump_logger, self)
         # NodeManager needs GroupManager for path calculation
         self.node_manager = NodeManager(config, dump_paths, self.dump_logger, self.dump_times, self.group_manager)
         # Detector needs logger and times
@@ -67,53 +71,56 @@ class DumpEngine:
 
         # Initialize DumpLogger instance with loaded data
         dump_logger = DumpLogger(self.dump_paths, stores_coll, last_dump_time_str)
-        msg = f'Dump logger initialized. Found {len(dump_logger.calculations)} calc logs, {len(dump_logger.workflows)} wf logs, {len(dump_logger.groups)} group logs.'
+        msg = (
+            f'Dump logger initialized. Found {len(dump_logger.calculations)} calc logs, '
+            f'{len(dump_logger.workflows)} wf logs, {len(dump_logger.groups)} group logs.'
+        )
         logger.debug(msg)
 
         if stored_mapping:
-            logger.debug(f'Loaded stored group mapping with {len(stored_mapping.group_to_nodes)} groups.')
+            msg = f'Loaded stored group mapping with {len(stored_mapping.group_to_nodes)} groups.'
+            logger.debug(msg)
         else:
-            logger.debug('No stored group mapping found in log file.')
+            msg = 'No stored group mapping found in log file.'
+            logger.debug(msg)
 
         return dump_times, dump_logger, stored_mapping
 
-    def dump(self, entity=None) -> None:
+    def dump(self, entity: orm.ProcessNode | orm.Group | Profile | None = None) -> None:
         """Selects and executes the appropriate dump strategy."""
-        logger.info(f'Starting dump process (Mode: {self.config.dump_mode.name})')
+        msg = f'Starting dump process (Mode: {self.config.dump_mode.name})'
+        logger.info(msg)
 
+        # NOTE: Should this maybe be after `prepare_dump_path`
         # --- Handle Deletion First (if requested) ---
         if self.config.delete_missing:
             logger.info('Deletion requested. Handling deleted entities...')
             # --- Change Detection (needed *only* for deletion info) ---
             logger.info('Detecting changes to identify deletions...')
             # Detect node changes (yields NodeChanges and mapping)
-            node_changes_for_deletion, current_mapping_for_deletion = self.detector.detect_changes(
-                group=None
-            )  # CORRECTED unpack
+            node_changes_for_deletion, current_mapping_for_deletion = self.detector.detect_changes(group=None)
             # Detect group changes (yields GroupChanges)
             group_changes_for_deletion = self.detector.detect_group_changes(
                 stored_mapping=self.stored_mapping,
-                current_mapping=current_mapping_for_deletion,  # Use the mapping just obtained
+                current_mapping=current_mapping_for_deletion,
                 specific_group_uuid=None,
             )
             # Assemble changes object specifically for deletion manager
             deletion_changes = DumpChanges(
-                nodes=node_changes_for_deletion,  # Pass NodeChanges instance
-                groups=group_changes_for_deletion,  # Pass GroupChanges instance
+                nodes=node_changes_for_deletion,
+                groups=group_changes_for_deletion,
             )
 
-            deleted = self.deletion_manager.handle_deleted_entities(
-                deletion_changes
-            )  # Pass correctly assembled changes
-            if deleted:
-                logger.info('Saving log after processing deletions.')
-                # Save the logger state using the current mapping identified during detection
-                self.dump_logger.save(self.dump_times.current, current_mapping_for_deletion)
-            logger.info('Deletion processing finished.')
-            return  # Deletion is an exclusive action
+            _ = self.deletion_manager.handle_deleted_entities(deletion_changes)  # Pass correctly assembled changes
+            # NOTE: This
+            # if deleted:
+            #     logger.info('Saving log after processing deletions.')
+            #     # Save the logger state using the current mapping identified during detection
+            #     self.dump_logger.save(self.dump_times.current, current_mapping_for_deletion)
+            # logger.info('Deletion processing finished.')
+            # return  # Deletion is an exclusive action
 
         # --- Prepare Top-Level Path ---
-        # ... (path preparation remains the same) ...
         try:
             prepare_dump_path(
                 path_to_validate=self.dump_paths.absolute,
@@ -158,7 +165,7 @@ class DumpEngine:
 
         try:
             # Pass the correctly assembled changes object
-            strategy.dump(all_changes)  # Strategies should expect DumpChanges
+            strategy.dump(changes=all_changes, dump_logger=self.dump_logger)  # Strategies should expect DumpChanges
         except Exception as e:
             logger.critical(
                 f'Error during execution of strategy {type(strategy).__name__}: {e}',
@@ -179,11 +186,22 @@ class DumpEngine:
         """Create the appropriate dump strategy based on entity type."""
         # Pass the engine instance (self) to strategies
         if isinstance(entity, orm.Group):
-            return GroupDumpStrategy(self, entity)
+            return GroupDumpStrategy(entity, engine=self)
         elif isinstance(entity, orm.ProcessNode):
-            return ProcessDumpStrategy(self, entity)
+            return ProcessDumpStrategy(entity, engine=self)
         elif entity is None:  # Assuming None entity means dump profile
-            return ProfileDumpStrategy(self, entity)  # Pass None entity
+            return ProfileDumpStrategy(entity, engine=self)  # Pass None entity
         else:
             # Handle unexpected entity types
             raise TypeError(f'Unsupported entity type for dumping: {type(entity)}')
+
+    def request_node_dump(self, node: orm.Node, group: orm.Group | None):
+        # NOTE: Avoids circular dependency between NodeManager and GroupManager
+        # NOTE: Uses mediator pattern
+        """Handles request from GroupManager to dump a node."""
+        logger.debug(f"Engine received request to dump node {node.pk} for group {group.label if group else 'None'}")
+        try:
+            # Delegate to NodeManager
+            self.node_manager.dump_process(node, group)
+        except Exception as e:
+            logger.error(f'Engine failed to delegate dump request for node {node.pk}: {e}', exc_info=True)

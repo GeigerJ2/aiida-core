@@ -177,6 +177,7 @@ class GroupNodeMapping:
             if added_nodes or removed_nodes:
                 modified_groups_info.append(GroupModificationInfo(
                     uuid=group_uuid,
+                    label=orm.load_group(group_uuid).label,
                     nodes_added=added_nodes,
                     nodes_removed=removed_nodes,
                 ))

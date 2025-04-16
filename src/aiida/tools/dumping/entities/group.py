@@ -38,15 +38,15 @@ logger = AIIDA_LOGGER.getChild('tools.dumping.entities.group')
 class GroupDumper:
     """Dumps data in an AiiDA group."""
 
-    def __init__(self, group, config=None, dump_paths=None):
+    def __init__(self, group, config=None, output_path=None):
         self.group = self._load_group(group)
         self.config = config or DumpConfig()
 
-        if dump_paths is None:
+        if output_path is None:
             default_path = generate_group_default_dump_path(self.group)
             self.dump_paths = DumpPaths(parent=Path.cwd(), child=default_path)
         else:
-            self.dump_paths = dump_paths
+            self.dump_paths = DumpPaths.from_path(output_path)
 
         self.engine = DumpEngine(config=self.config, dump_paths=self.dump_paths)
 
@@ -78,4 +78,5 @@ class GroupDumper:
 
     def dump(self):
         """Perform the dump operation."""
+        import ipdb; ipdb.set_trace()
         self.engine.dump(entity=self.group)

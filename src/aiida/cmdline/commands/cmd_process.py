@@ -598,12 +598,9 @@ def process_dump(
     node data for further inspection.
     """
 
-    from aiida.tools.archive.exceptions import ExportValidationError
-    from aiida.tools.dumping.config import DumpMode, ProcessDumperConfig
+    from aiida.tools.dumping.config import DumpMode, DumpConfig
     from aiida.tools.dumping.entities import ProcessDumper
-    from aiida.tools.dumping.utils import (
-        resolve_click_path_for_dump,
-    )
+    from aiida.tools.dumping.utils.paths import resolve_click_path_for_dump
 
     dump_paths = resolve_click_path_for_dump(path=path, entity=process)
     output_path = dump_paths.parent / dump_paths.child
@@ -613,14 +610,6 @@ def process_dump(
     else:
         dump_mode = DumpMode.INCREMENTAL
 
-    process_dump_config = ProcessDumperConfig(
-        include_inputs=include_inputs,
-        include_outputs=include_outputs,
-        include_attributes=include_attributes,
-        include_extras=include_extras,
-        flat=flat,
-        dump_unsealed=dump_unsealed,
-    )
 
     process_dumper = ProcessDumper(
         process_node=process,

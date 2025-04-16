@@ -64,7 +64,7 @@ class DumpConfig:
     # Profile options
     organize_by_groups: bool = True
     also_ungrouped: bool = False
-    update_groups: bool = False
+    update_groups: bool = True
     symlink_between_groups: bool = False
 
     def get_collector_config(self) -> DumpDetectionConfig:
@@ -184,5 +184,5 @@ class ProfileDumpConfig:
     delete_missing: bool = False
     organize_by_groups: bool = True
     also_ungrouped: bool = False
-    update_groups: bool = False
+    update_groups: bool = True
     symlink_between_groups: bool = False  # TODO

@@ -204,17 +204,15 @@ def generate_process_default_dump_path(
 
     path_entities = []
 
-    # No '' and None
     if prefix is not None:
         path_entities += [prefix]
 
-    try:
-        if process_node.process_label is not None:
-            path_entities.append(process_node.process_label)
-    except AttributeError:
-        # This case came up during testing, not sure how relevant it actually is
-        if process_node.process_type is not None:
-            path_entities.append(process_node.process_type)
+    if process_node.label:
+        path_entities.append(process_node.label)
+    elif process_node.process_label is not None:
+        path_entities.append(process_node.process_label)
+    elif process_node.process_type is not None:
+        path_entities.append(process_node.process_type)
 
     if append_pk:
         path_entities += [str(process_node.pk)]

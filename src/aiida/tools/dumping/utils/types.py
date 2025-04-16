@@ -135,6 +135,7 @@ class GroupModificationInfo:
     """Information about modifications to an existing group's membership."""
 
     uuid: str
+    label: str
     nodes_added: List[str] = field(default_factory=list)
     nodes_removed: List[str] = field(default_factory=list)
 

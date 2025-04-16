@@ -62,9 +62,6 @@ class DeletionManager:
 
         return something_deleted
 
-    # _detect_deleted_nodes - REMOVED
-    # _detect_deleted_groups - REMOVED
-
     # delete_node_from_logger_and_disk - Stays the same as in previous response
     def delete_node_from_logger_and_disk(self, uuid: str) -> bool:
         """Helper to remove node entry from logger and delete dump directory."""

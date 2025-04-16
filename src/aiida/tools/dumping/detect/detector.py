@@ -73,6 +73,57 @@ class DumpChangeDetector:
             except Exception as e:
                 logger.warning(f'Failed to query/filter nodes of type {orm_type.__name__}: {e}')
 
+        # --- START NEW LOGIC ---
+        # If only_top_level_calcs is True, we need to specifically re-add calculations
+        # that were filtered out *if* they belong to any group.
+        if orm.CalculationNode in [item[0] for item in nodes_to_query] and self.config.only_top_level_calcs:
+            logger.debug("Checking for explicitly grouped CalculationNodes potentially filtered by only_top_level_calcs=True...")
+            try:
+                # Build mapping to find all nodes currently in *any* group
+                current_mapping = GroupNodeMapping.build_from_db()
+                explicitly_grouped_calc_uuids = set()
+                for group_uuid, node_uuids in current_mapping.group_to_nodes.items():
+                    # Collect all node UUIDs that are in at least one group
+                     explicitly_grouped_calc_uuids.update(node_uuids)
+
+                if explicitly_grouped_calc_uuids:
+                    # Query CalculationNodes that are in groups, applying time/log filters
+                    # but *ignoring* the top-level status for this specific query.
+                    group_calc_filters = query_strategy.resolve_filters(
+                        orm.CalculationNode,
+                        self.dump_times,
+                        include_time_filter=self.config.filter_by_last_dump_time,
+                        include_uuid_filter=True # Exclude already logged
+                    )
+                    # Add filter to only select nodes that are in the set of grouped nodes
+                    group_calc_filters['uuid'] = {'in': list(explicitly_grouped_calc_uuids)}
+
+                    qb_grouped_calcs = QueryBuilder()
+                    # Crucially, query directly for CalculationNode without the top-level filter here
+                    qb_grouped_calcs.append(orm.CalculationNode, filters=group_calc_filters)
+                    grouped_calcs_to_add = qb_grouped_calcs.all(flat=True)
+
+                    if grouped_calcs_to_add:
+                        logger.debug(f"Found {len(grouped_calcs_to_add)} explicitly grouped calculations to ensure inclusion.")
+                        # Add these nodes to the initial list, ensuring uniqueness
+                        existing_calc_uuids = {calc.uuid for calc in initial_nodes['calculations']}
+                        unique_new_grouped_calcs = [
+                            calc for calc in grouped_calcs_to_add if calc.uuid not in existing_calc_uuids
+                        ]
+                        if unique_new_grouped_calcs:
+                            logger.debug(f"Adding {len(unique_new_grouped_calcs)} unique explicitly grouped calculations back.")
+                            initial_nodes['calculations'].extend(unique_new_grouped_calcs)
+                        else:
+                            logger.debug("All explicitly grouped calculations were already included.")
+                    else:
+                         logger.debug("No additional explicitly grouped calculations found matching time/log filters.")
+                else:
+                    logger.debug("No nodes found in any group according to current mapping.")
+
+            except Exception as e:
+                logger.warning(f"Could not query or process explicitly grouped calculations: {e}")
+        # --- END NEW LOGIC ---
+
         # --- Add Calculation Descendants if Required ---
         workflows_found = initial_nodes['workflows']
         # Add descendants only if processing processes AND only_top_level_calcs is FALSE

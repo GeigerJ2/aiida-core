@@ -5,19 +5,16 @@ from typing import TYPE_CHECKING
 
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.dumping.config import DumpConfig
-from aiida.tools.dumping.storage import DumpLog
+from aiida.tools.dumping.logger import DumpLog
 from aiida.tools.dumping.utils.groups import get_group_subpath
 from aiida.tools.dumping.utils.paths import DumpPaths, prepare_dump_path, safe_delete_dir
-from aiida.tools.dumping.utils.types import (
-    GroupChanges,
-    GroupModificationInfo,
-)
 
 if TYPE_CHECKING:
     from aiida.tools.dumping.config import DumpConfig
+    from aiida.tools.dumping.engine import DumpEngine
     from aiida.tools.dumping.logger import DumpLogger
     from aiida.tools.dumping.utils.paths import DumpPaths
+    from aiida.tools.dumping.utils.types import GroupChanges, GroupModificationInfo
 
 logger = AIIDA_LOGGER.getChild('tools.dumping.managers.group')
 
@@ -30,13 +27,16 @@ class GroupManager:
         config: DumpConfig,
         dump_paths: DumpPaths,
         dump_logger: DumpLogger,
+        engine: DumpEngine
     ):
         self.config: DumpConfig = config
         self.dump_paths: DumpPaths = dump_paths
         self.dump_logger: DumpLogger = dump_logger
+        self.engine: DumpEngine = engine
+        # self.node_manager: NodeManager = node_manager
         # TODO: dump_times needed here for any logic?
 
-    def prepare_group_path(self, group: orm.Group | None) -> Path:  # Renamed method
+    def prepare_group_path(self, group: orm.Group | None) -> Path:
         """
         Calculate, prepare (create/clean), and return the dump path for a specific group.
 
@@ -113,9 +113,12 @@ class GroupManager:
 
     def update_group_membership(self, mod_info: GroupModificationInfo):
         """Update dump structure for a group with added/removed nodes."""
-        logger.report(
-            f'Updating group {mod_info.uuid}: {len(mod_info.nodes_added)} added, {len(mod_info.nodes_removed)} removed.'
+        msg = (
+            f'Updating group {mod_info.label}: {len(mod_info.nodes_added)} added, '
+            f'{len(mod_info.nodes_removed)} removed.'
         )
+
+        logger.report(msg)
         try:
             group = orm.load_group(uuid=mod_info.uuid)
         except Exception as e:
@@ -136,7 +139,9 @@ class GroupManager:
                 # It will determine the correct path based on the group context
                 # We might not need to explicitly call dump here if the main loop does it,
                 # but ensure the node processor logic correctly places it in the group dir.
-                self.node_manager.dump_process(node, group)
+                self.engine.request_node_dump(node, group)
+                # This would introduce a circular dependency
+                # self.node_manager.dump_process(node, group)
             except Exception as e:
                 logger.warning(f'Could not process node {node_uuid} added to group {group.label}: {e}')
 
@@ -150,7 +155,7 @@ class GroupManager:
         if self.config.organize_by_groups and mod_info.nodes_removed:
             logger.debug(f"Handling {len(mod_info.nodes_removed)} nodes removed from group '{group.label}'")
             for node_uuid in mod_info.nodes_removed:
-                self.remove_node_representation_from_group_dir(group_path, node_uuid)
+                self.remove_node_from_group_dir(group_path, node_uuid)
 
     def ensure_group_registered(self, group: orm.Group) -> Path:
         """Ensure group exists in logger and return its path."""
@@ -167,50 +172,100 @@ class GroupManager:
 
         return group_path
 
-    # TODO: Possibly update this method
     def remove_node_from_group_dir(self, group_path: Path, node_uuid: str):
-        """Find and remove a node's dump dir/symlink within a specific group path."""
+        """
+        Find and remove a node's dump dir/symlink within a specific group path.
+        Handles nodes potentially deleted from the DB by checking filesystem paths.
+        """
         node_path_in_logger = self.dump_logger.get_dump_path_by_uuid(node_uuid)
         if not node_path_in_logger:
             logger.warning(f'Cannot find logger path for node {node_uuid} to remove from group.')
             return
 
-        # Construct potential paths within the group dir
-        possible_paths = [
-            group_path / 'calculations' / node_path_in_logger.name,
-            group_path / 'workflows' / node_path_in_logger.name,
-            group_path / node_path_in_logger.name,  # If not in subdirs
+        # Even if node is deleted from DB, we expect the dump_logger to know the original path name
+        node_filename = node_path_in_logger.name
+
+        # Construct potential paths within the group dir where the node might be represented
+        # The order matters if duplicates could somehow exist; checks stop on first find.
+        possible_paths_to_check = [
+            group_path / 'calculations' / node_filename,
+            group_path / 'workflows' / node_filename,
+            group_path / node_filename,  # Check group root last
         ]
 
-        for potential_path in possible_paths:
-            if potential_path.exists():  # Check if it exists (could be dir or symlink)
-                # Check if it's a symlink *to the logged path* or the actual logged path itself
-                # This logic needs refinement based on symlinking strategy
-                # TODO: This variable is not being used
-                is_symlink_to_target = (
-                    potential_path.is_symlink()
-                )  # and os.readlink(potential_path) == str(node_path_in_logger)
-                is_target_dir = potential_path == node_path_in_logger
+        found_path: Path | None = None
+        for potential_path in possible_paths_to_check:
+            # Use exists() which works for files, dirs, and symlinks (even broken ones)
+            if potential_path.exists():
+                found_path = potential_path
+                logger.debug(f'Found existing path for node {node_uuid} representation at: {found_path}')
+                break  # Stop searching once a potential candidate is found
 
-                # Decide whether to remove the symlink or the directory
-                # This example just removes whatever exists at the potential path
-                # CAUTION: Be careful not to delete the *original* dump if only removing from group
-                logger.report(f"Removing '{potential_path.name}' from group directory '{group_path.name}'.")
-                if potential_path.is_symlink():
-                    potential_path.unlink()
-                    # Also update logger if symlinks are tracked per entry
+        if not found_path:
+            logger.debug(
+                f"Node {node_uuid} representation ('{node_filename}') not found in standard "
+                f"group locations within '{group_path.name}'. No removal needed."
+            )
+            return
+
+        # --- Removal Logic applied to the found_path ---
+        try:
+            # Determine if the found path IS the original logged path.
+            # This is crucial to avoid deleting the source if it was stored directly in the group path.
+            is_target_dir = False
+            try:
+                # Use resolve() for robust comparison, handles symlinks, '.', '..' etc.
+                # This comparison is only meaningful if the original logged path *still exists*.
+                # If node_path_in_logger points to a non-existent location, found_path cannot be it.
+                if node_path_in_logger.exists():
+                    # Resolving might fail if permissions are wrong, hence the inner try/except
+                    is_target_dir = found_path.resolve() == node_path_in_logger.resolve()
+            except OSError as e:
+                # Error resolving paths, cannot be certain it's not the target. Err on safe side.
+                logger.error(
+                    f'Error resolving path {found_path} or {node_path_in_logger}: {e}. '
+                    f"Cannot safely determine if it's the target directory. Skipping removal."
+                )
+                return
+
+            log_suffix = f" from group directory '{group_path.name}'"
+
+            # Proceed with removal based on what found_path is
+            if found_path.is_symlink():
+                logger.info(f"Removing symlink '{found_path.name}'{log_suffix}.")
+                try:
+                    # Unlink works even if the symlink target doesn't exist
+                    found_path.unlink()
+                    # TODO: Update logger if symlinks are tracked?
                     # self.dump_logger.remove_symlink(...)
-                elif potential_path.is_dir() and not is_target_dir:
-                    # If it's a directory copy within the group, remove it safely
+                except OSError as e:
+                    logger.error(f'Failed to remove symlink {found_path}: {e}')
 
-                    safe_delete_dir(potential_path, safeguard_file='.aiida_node_metadata.yaml')  # Use node safeguard
-                elif is_target_dir:
-                    # If this *is* the primary dump path, removing from a group
-                    # shouldn't delete it entirely unless the node itself is deleted.
-                    logger.debug(
-                        f'Node {node_uuid} removed from group, but its primary dump path {potential_path} is not deleted here.'
-                    )
-                else:
-                    logger.warning(f'Cannot determine how to handle removed node path: {potential_path}')
+            elif found_path.is_dir() and not is_target_dir:
+                # It's a directory *within* the group structure (likely a copy), and NOT the original. Safe to remove.
+                logger.info(f"Removing directory '{found_path.name}'{log_suffix}.")
+                try:
+                    # Ensure safe_delete_dir handles non-empty dirs and potential errors
+                    safe_delete_dir(found_path, safeguard_file='.aiida_node_metadata.yaml')  # Use node safeguard
+                except Exception as e:  # Catch specific exceptions from safe_delete_dir if possible
+                    logger.error(f'Failed to safely delete directory {found_path}: {e}')
 
-                break  # Assume found
+            elif is_target_dir:
+                # The path found *is* the primary logged path.
+                # Removing the node from a group shouldn't delete its primary data here.
+                logger.debug(
+                    f'Node {node_uuid} representation found at {found_path} is the primary dump path. '
+                    f'It is intentionally not deleted by this operation.'
+                )
+            else:
+                # Exists, but isn't a symlink, and isn't a directory that's safe to remove (e.g., it's a file, or is_target_dir was True but it wasn't a dir?)
+                logger.warning(
+                    f'Path {found_path} exists but is not a symlink or a directory designated '
+                    f'for removal in this context (is_dir={found_path.is_dir()}, is_target_dir={is_target_dir}). Skipping removal.'
+                )
+
+        except Exception as e:
+            # Catch unexpected errors during the removal logic
+            logger.exception(
+                f'An unexpected error occurred while processing path {found_path} for node {node_uuid}: {e}'
+            )

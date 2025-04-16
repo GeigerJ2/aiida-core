@@ -33,6 +33,7 @@ from aiida.tools.dumping.utils.paths import (
 
 logger = AIIDA_LOGGER.getChild('tools.dumping.entities.profile')
 
+
 class ProfileDumper:
     """Dumps all data in an AiiDA profile."""
 
@@ -46,11 +47,7 @@ class ProfileDumper:
         else:
             self.dump_paths = DumpPaths.from_path(output_path)
 
-        # Create the engine with the refactored components
-        self.engine = DumpEngine(
-            config=self.config,
-            dump_paths=self.dump_paths
-        )
+        self.engine = DumpEngine(config=self.config, dump_paths=self.dump_paths)
 
     def _load_profile(self, profile: str | Profile | None) -> Profile:
         """Load the AiiDA profile from string or Profile object."""
@@ -60,6 +57,7 @@ class ProfileDumper:
             loaded_profile = profile
         else:
             from aiida.manage import get_manager
+
             manager = get_manager()
             loaded_profile = cast(Profile, manager.get_profile())
 
