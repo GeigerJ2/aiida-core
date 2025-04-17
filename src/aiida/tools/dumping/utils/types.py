@@ -172,6 +172,7 @@ class NodeChanges:
     deleted: Set[str] = field(default_factory=set)
 
 
+# TODO: Also write those to disk??
 @dataclass
 class DumpChanges:
     """Represents all detected changes for a dump cycle (Recommended Structure)."""

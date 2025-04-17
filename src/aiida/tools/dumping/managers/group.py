@@ -36,7 +36,8 @@ class GroupManager:
         # self.node_manager: NodeManager = node_manager
         # TODO: dump_times needed here for any logic?
 
-    def prepare_group_path(self, group: orm.Group | None) -> Path:
+    # TODO: Possibly make this static or class method?
+    def get_group_path(self, group: orm.Group | None) -> Path:
         """
         Calculate, prepare (create/clean), and return the dump path for a specific group.
 
@@ -50,6 +51,8 @@ class GroupManager:
             else:
                 group_path = self.dump_paths.absolute / 'ungrouped'
 
+            return group_path
+
         else:
             # Flat structure - group itself doesn't get a dedicated *prepared* directory.
             # Nodes will be placed directly under type subdirs by NodeManager.
@@ -57,24 +60,25 @@ class GroupManager:
             # Note: If flat structure *did* require group dirs, logic would change.
             return self.dump_paths.absolute
 
-        # 2. Prepare the calculated path using the utility function
+    def prepare_group_path(self, group_path: Path):
+        # Prepare the calculated path using the utility function
         # This handles mkdir, overwrite (via safe_delete_dir), and safeguard file.
+        # TODO: Add an option to clean the path here
         try:
             prepare_dump_path(
                 path_to_validate=group_path,
+                # TODO: Passing the top-level dump_mode through is problematic...
                 dump_mode=self.config.dump_mode,  # Pass current dump mode
                 safeguard_file=DumpPaths.safeguard_file,  # Use standard safeguard
                 top_level_caller=False,  # Indicate it's not the absolute root dump dir
             )
         except Exception as e:
             # Log error during specific group path preparation
-            logger.error(f'Failed to prepare path for group {group.label}: {e}', exc_info=True)
+            logger.error(f'Failed to prepare path for group {group_path.name}: {e}', exc_info=True)
             # Re-raise or handle as appropriate? Re-raising might stop the process.
             # Depending on desired robustness, you might want to allow skipping a group.
             raise  # Or return None / log and continue
 
-        # 3. Return the prepared path
-        return group_path
 
     def handle_group_changes(self, group_changes: GroupChanges):
         logger.report('Processing group changes...')
@@ -91,7 +95,7 @@ class GroupManager:
                 # Ensure the group directory exists and is logged
                 try:
                     group = orm.load_group(uuid=group_info.uuid)
-                    self.ensure_group_registered(group)
+                    self.register_group(group)
                     # Dumping nodes within this new group will happen if they
                     # are picked up by the NodeChanges detection based on config.
                 except Exception as e:
@@ -126,7 +130,7 @@ class GroupManager:
             return
 
         # Ensure group directory exists and is logged
-        group_path = self.ensure_group_registered(group)
+        group_path = self.register_group(group)
 
         # Handle added nodes (trigger dump/symlink if needed)
         # Note: These nodes might *also* be in changes.nodes.new_or_modified
@@ -139,7 +143,7 @@ class GroupManager:
                 # It will determine the correct path based on the group context
                 # We might not need to explicitly call dump here if the main loop does it,
                 # but ensure the node processor logic correctly places it in the group dir.
-                self.engine.request_node_dump(node, group)
+                self.engine.request_node_dump(node, group_path, group)
                 # This would introduce a circular dependency
                 # self.node_manager.dump_process(node, group)
             except Exception as e:
@@ -157,9 +161,14 @@ class GroupManager:
             for node_uuid in mod_info.nodes_removed:
                 self.remove_node_from_group_dir(group_path, node_uuid)
 
-    def ensure_group_registered(self, group: orm.Group) -> Path:
+    def register_group(self, group: orm.Group) -> Path:
         """Ensure group exists in logger and return its path."""
-        group_path = self.prepare_group_path(group)  # Get path using existing logic
+        group_path = self.get_group_path(group)  # Get path using existing logic
+        # TODO: Call these here?
+        # self.prepare_group_path
+        # import ipdb; ipdb.set_trace()
+        group_path.mkdir(exist_ok=True, parents=True)
+        (group_path / self.dump_paths.safeguard_file).touch()
         if group.uuid not in self.dump_logger.groups.entries:
             msg = f"Registering group '{group.label}' ({group.uuid}) in logger."
             logger.debug(msg)

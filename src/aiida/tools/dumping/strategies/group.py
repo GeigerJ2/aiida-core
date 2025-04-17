@@ -2,6 +2,7 @@ from aiida.common.log import AIIDA_LOGGER
 from aiida.tools.dumping.logger import DumpLog, DumpLogger
 from aiida.tools.dumping.strategies.base import DumpStrategy
 from aiida.tools.dumping.utils.types import DumpChanges
+from aiida.tools.dumping.utils.paths import get_directory_stats
 
 logger = AIIDA_LOGGER.getChild("tools.dumping.strategies.group")
 
@@ -23,7 +24,7 @@ class GroupDumpStrategy(DumpStrategy):
         # 1. Prepare Path (Ensure group directory exists and is logged)
         # This also ensures the group is in the logger if it's new
         try:
-            group_path = self.engine.group_manager.ensure_group_registered(group)
+            group_path = self.engine.group_manager.register_group(group)
             # Optional: Prepare path further if needed (safeguards etc.)
             # prepare_dump_path(...)
         except Exception as e:
@@ -68,6 +69,23 @@ class GroupDumpStrategy(DumpStrategy):
 
         logger.info(f"Finished GroupDumpStrategy for group '{group.label}'.")
 
+        # --- 4. Calculate and Update Group Directory Stats ---
+        # This happens *after* nodes have potentially been dumped into the group dir.
+        logger.debug(f"Calculating final stats for group directory: {group_path}")
+        group_log_entry = dump_logger.groups.get_entry(group.uuid)
+        if group_log_entry:
+            dir_mtime, dir_size = get_directory_stats(group_path)
+            group_log_entry.dir_mtime = dir_mtime
+            group_log_entry.dir_size = dir_size
+            logger.debug(f"Updated stats for group {group.uuid}: mtime={dir_mtime}, size={dir_size}")
+        else:
+            # This shouldn't happen if ensure_group_registered worked
+            logger.warning(f"Could not find log entry for group {group.uuid} to update stats.")
+
+
+        logger.info(f"Finished GroupDumpStrategy for group '{group.label}'.")
+
+        # TODO: Possibly this should be added?
         # dump_logger.groups.add_entry(
         #     uuid=group.uuid,
         #     entry=DumpLog(path=group_path.resolve())

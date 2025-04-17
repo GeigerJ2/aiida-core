@@ -1184,7 +1184,7 @@ def setup_no_process_group() -> orm.Group:
     return no_process_group
 
 
-# @pytest.mark.usefixtures('aiida_profile_clean')
+# TODO: Add possibility to parametrize with number of nodes created (make factory?)
 @pytest.fixture()
 def setup_add_group(generate_calculation_node_add) -> orm.Group:
     add_group, _ = orm.Group.collection.get_or_create(label='add-group')

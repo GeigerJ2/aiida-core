@@ -17,11 +17,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from aiida.common.log import AIIDA_LOGGER
+from aiida.common import timezone
 from aiida.tools.dumping.mapping import GroupNodeMapping
 from aiida.tools.dumping.utils.paths import DumpPaths
 from aiida.tools.dumping.utils.types import DumpStoreKeys, StoreNameType
 
-logger = AIIDA_LOGGER.getChild("tools.dumping.logger")
+logger = AIIDA_LOGGER.getChild('tools.dumping.logger')
 
 
 # TODO: Possibly dump hierarchy of dumped directory inside json file
@@ -34,6 +35,7 @@ logger = AIIDA_LOGGER.getChild("tools.dumping.logger")
 # NOTE: Shouldn't the logger have the `DumpTimes` attached to it??
 # NOTE: Problem with general `node_mtime` is that `Group`s don't have an `mtime` attribute
 
+
 @dataclass
 class DumpLog:
     """Represents a single dump log entry."""
@@ -41,36 +43,50 @@ class DumpLog:
     path: Path
     symlinks: List[Path] = field(default_factory=list)
     duplicates: List[Path] = field(default_factory=list)
-    # Add mtime? Could be useful for change detection
-    # mtime: datetime | None = None
+    dir_mtime: Optional[datetime] = None
+    dir_size: Optional[int] = None
 
     def to_dict(self) -> dict:
         # Add mtime serialization if included
         return {
-            "path": str(self.path),
-            "symlinks": [str(path) for path in self.symlinks] if self.symlinks else [],
+            'path': str(self.path),
+            'symlinks': [str(path) for path in self.symlinks] if self.symlinks else [],
             'duplicates': [str(path) for path in self.duplicates],
-
-            # 'mtime': self.mtime.isoformat() if self.mtime else None,
+            'dir_mtime': self.dir_mtime.isoformat() if self.dir_mtime else None,
+            'dir_size': self.dir_size,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "DumpLog":
+    def from_dict(cls, data: dict) -> 'DumpLog':
         symlinks = []
-        if data.get("symlinks"):
-            symlinks = [Path(path) for path in data["symlinks"]]
+        if data.get('symlinks'):
+            symlinks = [Path(path) for path in data['symlinks']]
         # Add mtime deserialization if included
         # mtime = datetime.fromisoformat(data['mtime']) if data.get('mtime') else None
         duplicates = []
         if data.get('duplicates'):
             duplicates = [Path(path) for path in data['duplicates']]
 
+        # Deserialize datetime from ISO string, handle None
+        dir_mtime_str = data.get('dir_mtime')
+        dir_mtime = None
+        if dir_mtime_str:
+            try:
+                dir_mtime = datetime.fromisoformat(dir_mtime_str)
+                # Ensure timezone-awareness if needed (assuming UTC if naive)
+                if dir_mtime.tzinfo is None:
+                    dir_mtime = timezone.make_aware(dir_mtime)  # Use AiiDA's timezone utility
+            except ValueError:
+                logger.warning(f'Could not parse dir_mtime string: {dir_mtime_str}')
+
+        dir_size = data.get('dir_size')  # Size should be stored as int
 
         return cls(
-            path=Path(data["path"]),
+            path=Path(data['path']),
             symlinks=symlinks,
             duplicates=duplicates,
-            # mtime=mtime,
+            dir_mtime=dir_mtime,
+            dir_size=dir_size,
         )
 
     def add_symlink(self, path: Path) -> None:
@@ -96,7 +112,6 @@ class DumpLog:
             self.duplicates.remove(path)
             return True
         return False
-
 
 
 @dataclass
@@ -142,15 +157,10 @@ class DumpLogStore:
         return {uuid: entry.to_dict() for uuid, entry in self.entries.items()}
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "DumpLogStore":
+    def from_dict(cls, data: Dict) -> DumpLogStore:
         store = cls()
         for uuid, entry_data in data.items():
-            if isinstance(entry_data, dict) and "path" in entry_data:
-                store.entries[uuid] = DumpLog.from_dict(entry_data)
-            elif isinstance(
-                entry_data, str
-            ):  # Handle old format backward compatibility
-                store.entries[uuid] = DumpLog(path=Path(entry_data))
+            store.entries[uuid] = DumpLog.from_dict(entry_data)
         return store
 
     def update_paths(self, old_str: str, new_str: str) -> None:
@@ -174,7 +184,6 @@ class DumpLogStore:
                 else:
                     updated_duplicates.append(duplicate_path)
             entry.duplicates = updated_duplicates
-
 
 
 @dataclass
@@ -226,43 +235,33 @@ class DumpLogger:
         last_dump_time_str = None
 
         if not dump_paths.log_path.exists():
-            logger.debug(
-                f"Log file not found at {dump_paths.log_path}, returning empty log data."
-            )
+            logger.debug(f'Log file not found at {dump_paths.log_path}, returning empty log data.')
             return stores, group_node_mapping, last_dump_time_str
 
         try:
-            with dump_paths.log_path.open("r", encoding="utf-8") as f:
+            with dump_paths.log_path.open('r', encoding='utf-8') as f:
                 prev_dump_data = json.load(f)
 
             # Load last dump time string
-            last_dump_time_str = prev_dump_data.get("last_dump_time")
+            last_dump_time_str = prev_dump_data.get('last_dump_time')
 
             # Load group-node mapping if present
-            if "group_node_mapping" in prev_dump_data:
+            if 'group_node_mapping' in prev_dump_data:
                 try:
-                    group_node_mapping = GroupNodeMapping.from_dict(
-                        prev_dump_data["group_node_mapping"]
-                    )
+                    group_node_mapping = GroupNodeMapping.from_dict(prev_dump_data['group_node_mapping'])
                 except Exception as e:
-                    logger.warning(f"Error loading group-node mapping: {e!s}")
+                    logger.warning(f'Error loading group-node mapping: {e!s}')
 
             # Load store data using deserialize_logs helper
             stores.calculations = DumpLogger._deserialize_logs(
-                prev_dump_data.get("calculations", {}), dump_paths=dump_paths
+                prev_dump_data.get('calculations', {}), dump_paths=dump_paths
             )
-            stores.workflows = DumpLogger._deserialize_logs(
-                prev_dump_data.get("workflows", {}), dump_paths=dump_paths
-            )
-            stores.groups = DumpLogger._deserialize_logs(
-                prev_dump_data.get("groups", {}), dump_paths=dump_paths
-            )
-            stores.data = DumpLogger._deserialize_logs(
-                prev_dump_data.get("data", {}), dump_paths=dump_paths
-            )
+            stores.workflows = DumpLogger._deserialize_logs(prev_dump_data.get('workflows', {}), dump_paths=dump_paths)
+            stores.groups = DumpLogger._deserialize_logs(prev_dump_data.get('groups', {}), dump_paths=dump_paths)
+            stores.data = DumpLogger._deserialize_logs(prev_dump_data.get('data', {}), dump_paths=dump_paths)
 
         except (json.JSONDecodeError, OSError, ValueError) as e:
-            logger.warning(f"Error loading dump log file {dump_paths.log_path}: {e!s}")
+            logger.warning(f'Error loading dump log file {dump_paths.log_path}: {e!s}')
             # Return default empty data on error
             return DumpLogStoreCollection(), None, None
 
@@ -274,9 +273,7 @@ class DumpLogger:
             try:
                 return datetime.fromisoformat(self._last_dump_time_str)
             except ValueError:
-                logger.warning(
-                    f"Could not parse last dump time string: {self._last_dump_time_str}"
-                )
+                logger.warning(f'Could not parse last dump time string: {self._last_dump_time_str}')
         return None
 
     def add_entry(self, store_key: StoreNameType, uuid: str, entry: DumpLog) -> None:
@@ -301,68 +298,98 @@ class DumpLogger:
         )
 
     # TODO: This currently requires the dump time as argument, not sure if this is what I want
-    def save(
-        self, current_dump_time: datetime, group_node_mapping: GroupNodeMapping | None = None
-    ) -> None:
+    def save(self, current_dump_time: datetime, group_node_mapping: GroupNodeMapping | None = None) -> None:
         """Save the current log state and mapping to the JSON file."""
         log_dict = {
             # Use the _serialize_logs helper method
-            "calculations": self._serialize_logs(self.calculations),
-            "workflows": self._serialize_logs(self.workflows),
-            "groups": self._serialize_logs(self.groups),
-            "data": self._serialize_logs(self.data),
-            "last_dump_time": current_dump_time.isoformat(),
+            'calculations': self._serialize_logs(self.calculations),
+            'workflows': self._serialize_logs(self.workflows),
+            'groups': self._serialize_logs(self.groups),
+            'data': self._serialize_logs(self.data),
+            'last_dump_time': current_dump_time.isoformat(),
         }
 
         if group_node_mapping:
-            log_dict["group_node_mapping"] = group_node_mapping.to_dict()
+            log_dict['group_node_mapping'] = group_node_mapping.to_dict()
 
         try:
-            with self.dump_paths.log_path.open("w", encoding="utf-8") as f:
+            with self.dump_paths.log_path.open('w', encoding='utf-8') as f:
                 json.dump(log_dict, f, indent=4)
-            logger.debug(f"Dump log saved to {self.dump_paths.log_path}")
+            logger.debug(f'Dump log saved to {self.dump_paths.log_path}')
         except OSError as e:
-            logger.error(
-                f"Failed to save dump log to {self.dump_paths.log_path}: {e!s}"
-            )
+            logger.error(f'Failed to save dump log to {self.dump_paths.log_path}: {e!s}')
 
-    # Make serialize/deserialize static helpers or private methods
+    # # Make serialize/deserialize static helpers or private methods
+    # def _serialize_logs(self, container: DumpLogStore) -> Dict:
+    #     """Serialize log entries to a dictionary format relative to dump parent."""
+    #     serialized = {}
+    #     for uuid, entry in container.entries.items():
+    #         try:
+    #             relative_path = entry.path.relative_to(self.dump_paths.parent)
+    #             relative_symlinks = (
+    #                 [
+    #                     path.relative_to(self.dump_paths.parent)
+    #                     for path in entry.symlinks
+    #                 ]
+    #                 if entry.symlinks
+    #                 else []
+    #             )
+    #             relative_duplicates = (
+    #                 [
+    #                     path.relative_to(self.dump_paths.parent)
+    #                     for path in entry.duplicates
+    #                 ]
+    #                 if entry.duplicates
+    #                 else []
+    #             )
+    #             serialized[uuid] = {
+    #                 "path": str(relative_path),
+    #                 "symlinks": [str(path) for path in relative_symlinks],
+    #                 "duplicates": [str(path) for path in relative_duplicates],
+    #             }
+    #         except ValueError:
+    #             logger.warning(
+    #                 f"Path {entry.path} or its symlinks not relative to {self.dump_paths.parent}. Storing absolute."
+    #             )
+    #             # Fallback to absolute paths if relative fails (should be rare)
+    #             serialized[uuid] = {
+    #                 "path": str(entry.path),
+    #                 "symlinks": [str(path) for path in entry.symlinks],
+    #             }
+    #     return serialized
     def _serialize_logs(self, container: DumpLogStore) -> Dict:
         """Serialize log entries to a dictionary format relative to dump parent."""
         serialized = {}
         for uuid, entry in container.entries.items():
             try:
-                relative_path = entry.path.relative_to(self.dump_paths.parent)
-                relative_symlinks = (
-                    [
-                        path.relative_to(self.dump_paths.parent)
-                        for path in entry.symlinks
+                # Use the DumpLog's to_dict method which now includes new fields
+                entry_dict = entry.to_dict()  # <-- This dict now contains all fields
+
+                # Convert paths to relative strings for serialization
+                # Ensure keys exist before attempting conversion
+                if 'path' in entry_dict and entry_dict['path'] is not None:
+                    entry_dict['path'] = str(Path(entry_dict['path']).relative_to(self.dump_paths.parent))
+                if 'symlinks' in entry_dict:
+                    entry_dict['symlinks'] = [
+                        str(Path(p).relative_to(self.dump_paths.parent)) for p in entry_dict['symlinks']
                     ]
-                    if entry.symlinks
-                    else []
-                )
-                relative_duplicates = (
-                    [
-                        path.relative_to(self.dump_paths.parent)
-                        for path in entry.duplicates
+                if 'duplicates' in entry_dict:
+                    entry_dict['duplicates'] = [
+                        str(Path(p).relative_to(self.dump_paths.parent)) for p in entry_dict['duplicates']
                     ]
-                    if entry.duplicates
-                    else []
-                )
-                serialized[uuid] = {
-                    "path": str(relative_path),
-                    "symlinks": [str(path) for path in relative_symlinks],
-                    "duplicates": [str(path) for path in relative_duplicates],
-                }
+
+                # Add the complete entry dict (including mtime/size) to serialized output
+                serialized[uuid] = entry_dict  # <-- Use the full dict from to_dict()
+
             except ValueError:
-                logger.warning(
-                    f"Path {entry.path} or its symlinks not relative to {self.dump_paths.parent}. Storing absolute."
-                )
-                # Fallback to absolute paths if relative fails (should be rare)
-                serialized[uuid] = {
-                    "path": str(entry.path),
-                    "symlinks": [str(path) for path in entry.symlinks],
-                }
+                # Fallback if path is not relative - use absolute paths from to_dict()
+                msg = f'Path {entry.path} or its links/duplicates not relative to {self.dump_paths.parent}. Storing absolute.'
+                logger.warning(msg)
+                serialized[uuid] = entry.to_dict()  # Store absolute paths using full dict
+            except Exception as e:
+                logger.error(f'Error serializing log entry for {uuid}: {e}', exc_info=True)
+                # Optionally add a marker for the failed entry
+                serialized[uuid] = {'error': 'Serialization failed'}
         return serialized
 
     @staticmethod
@@ -372,21 +399,19 @@ class DumpLogger:
         for uuid, entry_data in category_data.items():
             try:
                 # Handle new format (dict)
-                if isinstance(entry_data, dict) and "path" in entry_data:
+                if isinstance(entry_data, dict) and 'path' in entry_data:
                     # Assume paths are stored relative to parent
-                    path = dump_paths.parent / Path(entry_data["path"])
+                    path = dump_paths.parent / Path(entry_data['path'])
                     symlinks = []
-                    if entry_data.get("symlinks"):
-                        symlinks = [
-                            dump_paths.parent / Path(p) for p in entry_data["symlinks"]
-                        ]
+                    if entry_data.get('symlinks'):
+                        symlinks = [dump_paths.parent / Path(p) for p in entry_data['symlinks']]
                     container.add_entry(uuid, DumpLog(path=path, symlinks=symlinks))
                 # Handle old format (string path)
                 elif isinstance(entry_data, str):
                     path = dump_paths.parent / Path(entry_data)
                     container.add_entry(uuid, DumpLog(path=path))
             except Exception as e:
-                logger.warning(f"Failed to deserialize log entry for UUID {uuid}: {e}")
+                logger.warning(f'Failed to deserialize log entry for UUID {uuid}: {e}')
         return container
 
     # Keep helper methods to find stores/paths based on UUID
@@ -398,7 +423,7 @@ class DumpLogger:
             if uuid in store.entries:
                 return store
         # Return None instead of raising NotExistent for easier checking
-        logger.debug(f"UUID {uuid} not found in any log store.")
+        logger.debug(f'UUID {uuid} not found in any log store.')
         return None
 
     def get_store_by_name(self, name: StoreNameType) -> DumpLogStore:
@@ -408,7 +433,7 @@ class DumpLogger:
             return getattr(stores_coll, name)
         else:
             store_names = [field.name for field in fields(stores_coll)]
-            msg = f"Wrong store key <{name}> selected. Choose one of {store_names}."
+            msg = f'Wrong store key <{name}> selected. Choose one of {store_names}.'
             raise ValueError(msg)
 
     def get_dump_path_by_uuid(self, uuid: str) -> Optional[Path]:
@@ -428,20 +453,15 @@ class DumpLogger:
         """Update all paths across all stores by replacing substrings."""
         updates = {}
         # Update each store using its own update_paths method
-        for store_name in ["calculations", "workflows", "groups", "data"]:
+        for store_name in ['calculations', 'workflows', 'groups', 'data']:
             store: DumpLogStore = getattr(self, store_name)
             # Store could track changes internally if needed, or just report here
-            count_before = sum(
-                1 for entry in store.entries.values() if old_str in str(entry.path)
-            )
+            count_before = sum(1 for entry in store.entries.values() if old_str in str(entry.path))
             store.update_paths(old_str, new_str)
-            count_after = sum(
-                1 for entry in store.entries.values() if new_str in str(entry.path)
-            )
-            updates[store_name] = {"before": count_before, "after": count_after}
+            count_after = sum(1 for entry in store.entries.values() if new_str in str(entry.path))
+            updates[store_name] = {'before': count_before, 'after': count_after}
             if count_before > 0:
                 logger.debug(
                     f"Updated {count_after} paths in '{store_name}' store replacing '{old_str}' with '{new_str}'."
                 )
         return updates
-

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aiida import orm
@@ -42,7 +43,9 @@ class DumpEngine:
         # GroupManager might need DumpTimes if doing time-based logic internally
         self.group_manager = GroupManager(config, dump_paths, self.dump_logger, self)
         # NodeManager needs GroupManager for path calculation
-        self.node_manager = ProcessNodeManager(config, dump_paths, self.dump_logger, self.dump_times, self.group_manager, engine=self)
+        self.node_manager = ProcessNodeManager(
+            config, dump_paths, self.dump_logger, self.dump_times, self.group_manager, engine=self
+        )
         # Detector needs logger and times
         self.detector = DumpChangeDetector(self.dump_logger, self.config, self.dump_times)
         # DeletionManager needs logger
@@ -98,7 +101,7 @@ class DumpEngine:
             # --- Change Detection (needed *only* for deletion info) ---
             logger.info('Detecting changes to identify deletions...')
             # Detect node changes (yields NodeChanges and mapping)
-            node_changes_for_deletion, current_mapping_for_deletion = self.detector.detect_changes(group=None)
+            node_changes_for_deletion, current_mapping_for_deletion = self.detector.detect_all_changes(group=None)
             # Detect group changes (yields GroupChanges)
             group_changes_for_deletion = self.detector.detect_group_changes(
                 stored_mapping=self.stored_mapping,
@@ -135,7 +138,7 @@ class DumpEngine:
         # --- Change Detection (for Dumping) ---
         logger.info('Detecting node changes for dump...')
         # node_changes now holds a NodeChanges object, current_mapping holds the mapping
-        node_changes, current_mapping = self.detector.detect_changes(  # CORRECTED unpack
+        node_changes, current_mapping = self.detector.detect_all_changes(  # CORRECTED unpack
             group=entity if isinstance(entity, orm.Group) else None
         )
         # Store current mapping on engine instance if ProfileStrategy needs it
@@ -143,15 +146,20 @@ class DumpEngine:
 
         logger.info('Detecting group changes for dump...')
         group_changes: GroupChanges
-        if self.config.update_groups:  # Only calculate diff if we plan to use it
-            group_changes = self.detector.detect_group_changes(
-                stored_mapping=self.stored_mapping,  # Use mapping loaded at init
-                current_mapping=current_mapping,  # Use mapping from node detection
-                specific_group_uuid=(entity.uuid if isinstance(entity, orm.Group) else None),
-            )
-        else:
-            logger.info('Skipping group change detection (update_groups is False).')
-            group_changes = GroupChanges()  # Use empty changes
+        group_changes = self.detector.detect_group_changes(
+            stored_mapping=self.stored_mapping,  # Use mapping loaded at init
+            current_mapping=current_mapping,  # Use mapping from node detection
+            specific_group_uuid=(entity.uuid if isinstance(entity, orm.Group) else None),
+        )
+        # if self.config.update_groups:  # Only calculate diff if we plan to use it
+        #     group_changes = self.detector.detect_group_changes(
+        #         stored_mapping=self.stored_mapping,  # Use mapping loaded at init
+        #         current_mapping=current_mapping,  # Use mapping from node detection
+        #         specific_group_uuid=(entity.uuid if isinstance(entity, orm.Group) else None),
+        #     )
+        # else:
+        #     logger.info('Skipping group change detection (update_groups is False).')
+        #     group_changes = GroupChanges()  # Use empty changes
 
         # Combine detected changes correctly
         all_changes = DumpChanges(
@@ -195,13 +203,13 @@ class DumpEngine:
             # Handle unexpected entity types
             raise TypeError(f'Unsupported entity type for dumping: {type(entity)}')
 
-    def request_node_dump(self, node: orm.Node, group: orm.Group | None):
+    def request_node_dump(self, node: orm.Node, target_path: Path, group: orm.Group | None):
         # NOTE: Avoids circular dependency between NodeManager and GroupManager
         # NOTE: Uses mediator pattern
         """Handles request from GroupManager to dump a node."""
         logger.debug(f"Engine received request to dump node {node.pk} for group {group.label if group else 'None'}")
         try:
             # Delegate to NodeManager
-            self.node_manager.dump_process(node, group)
+            self.node_manager.dump_process(node, target_path, group)
         except Exception as e:
             logger.error(f'Engine failed to delegate dump request for node {node.pk}: {e}', exc_info=True)

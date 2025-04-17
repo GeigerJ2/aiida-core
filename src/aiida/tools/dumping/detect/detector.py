@@ -10,11 +10,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Set
+from typing import TYPE_CHECKING, Optional
 
 from aiida import orm
 from aiida.common.log import AIIDA_LOGGER
-from aiida.orm.querybuilder import QueryBuilder
+from aiida.orm import QueryBuilder
 from aiida.tools.dumping.config import NodeDumpGroupScope
 from aiida.tools.dumping.mapping.group import GroupNodeMapping
 from aiida.tools.dumping.utils.time import DumpTimes
@@ -22,6 +22,7 @@ from aiida.tools.dumping.utils.types import (
     DumpNodeStore,
     DumpStoreKeys,
     GroupChanges,
+    GroupInfo,
     NodeChanges,
     NodeMembershipChange,
 )
@@ -77,14 +78,16 @@ class DumpChangeDetector:
         # If only_top_level_calcs is True, we need to specifically re-add calculations
         # that were filtered out *if* they belong to any group.
         if orm.CalculationNode in [item[0] for item in nodes_to_query] and self.config.only_top_level_calcs:
-            logger.debug("Checking for explicitly grouped CalculationNodes potentially filtered by only_top_level_calcs=True...")
+            logger.debug(
+                'Checking for explicitly grouped CalculationNodes potentially filtered by only_top_level_calcs=True...'
+            )
             try:
                 # Build mapping to find all nodes currently in *any* group
                 current_mapping = GroupNodeMapping.build_from_db()
                 explicitly_grouped_calc_uuids = set()
                 for group_uuid, node_uuids in current_mapping.group_to_nodes.items():
                     # Collect all node UUIDs that are in at least one group
-                     explicitly_grouped_calc_uuids.update(node_uuids)
+                    explicitly_grouped_calc_uuids.update(node_uuids)
 
                 if explicitly_grouped_calc_uuids:
                     # Query CalculationNodes that are in groups, applying time/log filters
@@ -93,7 +96,7 @@ class DumpChangeDetector:
                         orm.CalculationNode,
                         self.dump_times,
                         include_time_filter=self.config.filter_by_last_dump_time,
-                        include_uuid_filter=True # Exclude already logged
+                        include_uuid_filter=True,  # Exclude already logged
                     )
                     # Add filter to only select nodes that are in the set of grouped nodes
                     group_calc_filters['uuid'] = {'in': list(explicitly_grouped_calc_uuids)}
@@ -104,24 +107,28 @@ class DumpChangeDetector:
                     grouped_calcs_to_add = qb_grouped_calcs.all(flat=True)
 
                     if grouped_calcs_to_add:
-                        logger.debug(f"Found {len(grouped_calcs_to_add)} explicitly grouped calculations to ensure inclusion.")
+                        logger.debug(
+                            f'Found {len(grouped_calcs_to_add)} explicitly grouped calculations to ensure inclusion.'
+                        )
                         # Add these nodes to the initial list, ensuring uniqueness
                         existing_calc_uuids = {calc.uuid for calc in initial_nodes['calculations']}
                         unique_new_grouped_calcs = [
                             calc for calc in grouped_calcs_to_add if calc.uuid not in existing_calc_uuids
                         ]
                         if unique_new_grouped_calcs:
-                            logger.debug(f"Adding {len(unique_new_grouped_calcs)} unique explicitly grouped calculations back.")
+                            logger.debug(
+                                f'Adding {len(unique_new_grouped_calcs)} unique explicitly grouped calculations back.'
+                            )
                             initial_nodes['calculations'].extend(unique_new_grouped_calcs)
                         else:
-                            logger.debug("All explicitly grouped calculations were already included.")
+                            logger.debug('All explicitly grouped calculations were already included.')
                     else:
-                         logger.debug("No additional explicitly grouped calculations found matching time/log filters.")
+                        logger.debug('No additional explicitly grouped calculations found matching time/log filters.')
                 else:
-                    logger.debug("No nodes found in any group according to current mapping.")
+                    logger.debug('No nodes found in any group according to current mapping.')
 
             except Exception as e:
-                logger.warning(f"Could not query or process explicitly grouped calculations: {e}")
+                logger.warning(f'Could not query or process explicitly grouped calculations: {e}')
         # --- END NEW LOGIC ---
 
         # --- Add Calculation Descendants if Required ---
@@ -160,10 +167,10 @@ class DumpChangeDetector:
         logger.debug('Finished detecting new/modified nodes.')
         return node_store
 
-    def detect_deleted_nodes(self) -> Set[str]:
+    def detect_deleted_nodes(self) -> set[str]:
         """Detect nodes (CalcJobNode, WorkflowNode, DataNode) deleted from DB."""
         logger.debug('Detecting deleted nodes...')
-        deleted_node_uuids: Set[str] = set()
+        deleted_node_uuids: set[str] = set()
 
         # Check node types only
         for orm_type in (orm.CalculationNode, orm.WorkflowNode, orm.Data):
@@ -198,36 +205,51 @@ class DumpChangeDetector:
         logger.debug(f'Total deleted node UUIDs detected: {len(deleted_node_uuids)}')
         return deleted_node_uuids
 
+    def detect_new_groups(self, current_mapping: GroupNodeMapping) -> list[GroupInfo]:
+        """
+        Identifies all groups in the current mapping as 'new'.
+        Called only when no previous mapping exists (first dump).
+        """
+        logger.debug('Detecting initial set of all groups as new.')
+        new_groups_info = []
+        for group_uuid, node_uuids in current_mapping.group_to_nodes.items():
+            new_groups_info.append(GroupInfo(uuid=group_uuid, node_count=len(node_uuids)))
+        return new_groups_info
+
     def detect_group_changes(
         self,
         stored_mapping: GroupNodeMapping | None,
-        current_mapping: GroupNodeMapping,  # Current mapping must be provided
+        current_mapping: GroupNodeMapping,
         specific_group_uuid: str | None = None,
     ) -> GroupChanges:
         """Detect changes between stored and current group mappings."""
         logger.debug('Calculating group changes diff...')
 
         if stored_mapping is None:
-            logger.debug('No stored group mapping provided, creating empty one for diff.')
-            stored_mapping = GroupNodeMapping()  # Diff against empty mapping
+            # First run: Call the dedicated method
+                new_groups = self.detect_new_groups(current_mapping)
+                group_changes = GroupChanges(new=new_groups) # Populate only 'new'
 
-        # Get the diff using GroupNodeMapping's method
-        try:
-            diff_result: GroupChanges = stored_mapping.diff(current_mapping)
-            logger.debug(
-                f'Group mapping diff calculated: {len(diff_result.new)} new, {len(diff_result.deleted)} deleted, {len(diff_result.modified)} modified.'
-            )
-        except Exception as e:
-            logger.error(f'Error calculating group mapping diff: {e}')
-            return GroupChanges()  # Return empty changes on error
+        else:
+            # Subsequent runs: Perform the diff as before
+            try:
+                group_changes: GroupChanges = stored_mapping.diff(current_mapping)
+                logger.debug(
+                    f'Group mapping diff calculated: {len(group_changes.new)} new, '
+                    f'{len(group_changes.deleted)} deleted, {len(group_changes.modified)} modified.'
+                )
+            except Exception as e:
+                logger.error(f'Error calculating group mapping diff: {e}')
+                return GroupChanges()  # Return empty changes on error
 
+        # Filter if a specific group was requested (relevant for GroupDumpStrategy)
         if specific_group_uuid:
             logger.debug(f'Filtering group changes for specific group UUID: {specific_group_uuid}')
-            return self.filter_group_changes_for_group(diff_result, specific_group_uuid)
+            return self.filter_group_changes_for_group(group_changes, specific_group_uuid)
         else:
-            return diff_result
+            return group_changes
 
-    def detect_changes(
+    def detect_all_changes(
         self, group: Optional[orm.Group] = None
     ) -> tuple[NodeChanges, GroupNodeMapping]:  # MODIFIED return type
         """
@@ -275,7 +297,7 @@ class DumpChangeDetector:
 
         # 2. Detect Deleted Nodes (UUIDs only)
         try:
-            deleted_node_uuids: Set[str] = self.detect_deleted_nodes()
+            deleted_node_uuids: set[str] = self.detect_deleted_nodes()
             logger.debug(f'Detected {len(deleted_node_uuids)} deleted node UUIDs.')
         except Exception as e:
             logger.error(f'Error detecting deleted nodes: {e}', exc_info=True)
@@ -325,13 +347,13 @@ class DumpChangeDetector:
         """Get CalculationNode descendants of the provided workflows."""
         descendants = []
         for workflow in workflows:
-             try:
-                  # Using iter_descendants is generally safer and more flexible
-                  for node in workflow.called_descendants:
-                       if isinstance(node, orm.CalculationNode):
-                            descendants.append(node)
-             except Exception as e:
-                  logger.warning(f"Could not get descendants for workflow {workflow.pk}: {e}")
+            try:
+                # Using iter_descendants is generally safer and more flexible
+                for node in workflow.called_descendants:
+                    if isinstance(node, orm.CalculationNode):
+                        descendants.append(node)
+            except Exception as e:
+                logger.warning(f'Could not get descendants for workflow {workflow.pk}: {e}')
         # Remove duplicates based on UUID, preserving order roughly
         unique_descendants = list({node.uuid: node for node in descendants}.values())
         return unique_descendants

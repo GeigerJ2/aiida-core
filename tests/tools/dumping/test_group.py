@@ -961,6 +961,7 @@ tree_profile_sub_calc_group = {
 }
 
 
+# TODO: Test symlinking features: symlink_calcs and symlink between groups
 class TestGroupDumper:
     @pytest.mark.usefixtures('aiida_profile_clean')
     def test_dump_add_group(self, tmp_path, setup_add_group):
