@@ -40,6 +40,7 @@ class DumpLog:
 
     path: Path
     symlinks: List[Path] = field(default_factory=list)
+    duplicates: List[Path] = field(default_factory=list)
     # Add mtime? Could be useful for change detection
     # mtime: datetime | None = None
 
@@ -48,6 +49,8 @@ class DumpLog:
         return {
             "path": str(self.path),
             "symlinks": [str(path) for path in self.symlinks] if self.symlinks else [],
+            'duplicates': [str(path) for path in self.duplicates],
+
             # 'mtime': self.mtime.isoformat() if self.mtime else None,
         }
 
@@ -58,10 +61,15 @@ class DumpLog:
             symlinks = [Path(path) for path in data["symlinks"]]
         # Add mtime deserialization if included
         # mtime = datetime.fromisoformat(data['mtime']) if data.get('mtime') else None
+        duplicates = []
+        if data.get('duplicates'):
+            duplicates = [Path(path) for path in data['duplicates']]
+
 
         return cls(
             path=Path(data["path"]),
             symlinks=symlinks,
+            duplicates=duplicates,
             # mtime=mtime,
         )
 
@@ -76,6 +84,19 @@ class DumpLog:
             self.symlinks.remove(path)
             return True
         return False
+
+    def add_duplicate(self, path: Path) -> None:
+        """Add a duplicate dump path to this log entry."""
+        if path not in self.duplicates:
+            self.duplicates.append(path)
+
+    def remove_duplicate(self, path: Path) -> bool:
+        """Remove a duplicate dump path from this log entry."""
+        if path in self.duplicates:
+            self.duplicates.remove(path)
+            return True
+        return False
+
 
 
 @dataclass
@@ -139,10 +160,21 @@ class DumpLogStore:
             path_str = str(entry.path)
             if old_str in path_str:
                 entry.path = Path(path_str.replace(old_str, new_str))
+            # Update symlinks
             for i, symlink_path in enumerate(entry.symlinks):
                 symlink_str = str(symlink_path)
                 if old_str in symlink_str:
                     entry.symlinks[i] = Path(symlink_str.replace(old_str, new_str))
+            # Update duplicates
+            updated_duplicates = []
+            for duplicate_path in entry.duplicates:
+                duplicate_str = str(duplicate_path)
+                if old_str in duplicate_str:
+                    updated_duplicates.append(Path(duplicate_str.replace(old_str, new_str)))
+                else:
+                    updated_duplicates.append(duplicate_path)
+            entry.duplicates = updated_duplicates
+
 
 
 @dataclass
@@ -309,9 +341,18 @@ class DumpLogger:
                     if entry.symlinks
                     else []
                 )
+                relative_duplicates = (
+                    [
+                        path.relative_to(self.dump_paths.parent)
+                        for path in entry.duplicates
+                    ]
+                    if entry.duplicates
+                    else []
+                )
                 serialized[uuid] = {
                     "path": str(relative_path),
                     "symlinks": [str(path) for path in relative_symlinks],
+                    "duplicates": [str(path) for path in relative_duplicates],
                 }
             except ValueError:
                 logger.warning(

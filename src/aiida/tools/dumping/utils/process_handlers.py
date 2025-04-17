@@ -36,7 +36,7 @@ DumpProcessorType = Callable[[orm.ProcessNode, Path], None]
 class NodeMetadataWriter:
     """Handles writing the .aiida_node_metadata.yaml file."""
 
-    def __init__(self, config: "DumpConfig"):
+    def __init__(self, config: DumpConfig):
         self.config = config
 
     def write(
@@ -111,7 +111,7 @@ class NodeMetadataWriter:
 class NodeRepoIoDumper:
     """Handles dumping repository contents and linked I/O Data nodes."""
 
-    def __init__(self, config: "DumpConfig"):
+    def __init__(self, config: DumpConfig):
         self.config = config
 
     def dump_calculation_content(
@@ -157,7 +157,8 @@ class NodeRepoIoDumper:
                 ).all()
                 if input_links:
                     input_path = output_path / io_dump_mapping.inputs
-                    input_path.mkdir(parents=True, exist_ok=True)
+                    # NOTE: Not needed, done in _dump_calculation_io_files
+                    # input_path.mkdir(parents=True, exist_ok=True)
                     self._dump_calculation_io_files(
                         parent_path=input_path,
                         link_triples=input_links,
@@ -207,8 +208,9 @@ class NodeRepoIoDumper:
                     # Dump content directly into parent_path, letting copy_tree handle structure
                     linked_node_path = parent_path
 
-                linked_node_path.parent.mkdir(parents=True, exist_ok=True)
-                node.base.repository.copy_tree(linked_node_path)
+                if node.base.repository.list_object_names():
+                    linked_node_path.parent.mkdir(parents=True, exist_ok=True)
+                    node.base.repository.copy_tree(linked_node_path)
             except Exception as e:
                 logger.warning(
                     f"Failed copying IO node {node.pk} (link: {link_label}): {e}"
@@ -279,6 +281,7 @@ class WorkflowWalker:
                 )
 
 
+# TODO: Only call this via the CLI
 class ReadmeGenerator:
     """Handles generating README.md files for process nodes."""
 

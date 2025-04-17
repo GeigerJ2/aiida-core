@@ -47,7 +47,6 @@ tree_profile_group_add = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -86,7 +85,6 @@ tree_profile_group_multiply_add = {
                                                 '.aiida_node_metadata.yaml',
                                                 '.aiida_dump_safeguard',
                                                 {'inputs': ['source_file']},
-                                                {'node_inputs': []},
                                             ]
                                         },
                                         {
@@ -105,7 +103,6 @@ tree_profile_group_multiply_add = {
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
                                                 {
                                                     'outputs': [
                                                         '_scheduler-stderr.txt',
@@ -153,7 +150,6 @@ tree_profile_groups_add_multiply_add = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -181,7 +177,6 @@ tree_profile_groups_add_multiply_add = {
                                                 '.aiida_node_metadata.yaml',
                                                 '.aiida_dump_safeguard',
                                                 {'inputs': ['source_file']},
-                                                {'node_inputs': []},
                                             ]
                                         },
                                         {
@@ -200,7 +195,6 @@ tree_profile_groups_add_multiply_add = {
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
                                                 {
                                                     'outputs': [
                                                         '_scheduler-stderr.txt',
@@ -248,7 +242,6 @@ tree_profile_groups_multiply_add_add = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -276,7 +269,6 @@ tree_profile_groups_multiply_add_add = {
                                                 '.aiida_node_metadata.yaml',
                                                 '.aiida_dump_safeguard',
                                                 {'inputs': ['source_file']},
-                                                {'node_inputs': []},
                                             ]
                                         },
                                         {
@@ -295,7 +287,6 @@ tree_profile_groups_multiply_add_add = {
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
                                                 {
                                                     'outputs': [
                                                         '_scheduler-stderr.txt',
@@ -333,7 +324,6 @@ tree_profile_no_organize_by_groups = {
                                 {'.aiida': ['calcinfo.json', 'job_tmpl.json']},
                             ]
                         },
-                        {'node_inputs': []},
                         {
                             'outputs': [
                                 '_scheduler-stderr.txt',
@@ -356,7 +346,6 @@ tree_profile_no_organize_by_groups = {
                                 '.aiida_node_metadata.yaml',
                                 '.aiida_dump_safeguard',
                                 {'inputs': ['source_file']},
-                                {'node_inputs': []},
                             ]
                         },
                         {
@@ -370,7 +359,6 @@ tree_profile_no_organize_by_groups = {
                                         {'.aiida': ['calcinfo.json', 'job_tmpl.json']},
                                     ]
                                 },
-                                {'node_inputs': []},
                                 {
                                     'outputs': [
                                         '_scheduler-stderr.txt',
@@ -414,7 +402,6 @@ tree_profile_also_ungrouped = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -442,7 +429,6 @@ tree_profile_also_ungrouped = {
                                                 '.aiida_node_metadata.yaml',
                                                 '.aiida_dump_safeguard',
                                                 {'inputs': ['source_file']},
-                                                {'node_inputs': []},
                                             ]
                                         },
                                         {
@@ -461,7 +447,6 @@ tree_profile_also_ungrouped = {
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
                                                 {
                                                     'outputs': [
                                                         '_scheduler-stderr.txt',
@@ -501,7 +486,6 @@ tree_profile_also_ungrouped = {
                                         },
                                     ]
                                 },
-                                {'node_inputs': []},
                                 {
                                     'outputs': [
                                         '_scheduler-stderr.txt',
@@ -524,7 +508,6 @@ tree_profile_also_ungrouped = {
                                         '.aiida_node_metadata.yaml',
                                         '.aiida_dump_safeguard',
                                         {'inputs': ['source_file']},
-                                        {'node_inputs': []},
                                     ]
                                 },
                                 {
@@ -543,7 +526,6 @@ tree_profile_also_ungrouped = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -589,7 +571,6 @@ tree_profile_no_only_top_level_calcs = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -624,7 +605,6 @@ tree_profile_no_only_top_level_calcs = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -639,7 +619,6 @@ tree_profile_no_only_top_level_calcs = {
                                         '.aiida_dump_safeguard',
                                         '.aiida_node_metadata.yaml',
                                         {'inputs': ['source_file']},
-                                        {'node_inputs': []},
                                     ]
                                 },
                             ]
@@ -655,7 +634,6 @@ tree_profile_no_only_top_level_calcs = {
                                                 '.aiida_dump_safeguard',
                                                 '.aiida_node_metadata.yaml',
                                                 {'inputs': ['source_file']},
-                                                {'node_inputs': []},
                                             ]
                                         },
                                         {
@@ -674,7 +652,6 @@ tree_profile_no_only_top_level_calcs = {
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
                                                 {
                                                     'outputs': [
                                                         '_scheduler-stderr.txt',
@@ -715,7 +692,6 @@ tree_profile_delete_missing_nodes = {
                                                 '.aiida_dump_safeguard',
                                                 '.aiida_node_metadata.yaml',
                                                 {'inputs': ['source_file']},
-                                                {'node_inputs': []},
                                             ]
                                         },
                                         {
@@ -734,7 +710,6 @@ tree_profile_delete_missing_nodes = {
                                                         },
                                                     ]
                                                 },
-                                                {'node_inputs': []},
                                                 {
                                                     'outputs': [
                                                         '_scheduler-stderr.txt',
@@ -782,7 +757,6 @@ tree_profile_add_node_to_group = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -808,7 +782,6 @@ tree_profile_add_node_to_group = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -854,7 +827,6 @@ tree_profile_group_add_copy = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -889,7 +861,6 @@ tree_profile_group_add_copy = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -935,7 +906,6 @@ tree_profile_sub_calc_group = {
                                                 },
                                             ]
                                         },
-                                        {'node_inputs': []},
                                         {
                                             'outputs': [
                                                 '_scheduler-stderr.txt',
@@ -950,7 +920,6 @@ tree_profile_sub_calc_group = {
                                         '.aiida_dump_safeguard',
                                         '.aiida_node_metadata.yaml',
                                         {'inputs': ['source_file']},
-                                        {'node_inputs': []},
                                     ]
                                 },
                             ]
@@ -1169,7 +1138,6 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-
     @pytest.mark.usefixtures('aiida_profile_clean')
     def test_dump_no_only_top_level_calcs(self, tmp_path, setup_add_group, setup_multiply_add_group):
         setup_multiply_add_group
@@ -1204,7 +1172,7 @@ class TestProfileDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures("aiida_profile_clean")
+    @pytest.mark.usefixtures('aiida_profile_clean')
     def test_dump_delete_missing_nodes(
         self,
         tmp_path,

@@ -10,20 +10,19 @@ from aiida.common.progress_reporter import get_progress_reporter, set_progress_b
 from aiida.orm.utils import LinkTriple
 from aiida.tools.archive.exceptions import ExportValidationError
 from aiida.tools.dumping.logger import DumpLog
+from aiida.tools.dumping.utils.paths import (
+    DumpPaths,
+    generate_process_default_dump_path,
+    prepare_dump_path,
+    safe_delete_dir,
+)
 from aiida.tools.dumping.utils.process_handlers import (
     NodeMetadataWriter,
     NodeRepoIoDumper,
     ReadmeGenerator,
     WorkflowWalker,
 )
-from aiida.tools.dumping.utils.paths import (
-    DumpPaths,
-    prepare_dump_path,
-    safe_delete_dir,
-)
 from aiida.tools.dumping.utils.types import DumpStoreKeys
-from aiida.tools.dumping.utils.paths import generate_process_default_dump_path
-
 
 if TYPE_CHECKING:
     from aiida.tools.dumping.config import DumpConfig
@@ -125,114 +124,242 @@ class ProcessNodeManager:
         self,
         process_node: orm.ProcessNode,
         target_path: Path,  # Final path for this node's content
+        group: orm.Group | None = None, # Pass group context for symlink check
+        is_child_call: bool = False, # Flag to know if it's a recursive call
     ):
         """
         Dumps a single ProcessNode by coordinating helper classes.
-        Handles validation, logging checks, symlinking, and cleanup.
+        Handles validation, logging checks, symlinking, duplicate dumping, and cleanup.
         """
         node = process_node
 
         # --- Validation ---
         if not node.is_sealed and not self.config.dump_unsealed:
             raise ExportValidationError(
-                f"Process `{node.pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True."
+                f'Process `{node.pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True.'
             )
 
-        # --- Logging Check & Symlinking ---
+        # --- Logging Check & Symlinking/Duplication Logic ---
         store_key = DumpStoreKeys.from_instance(node_inst=node)
         node_store = self.dump_logger.get_store_by_name(store_key)
         existing_log_entry = node_store.get_entry(node.uuid)
+        is_primary_dump = existing_log_entry is None # Is this the first time we dump this node?
+
+        # Define safeguard file here for use in preparation and cleanup
+        node_safeguard_file = DumpPaths.safeguard_file
 
         if existing_log_entry:
-            # (Symlinking logic remains the same as previous version)
-            # is_group_context = self.engine.top_level_entity_type in ["group", "profile"]
-            if (
+            # Node is already logged. Decide whether to symlink, duplicate, or skip.
+            # We only symlink CalculationNodes when requested AND within a group context (profile or group dump)
+            # AND not a direct child call within a workflow (avoids symlinking inside workflow structure).
+            # Assume Profile/Group context if group is provided (simplification for now).
+            should_symlink = (
                 self.config.symlink_calcs
                 and isinstance(node, orm.CalculationNode)
-                # and is_group_context
-            ):
+                and group is not None # Indicates Profile or Group context dump
+                and not is_child_call # Avoid symlink for direct workflow children
+            )
+
+            if should_symlink:
+                # Attempt to create a symlink
                 if target_path.exists() or target_path.is_symlink():
-                    logger.debug(
-                        f"Path {target_path.name} exists, skipping symlink for node {node.pk}."
-                    )
-                    return
+                    logger.debug(f'Path {target_path.name} exists, skipping symlink for node {node.pk}.')
+                    return # Skip if path exists
                 try:
                     source_path = existing_log_entry.path
                     if not source_path.exists():
-                        logger.warning(
-                            f"Source path {source_path} for node {node.pk} does not exist. Cannot symlink."
-                        )
-                        return
+                        logger.warning(f'Source path {source_path} for node {node.pk} does not exist. Cannot symlink.')
+                        return # Cannot symlink if source is gone
                     os.symlink(source_path, target_path, target_is_directory=True)
-                    logger.debug(f"Created symlink {target_path.name} -> {source_path}")
-                    return
+                    logger.debug(f'Created symlink {target_path.name} -> {source_path}')
+                    # Record the symlink in the *original* log entry
+                    existing_log_entry.add_symlink(target_path.resolve())
+                    # Log needs saving later
+                    return # Successfully symlinked, done with this path.
                 except OSError as e:
-                    logger.error(
-                        f"Failed symlink creation for node {node.pk} at {target_path.name}: {e}"
-                    )
+                    logger.error(f'Failed symlink creation for node {node.pk} at {target_path.name}: {e}')
+                    # Don't proceed with full dump if symlink failed
                     return
-            else:
-                logger.debug(
-                    f"Node {node.pk} already logged at {existing_log_entry.path}, skipping dump."
-                )
+            # Symlinking is off or not applicable. Dump as duplicate if path is different.
+            elif target_path.resolve() == existing_log_entry.path.resolve():
+                 # Path is the same as original, definitely skip.
+                logger.debug(f"Node {node.pk} already logged at the target path {target_path.name}, skipping.")
                 return
+            else:
+                 # Path is different -> create a full duplicate dump.
+                logger.info(f"Node {node.pk} already logged, creating duplicate dump at {target_path.name}")
+                # Set flag to indicate this is not the primary dump
+                is_primary_dump = False
+                    # Proceed to the dump logic below...
 
-        # --- Prepare Node Directory ---
-        node_safeguard_file = ".aiida_node_metadata.yaml"
+        # --- Prepare Node Directory (only if not skipped/symlinked) ---
         try:
-            # Prepare the specific node directory
             prepare_dump_path(
                 path_to_validate=target_path,
                 dump_mode=self.config.dump_mode,
-                safeguard_file=node_safeguard_file,
-                top_level_caller=False,  # This specific node dir is not the absolute top level
+                safeguard_file=node_safeguard_file, # Use node-specific safeguard
+                top_level_caller=False,
             )
-            # Ensure safeguard exists (prepare_dump_path touches it if created/overwritten)
             (target_path / node_safeguard_file).touch(exist_ok=True)
-
         except Exception as e:
             logger.error(
-                f"Failed preparing target path {target_path.name} for node {node.pk}: {e}",
+                f'Failed preparing target path {target_path.name} for node {node.pk}: {e}',
                 exc_info=True,
             )
-            return
+            return # Cannot proceed if path prep fails
 
         # --- Dump Node Content using Helpers ---
         try:
             # 1. Write Metadata
-            self.metadata_writer.write(
-                node, target_path, output_filename=node_safeguard_file
-            )
+            self.metadata_writer.write(node, target_path)
 
-            # 2. Add to logger (before potential errors in content dumping/recursion)
-            node_store.add_entry(node.uuid, DumpLog(path=target_path.resolve()))
+            # 2. Update logger
+            if is_primary_dump:
+                 # First time dumping this node, create the primary log entry
+                node_store.add_entry(node.uuid, DumpLog(path=target_path.resolve()))
+            elif existing_log_entry:
+                # It's a duplicate dump, add path to original entry's duplicates list
+                existing_log_entry.add_duplicate(target_path.resolve())
             # Note: Log needs saving later by the engine
 
             # 3. Dump Content / Recurse Children
-            (target_path / DumpPaths.safeguard_file).touch()
+            (target_path / DumpPaths.safeguard_file).touch(exist_ok=True) # Add general safeguard too
             if isinstance(node, orm.CalculationNode):
                 self.repo_io_dumper.dump_calculation_content(node, target_path)
             elif isinstance(node, orm.WorkflowNode):
+                 # Pass is_child_call=True for recursive calls
                 self.workflow_walker.dump_children(node, target_path)
 
             # 4. Generate README (Consider if this should only be done by the Strategy at the top level)
-            # If called here, every node gets a README.
             # self.readme_generator.generate(node, target_path)
 
         except Exception as e:
             logger.error(
-                f"Failed during content dump of node PK={node.pk} (UUID={node.uuid}): {e}",
+                f'Failed during content dump of node PK={node.pk} (UUID={node.uuid}) at {target_path}: {e}',
                 exc_info=True,
             )
-            # Attempt cleanup
+            # Attempt cleanup only if it wasn't a symlink/skip case
             try:
                 safe_delete_dir(target_path, safeguard_file=node_safeguard_file)
-                # Remove from logger if it was added
-                node_store.del_entry(node.uuid)
+                # Remove from logger ONLY if it was the primary dump attempt that failed
+                if is_primary_dump:
+                    node_store.del_entry(node.uuid)
+                # If it was a duplicate dump that failed, we don't modify the original log entry's duplicate list here
             except Exception as cleanup_e:
-                logger.error(
-                    f"Failed cleanup for node {node.pk} at {target_path.name}: {cleanup_e}"
-                )
+                logger.error(f'Failed cleanup for node {node.pk} at {target_path.name}: {cleanup_e}')
+
+    # def dump_process(
+    #     self,
+    #     process_node: orm.ProcessNode,
+    #     target_path: Path,  # Final path for this node's content
+    # ):
+    #     """
+    #     Dumps a single ProcessNode by coordinating helper classes.
+    #     Handles validation, logging checks, symlinking, and cleanup.
+    #     """
+    #     node = process_node
+
+    #     # --- Validation ---
+    #     if not node.is_sealed and not self.config.dump_unsealed:
+    #         raise ExportValidationError(
+    #             f"Process `{node.pk}` must be sealed before it can be dumped, or `--dump-unsealed` set to True."
+    #         )
+
+    #     # --- Logging Check & Symlinking ---
+    #     store_key = DumpStoreKeys.from_instance(node_inst=node)
+    #     node_store = self.dump_logger.get_store_by_name(store_key)
+    #     existing_log_entry = node_store.get_entry(node.uuid)
+
+    #     if existing_log_entry:
+    #         # (Symlinking logic remains the same as previous version)
+    #         # is_group_context = self.engine.top_level_entity_type in ["group", "profile"]
+    #         if (
+    #             self.config.symlink_calcs
+    #             and isinstance(node, orm.CalculationNode)
+    #             # and is_group_context
+    #         ):
+    #             if target_path.exists() or target_path.is_symlink():
+    #                 logger.debug(
+    #                     f"Path {target_path.name} exists, skipping symlink for node {node.pk}."
+    #                 )
+    #                 return
+    #             try:
+    #                 source_path = existing_log_entry.path
+    #                 if not source_path.exists():
+    #                     logger.warning(
+    #                         f"Source path {source_path} for node {node.pk} does not exist. Cannot symlink."
+    #                     )
+    #                     return
+    #                 os.symlink(source_path, target_path, target_is_directory=True)
+    #                 logger.debug(f"Created symlink {target_path.name} -> {source_path}")
+    #                 return
+    #             except OSError as e:
+    #                 logger.error(
+    #                     f"Failed symlink creation for node {node.pk} at {target_path.name}: {e}"
+    #                 )
+    #                 return
+    #         else:
+    #             logger.debug(
+    #                 f"Node {node.pk} already logged at {existing_log_entry.path}, skipping dump."
+    #             )
+    #             return
+
+    #     # --- Prepare Node Directory ---
+    #     node_safeguard_file = ".aiida_node_metadata.yaml"
+    #     try:
+    #         # Prepare the specific node directory
+    #         prepare_dump_path(
+    #             path_to_validate=target_path,
+    #             dump_mode=self.config.dump_mode,
+    #             safeguard_file=node_safeguard_file,
+    #             top_level_caller=False,  # This specific node dir is not the absolute top level
+    #         )
+    #         # Ensure safeguard exists (prepare_dump_path touches it if created/overwritten)
+    #         (target_path / node_safeguard_file).touch(exist_ok=True)
+
+    #     except Exception as e:
+    #         logger.error(
+    #             f"Failed preparing target path {target_path.name} for node {node.pk}: {e}",
+    #             exc_info=True,
+    #         )
+    #         return
+
+    #     # --- Dump Node Content using Helpers ---
+    #     try:
+    #         # 1. Write Metadata
+    #         self.metadata_writer.write(
+    #             node, target_path, output_filename=node_safeguard_file
+    #         )
+
+    #         # 2. Add to logger (before potential errors in content dumping/recursion)
+    #         node_store.add_entry(node.uuid, DumpLog(path=target_path.resolve()))
+    #         # Note: Log needs saving later by the engine
+
+    #         # 3. Dump Content / Recurse Children
+    #         (target_path / DumpPaths.safeguard_file).touch()
+    #         if isinstance(node, orm.CalculationNode):
+    #             self.repo_io_dumper.dump_calculation_content(node, target_path)
+    #         elif isinstance(node, orm.WorkflowNode):
+    #             self.workflow_walker.dump_children(node, target_path)
+
+    #         # 4. Generate README (Consider if this should only be done by the Strategy at the top level)
+    #         # If called here, every node gets a README.
+    #         # self.readme_generator.generate(node, target_path)
+
+    #     except Exception as e:
+    #         logger.error(
+    #             f"Failed during content dump of node PK={node.pk} (UUID={node.uuid}): {e}",
+    #             exc_info=True,
+    #         )
+    #         # Attempt cleanup
+    #         try:
+    #             safe_delete_dir(target_path, safeguard_file=node_safeguard_file)
+    #             # Remove from logger if it was added
+    #             node_store.del_entry(node.uuid)
+    #         except Exception as cleanup_e:
+    #             logger.error(
+    #                 f"Failed cleanup for node {node.pk} at {target_path.name}: {cleanup_e}"
+    #             )
 
     @staticmethod
     def _generate_child_node_label(
