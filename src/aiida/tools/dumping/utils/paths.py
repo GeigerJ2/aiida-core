@@ -216,7 +216,6 @@ def generate_process_default_dump_path(
 
     if append_pk:
         path_entities += [str(process_node.pk)]
-
     return Path("-".join(path_entities))
 
 

@@ -78,5 +78,4 @@ class GroupDumper:
 
     def dump(self):
         """Perform the dump operation."""
-        import ipdb; ipdb.set_trace()
         self.engine.dump(entity=self.group)

@@ -1063,6 +1063,7 @@ class TestProfileDumper:
         profile_dumper = ProfileDumper(
             output_path=output_path,
             config=DumpConfig(also_ungrouped=True, filter_by_last_dump_time=False),
+            # config=DumpConfig(also_ungrouped=True, dump_mode=DumpMode.OVERWRITE),
         )
         profile_dumper.dump()
 

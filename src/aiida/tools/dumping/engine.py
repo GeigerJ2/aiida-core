@@ -9,7 +9,7 @@ from aiida.tools.dumping.detect.detector import DumpChangeDetector
 from aiida.tools.dumping.logger import DumpLogger
 from aiida.tools.dumping.managers.deletion import DeletionManager
 from aiida.tools.dumping.managers.group import GroupManager
-from aiida.tools.dumping.managers.node import NodeManager
+from aiida.tools.dumping.managers.node import ProcessNodeManager
 from aiida.tools.dumping.strategies.base import DumpStrategy
 from aiida.tools.dumping.strategies.group import GroupDumpStrategy
 from aiida.tools.dumping.strategies.process import ProcessDumpStrategy
@@ -42,7 +42,7 @@ class DumpEngine:
         # GroupManager might need DumpTimes if doing time-based logic internally
         self.group_manager = GroupManager(config, dump_paths, self.dump_logger, self)
         # NodeManager needs GroupManager for path calculation
-        self.node_manager = NodeManager(config, dump_paths, self.dump_logger, self.dump_times, self.group_manager)
+        self.node_manager = ProcessNodeManager(config, dump_paths, self.dump_logger, self.dump_times, self.group_manager, engine=self)
         # Detector needs logger and times
         self.detector = DumpChangeDetector(self.dump_logger, self.config, self.dump_times)
         # DeletionManager needs logger
