@@ -89,7 +89,6 @@ def prepare_dump_path(
         `incremental` are enabled.
     :raises FileNotFoundError: If no `safeguard_file` is found."""
 
-
     if path_to_validate.is_file():
         msg = f'A file at the given path `{path_to_validate}` already exists.'
         raise FileExistsError(msg)

@@ -227,8 +227,8 @@ class DumpChangeDetector:
 
         if stored_mapping is None:
             # First run: Call the dedicated method
-                new_groups = self.detect_new_groups(current_mapping)
-                group_changes = GroupChanges(new=new_groups) # Populate only 'new'
+            new_groups = self.detect_new_groups(current_mapping)
+            group_changes = GroupChanges(new=new_groups)  # Populate only 'new'
 
         else:
             # Subsequent runs: Perform the diff as before

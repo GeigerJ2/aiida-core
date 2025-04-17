@@ -192,9 +192,7 @@ def test_dump_multiply_add(tmp_path, generate_workchain_multiply_add):
     dump_parent_path = tmp_path / 'wc-dump-test-multiply-add-flat'
     dump_paths_flat = DumpPaths.from_path(dump_parent_path)
     process_dump_config = ProcessDumperConfig(flat=True)
-    process_dumper = ProcessDumper(
-        dump_paths=dump_paths_flat, config=process_dump_config, process_node=wc_node
-    )
+    process_dumper = ProcessDumper(dump_paths=dump_paths_flat, config=process_dump_config, process_node=wc_node)
     process_dumper.dump()
 
     multiply_file = dump_parent_path / '01-multiply-6' / 'source_file'
@@ -226,9 +224,7 @@ def test_dump_calculation_node(tmp_path, generate_calculation_node_io):
     dump_paths = DumpPaths.from_path(dump_parent_path)
     process_dump_config = ProcessDumperConfig(include_outputs=True)
     calculation_node = generate_calculation_node_io()
-    process_dumper = ProcessDumper(
-        dump_paths=dump_paths, config=process_dump_config, process_node=calculation_node
-    )
+    process_dumper = ProcessDumper(dump_paths=dump_paths, config=process_dump_config, process_node=calculation_node)
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
 
     assert (dump_parent_path / inputs_relpath / filename).is_file()
@@ -260,9 +256,7 @@ def test_dump_calculation_flat(tmp_path, generate_calculation_node_io):
     dump_paths = DumpPaths.from_path(dump_parent_path)
     process_dump_config = ProcessDumperConfig(flat=True)
     calculation_node = generate_calculation_node_io()
-    process_dumper = ProcessDumper(
-        dump_paths=dump_paths, process_node=calculation_node, config=process_dump_config
-    )
+    process_dumper = ProcessDumper(dump_paths=dump_paths, process_node=calculation_node, config=process_dump_config)
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
 
     # Here, the same file will be written by inputs and node_outputs and node_inputs
@@ -290,9 +284,7 @@ def test_dump_calculation_overwr_incr(tmp_path, generate_calculation_node_io):
     # we create safeguard file so the dumping works
     (dump_parent_path / '.aiida_dump_safeguard').touch()
     # With overwrite option true no error is raised and the dumping can run through.
-    process_dumper = ProcessDumper(
-        dump_mode=DumpMode.OVERWRITE, dump_paths=dump_paths, process_node=calculation_node
-    )
+    process_dumper = ProcessDumper(dump_mode=DumpMode.OVERWRITE, dump_paths=dump_paths, process_node=calculation_node)
     process_dumper._dump_calculation(calculation_node=calculation_node, output_path=dump_parent_path)
     assert (dump_parent_path / inputs_relpath / filename).is_file()
 

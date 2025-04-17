@@ -1,10 +1,10 @@
 from aiida.common.log import AIIDA_LOGGER
-from aiida.tools.dumping.logger import DumpLog, DumpLogger
+from aiida.tools.dumping.logger import DumpLogger
 from aiida.tools.dumping.strategies.base import DumpStrategy
-from aiida.tools.dumping.utils.types import DumpChanges
 from aiida.tools.dumping.utils.paths import get_directory_stats
+from aiida.tools.dumping.utils.types import DumpChanges
 
-logger = AIIDA_LOGGER.getChild("tools.dumping.strategies.group")
+logger = AIIDA_LOGGER.getChild('tools.dumping.strategies.group')
 
 
 class GroupDumpStrategy(DumpStrategy):
@@ -14,12 +14,10 @@ class GroupDumpStrategy(DumpStrategy):
         """Dumps the specific group using pre-detected changes."""
         group = self.entity
         if group is None:
-            logger.error("GroupDumpStrategy executed without a valid group entity.")
+            logger.error('GroupDumpStrategy executed without a valid group entity.')
             return
 
-        logger.info(
-            f"Executing GroupDumpStrategy for group '{group.label}' ({group.uuid})"
-        )
+        logger.info(f"Executing GroupDumpStrategy for group '{group.label}' ({group.uuid})")
 
         # 1. Prepare Path (Ensure group directory exists and is logged)
         # This also ensures the group is in the logger if it's new
@@ -29,7 +27,7 @@ class GroupDumpStrategy(DumpStrategy):
             # prepare_dump_path(...)
         except Exception as e:
             logger.error(
-                f"Failed to get or register path for group {group.label}: {e}",
+                f'Failed to get or register path for group {group.label}: {e}',
                 exc_info=True,
             )
             return
@@ -38,9 +36,7 @@ class GroupDumpStrategy(DumpStrategy):
         # group_changes_for_this_group = changes.groups # Changes should already be filtered for this group
         # Delegate processing to GroupManager using the relevant part of changes
         if self.engine.config.update_groups and changes.groups:
-            logger.info(
-                f"Dispatching group lifecycle/membership changes for {group.label} to GroupManager..."
-            )
+            logger.info(f'Dispatching group lifecycle/membership changes for {group.label} to GroupManager...')
             self.engine.group_manager.handle_group_changes(changes.groups)
 
         # 3. Handle New/Modified Nodes for this Group
@@ -63,25 +59,22 @@ class GroupDumpStrategy(DumpStrategy):
                     exc_info=True,
                 )
         else:
-            logger.info(
-                f"No new/modified nodes detected to dump for group '{group.label}'."
-            )
+            logger.info(f"No new/modified nodes detected to dump for group '{group.label}'.")
 
         logger.info(f"Finished GroupDumpStrategy for group '{group.label}'.")
 
         # --- 4. Calculate and Update Group Directory Stats ---
         # This happens *after* nodes have potentially been dumped into the group dir.
-        logger.debug(f"Calculating final stats for group directory: {group_path}")
+        logger.debug(f'Calculating final stats for group directory: {group_path}')
         group_log_entry = dump_logger.groups.get_entry(group.uuid)
         if group_log_entry:
             dir_mtime, dir_size = get_directory_stats(group_path)
             group_log_entry.dir_mtime = dir_mtime
             group_log_entry.dir_size = dir_size
-            logger.debug(f"Updated stats for group {group.uuid}: mtime={dir_mtime}, size={dir_size}")
+            logger.debug(f'Updated stats for group {group.uuid}: mtime={dir_mtime}, size={dir_size}')
         else:
             # This shouldn't happen if ensure_group_registered worked
-            logger.warning(f"Could not find log entry for group {group.uuid} to update stats.")
-
+            logger.warning(f'Could not find log entry for group {group.uuid} to update stats.')
 
         logger.info(f"Finished GroupDumpStrategy for group '{group.label}'.")
 

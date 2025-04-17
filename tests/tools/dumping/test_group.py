@@ -10,8 +10,8 @@
 
 import pytest
 
-from aiida.tools.dumping.config import DumpConfig
 from aiida.tools.dumping import GroupDumper
+from aiida.tools.dumping.config import DumpConfig
 from aiida.tools.dumping.utils.tree import compare_tree
 
 # TODO: Also verify the log updates
@@ -21,47 +21,47 @@ add_group_label = 'add-group'
 multiply_add_group_label = 'multiply-add-group'
 
 tree_profile_group_add = {
-        '.aiida_dump_log.json',
-        '.aiida_dump_safeguard',
-        {
-            'groups': [
-                {
-                    add_group_label: [
-                        '.aiida_dump_safeguard',
-                        {
-                            'calculations': [
-                                {
-                                    'ArithmeticAddCalculation-4': [
-                                        '.aiida_dump_safeguard',
-                                        '.aiida_node_metadata.yaml',
-                                        {
-                                            'inputs': [
-                                                '_aiidasubmit.sh',
-                                                'aiida.in',
-                                                {
-                                                    '.aiida': [
-                                                        'calcinfo.json',
-                                                        'job_tmpl.json',
-                                                    ]
-                                                },
-                                            ]
-                                        },
-                                        {'node_inputs': []},
-                                        {
-                                            'outputs': [
-                                                '_scheduler-stderr.txt',
-                                                '_scheduler-stdout.txt',
-                                                'aiida.out',
-                                            ]
-                                        },
-                                    ]
-                                }
-                            ]
-                        },
-                    ]
-                }
-            ]
-        },
+    '.aiida_dump_log.json',
+    '.aiida_dump_safeguard',
+    {
+        'groups': [
+            {
+                add_group_label: [
+                    '.aiida_dump_safeguard',
+                    {
+                        'calculations': [
+                            {
+                                'ArithmeticAddCalculation-4': [
+                                    '.aiida_dump_safeguard',
+                                    '.aiida_node_metadata.yaml',
+                                    {
+                                        'inputs': [
+                                            '_aiidasubmit.sh',
+                                            'aiida.in',
+                                            {
+                                                '.aiida': [
+                                                    'calcinfo.json',
+                                                    'job_tmpl.json',
+                                                ]
+                                            },
+                                        ]
+                                    },
+                                    {'node_inputs': []},
+                                    {
+                                        'outputs': [
+                                            '_scheduler-stderr.txt',
+                                            '_scheduler-stdout.txt',
+                                            'aiida.out',
+                                        ]
+                                    },
+                                ]
+                            }
+                        ]
+                    },
+                ]
+            }
+        ]
+    },
 }
 
 tree_profile_group_multiply_add = {
@@ -1167,7 +1167,6 @@ class TestGroupDumper:
             base_path=tmp_path,
         )
 
-
     @pytest.mark.usefixtures('aiida_profile_clean')
     def test_dump_no_only_top_level_calcs(self, tmp_path, setup_add_group, setup_multiply_add_group):
         setup_multiply_add_group
@@ -1202,7 +1201,7 @@ class TestGroupDumper:
             base_path=tmp_path,
         )
 
-    @pytest.mark.usefixtures("aiida_profile_clean")
+    @pytest.mark.usefixtures('aiida_profile_clean')
     def test_dump_delete_missing_nodes(
         self,
         tmp_path,

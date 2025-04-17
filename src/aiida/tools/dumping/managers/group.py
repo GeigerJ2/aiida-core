@@ -22,13 +22,7 @@ logger = AIIDA_LOGGER.getChild('tools.dumping.managers.group')
 class GroupManager:
     """Handles group-related operations during dumping"""
 
-    def __init__(
-        self,
-        config: DumpConfig,
-        dump_paths: DumpPaths,
-        dump_logger: DumpLogger,
-        engine: DumpEngine
-    ):
+    def __init__(self, config: DumpConfig, dump_paths: DumpPaths, dump_logger: DumpLogger, engine: DumpEngine):
         self.config: DumpConfig = config
         self.dump_paths: DumpPaths = dump_paths
         self.dump_logger: DumpLogger = dump_logger
@@ -78,7 +72,6 @@ class GroupManager:
             # Re-raise or handle as appropriate? Re-raising might stop the process.
             # Depending on desired robustness, you might want to allow skipping a group.
             raise  # Or return None / log and continue
-
 
     def handle_group_changes(self, group_changes: GroupChanges):
         logger.report('Processing group changes...')

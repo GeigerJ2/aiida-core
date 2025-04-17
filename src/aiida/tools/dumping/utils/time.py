@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 @dataclass
 class DumpTimes:
     """Holds relevant timestamps for a dump operation."""
+
     # Time the current dump operation started (or object was instantiated)
     current: datetime = field(default_factory=timezone.now)
     # Time the last dump operation finished (loaded from log)
@@ -28,7 +29,6 @@ class DumpTimes:
             try:
                 last = datetime.fromisoformat(last_log_time)
             except ValueError:
-                 # Handle potential parsing errors if necessary
-                 pass # Or log a warning
+                # Handle potential parsing errors if necessary
+                pass  # Or log a warning
         return cls(last=last)
-

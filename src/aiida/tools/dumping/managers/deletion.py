@@ -144,4 +144,3 @@ class DeletionManager:
         else:
             logger.debug(f'Removed log entry for deleted group {uuid}.')
         return deleted_from_log
-

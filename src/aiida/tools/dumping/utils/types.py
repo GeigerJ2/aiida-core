@@ -8,7 +8,7 @@ from aiida import orm
 
 DumpEntityType = orm.CalculationNode | orm.WorkflowNode | orm.Data
 QbDumpEntityType = Type[orm.CalculationNode] | Type[orm.WorkflowNode] | Type[orm.Data]
-StoreNameType = Literal["calculations", "workflows", "groups", "data"]
+StoreNameType = Literal['calculations', 'workflows', 'groups', 'data']
 
 
 @dataclass
@@ -43,12 +43,7 @@ class DumpNodeStore:
         return len(self.data) > 0
 
     def __len__(self) -> int:
-        return (
-            len(self.calculations)
-            + len(self.workflows)
-            + len(self.data)
-            + len(self.groups)
-        )
+        return len(self.calculations) + len(self.workflows) + len(self.data) + len(self.groups)
 
     def num_processes(self) -> int:
         return len(self.calculations) + len(self.workflows)
@@ -85,7 +80,7 @@ class DumpNodeStore:
 
         store_names = list(self.stores.keys())
         if name not in store_names:
-            msg = f"Wrong key <{name}> selected. Choose one of {store_names}."
+            msg = f'Wrong key <{name}> selected. Choose one of {store_names}.'
             raise ValueError(msg)
 
         return getattr(self.stores, name)
@@ -112,12 +107,7 @@ class DeletedEntityStore:
     groups: Set[str] = field(default_factory=set)
 
     def __len__(self) -> int:
-        return (
-            len(self.calculations)
-            + len(self.workflows)
-            + len(self.data)
-            + len(self.groups)
-        )
+        return len(self.calculations) + len(self.workflows) + len(self.data) + len(self.groups)
 
 
 # --- Supporting Dataclasses for Group Changes ---
@@ -182,10 +172,10 @@ class DumpChanges:
 
 
 class DumpStoreKeys(str, Enum):
-    CALCULATIONS = "calculations"
-    WORKFLOWS = "workflows"
-    GROUPS = "groups"
-    DATA = "data"
+    CALCULATIONS = 'calculations'
+    WORKFLOWS = 'workflows'
+    GROUPS = 'groups'
+    DATA = 'data'
 
     @classmethod
     def from_instance(cls, node_inst: orm.Node | orm.Group) -> StoreNameType:
@@ -198,7 +188,7 @@ class DumpStoreKeys(str, Enum):
         elif isinstance(node_inst, orm.Group):
             return cls.GROUPS.value
         else:
-            msg = f"Dumping not implemented yet for node type: {type(node_inst)}"
+            msg = f'Dumping not implemented yet for node type: {type(node_inst)}'
             raise NotImplementedError(msg)
 
     @classmethod
@@ -212,11 +202,11 @@ class DumpStoreKeys(str, Enum):
         elif issubclass(orm_class, orm.Group):
             return cls.GROUPS.value
         else:
-            msg = f"Dumping not implemented yet for node type: {orm_class}"
+            msg = f'Dumping not implemented yet for node type: {orm_class}'
             raise NotImplementedError(msg)
 
     @classmethod
-    def to_class(cls, key: "DumpStoreKeys") -> Type:
+    def to_class(cls, key: 'DumpStoreKeys') -> Type:
         mapping = {
             cls.CALCULATIONS: orm.CalculationNode,
             cls.WORKFLOWS: orm.WorkflowNode,
@@ -226,5 +216,5 @@ class DumpStoreKeys(str, Enum):
         if key in mapping:
             return mapping[key]
         else:
-            msg = f"No node type mapping exists for key: {key}"
+            msg = f'No node type mapping exists for key: {key}'
             raise ValueError(msg)

@@ -15,7 +15,6 @@ from aiida.tools.dumping.utils.paths import (
     generate_process_default_dump_path,
     get_directory_stats,
     prepare_dump_path,
-    safe_delete_dir,
 )
 from aiida.tools.dumping.utils.process_handlers import (
     NodeMetadataWriter,
@@ -477,4 +476,3 @@ class ProcessNodeManager:
         node_label = node_label.replace('CALL-', '')
         # Original code had this replacement
         return node_label.replace('None-', '')
-

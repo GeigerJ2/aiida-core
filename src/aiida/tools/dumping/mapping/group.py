@@ -154,17 +154,21 @@ class GroupNodeMapping:
 
         # Deleted groups
         for group_uuid in self_group_uuids - other_group_uuids:
-            deleted_groups_info.append(GroupInfo(
-                uuid=group_uuid,
-                node_count=len(self.group_to_nodes.get(group_uuid, set())),
-            ))
+            deleted_groups_info.append(
+                GroupInfo(
+                    uuid=group_uuid,
+                    node_count=len(self.group_to_nodes.get(group_uuid, set())),
+                )
+            )
 
         # New groups
         for group_uuid in other_group_uuids - self_group_uuids:
-            new_groups_info.append(GroupInfo(
-                uuid=group_uuid,
-                node_count=len(other.group_to_nodes.get(group_uuid, set())),
-            ))
+            new_groups_info.append(
+                GroupInfo(
+                    uuid=group_uuid,
+                    node_count=len(other.group_to_nodes.get(group_uuid, set())),
+                )
+            )
 
         # Modified groups
         for group_uuid in self_group_uuids & other_group_uuids:
@@ -175,12 +179,14 @@ class GroupNodeMapping:
             removed_nodes = list(self_nodes - other_nodes)
 
             if added_nodes or removed_nodes:
-                modified_groups_info.append(GroupModificationInfo(
-                    uuid=group_uuid,
-                    label=orm.load_group(group_uuid).label,
-                    nodes_added=added_nodes,
-                    nodes_removed=removed_nodes,
-                ))
+                modified_groups_info.append(
+                    GroupModificationInfo(
+                        uuid=group_uuid,
+                        label=orm.load_group(group_uuid).label,
+                        nodes_added=added_nodes,
+                        nodes_removed=removed_nodes,
+                    )
+                )
 
                 # Track detailed node membership changes
                 for node_uuid in added_nodes:
@@ -198,5 +204,5 @@ class GroupNodeMapping:
             deleted=deleted_groups_info,
             new=new_groups_info,
             modified=modified_groups_info,
-            node_membership=node_membership_changes
+            node_membership=node_membership_changes,
         )

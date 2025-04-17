@@ -713,11 +713,7 @@ def group_dump(
         delete_missing=delete_missing,
     )
 
-    group_dumper = GroupDumper(
-        group=group,
-        config=config,
-        output_path=output_path
-    )
+    group_dumper = GroupDumper(group=group, config=config, output_path=output_path)
 
     try:
         _ = group_dumper.dump()

@@ -5,8 +5,8 @@ from aiida.common.log import AIIDA_LOGGER
 from aiida.orm import QueryBuilder
 from aiida.tools.dumping.logger import DumpLogger
 from aiida.tools.dumping.strategies.base import DumpStrategy
-from aiida.tools.dumping.utils.types import DumpChanges, DumpNodeStore
 from aiida.tools.dumping.utils.paths import get_directory_stats
+from aiida.tools.dumping.utils.types import DumpChanges, DumpNodeStore
 
 logger = AIIDA_LOGGER.getChild('tools.dumping.strategies.profile')
 
@@ -129,19 +129,18 @@ class ProfileDumpStrategy(DumpStrategy):
             self._handle_ungrouped_nodes(ungrouped_nodes_store)
 
         # --- Final Step: Calculate and Update Stats for ALL Registered Groups ---
-        logger.info("Calculating final directory stats for all registered groups...")
+        logger.info('Calculating final directory stats for all registered groups...')
         for group_uuid, group_log_entry in dump_logger.groups.entries.items():
             group_path = group_log_entry.path
-            logger.debug(f"Calculating stats for group directory: {group_path} (UUID: {group_uuid})")
+            logger.debug(f'Calculating stats for group directory: {group_path} (UUID: {group_uuid})')
             try:
-                 dir_mtime, dir_size = get_directory_stats(group_path)
-                 group_log_entry.dir_mtime = dir_mtime
-                 group_log_entry.dir_size = dir_size
-                 logger.debug(f"Updated stats for group {group_uuid}: mtime={dir_mtime}, size={dir_size}")
+                dir_mtime, dir_size = get_directory_stats(group_path)
+                group_log_entry.dir_mtime = dir_mtime
+                group_log_entry.dir_size = dir_size
+                logger.debug(f'Updated stats for group {group_uuid}: mtime={dir_mtime}, size={dir_size}')
             except Exception as e:
-                 # Log error but continue to next group
-                 logger.error(f"Failed to calculate/update stats for group {group_uuid} at {group_path}: {e}")
-
+                # Log error but continue to next group
+                logger.error(f'Failed to calculate/update stats for group {group_uuid} at {group_path}: {e}')
 
         logger.info('Finished ProfileDumpStrategy.')
 

@@ -598,7 +598,7 @@ def process_dump(
     node data for further inspection.
     """
 
-    from aiida.tools.dumping.config import DumpMode, DumpConfig
+    from aiida.tools.dumping.config import DumpMode
     from aiida.tools.dumping.entities import ProcessDumper
     from aiida.tools.dumping.utils.paths import resolve_click_path_for_dump
 
@@ -609,7 +609,6 @@ def process_dump(
         dump_mode = DumpMode.OVERWRITE
     else:
         dump_mode = DumpMode.INCREMENTAL
-
 
     process_dumper = ProcessDumper(
         process_node=process,

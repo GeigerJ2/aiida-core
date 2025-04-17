@@ -12,7 +12,6 @@ from typing import Any
 
 
 def tree_to_dict(root_path: Path) -> dict[str, list[Any]]:
-
     """
     Convert a directory tree structure into a dictionary representation.
 
@@ -29,7 +28,7 @@ def tree_to_dict(root_path: Path) -> dict[str, list[Any]]:
         Dict[str, List[Any]]: Dictionary representation of the directory structure
     """
     if not root_path.exists() or not root_path.is_dir():
-        raise ValueError(f"The path {root_path} does not exist or is not a directory")
+        raise ValueError(f'The path {root_path} does not exist or is not a directory')
 
     # Get the directory name
     dir_name = root_path.name
@@ -75,7 +74,7 @@ def tree_to_dict_dirs_only(root_path: Path) -> dict[str, list[Any]]:
                               containing only directories
     """
     if not root_path.exists() or not root_path.is_dir():
-        raise ValueError(f"The path {root_path} does not exist or is not a directory")
+        raise ValueError(f'The path {root_path} does not exist or is not a directory')
 
     # Get the directory name
     dir_name = root_path.name
@@ -84,8 +83,7 @@ def tree_to_dict_dirs_only(root_path: Path) -> dict[str, list[Any]]:
     contents = []
 
     # Get all subdirectories in the current directory (sorted alphabetically)
-    subdirs = sorted([entry for entry in root_path.iterdir() if entry.is_dir()],
-                    key=lambda p: p.name)
+    subdirs = sorted([entry for entry in root_path.iterdir() if entry.is_dir()], key=lambda p: p.name)
 
     # Recursively process all subdirectories
     for subdir in subdirs:
