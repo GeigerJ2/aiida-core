@@ -51,8 +51,29 @@ __all__ = (
     'NodeChanges',
     'NodeMembershipChange',
     'ProcessingQueue',
-    'RegistryNameType',
+    'RegistryNameType'
 )
+
+
+@dataclass
+class ProcessingQueue:
+    """Simple collections of nodes to process."""
+
+    calculations: list[orm.CalculationNode]
+    workflows: list[orm.WorkflowNode]
+
+    def __init__(self, calculations=None, workflows=None):
+        self.calculations = calculations or []
+        self.workflows = workflows or []
+
+    def all_process_nodes(self) -> list[orm.ProcessNode]:
+        return self.calculations + self.workflows
+
+    def is_empty(self) -> bool:
+        return len(self.calculations) == 0 and len(self.workflows) == 0
+
+    def __len__(self) -> int:
+        return len(self.calculations) + len(self.workflows)
 
 
 @dataclass
@@ -69,26 +90,6 @@ class DumpTimes:
         if last_log_time:
             last = datetime.fromisoformat(last_log_time)
         return cls(last=last)
-
-
-@dataclass
-class ProcessingQueue:
-    """Queue/stroe for nodes to be dumped."""
-
-    calculations: list = field(default_factory=list)
-    workflows: list = field(default_factory=list)
-    groups: list = field(default_factory=list)
-
-    def __len__(self) -> int:
-        return len(self.calculations) + len(self.workflows) + len(self.groups)
-
-    def is_empty(self) -> bool:
-        return len(self) == 0
-
-    def all_process_nodes(self) -> list[orm.ProcessNode]:
-        """Get all calculations and workflows as a single list."""
-        return self.calculations + self.workflows
-
 
 @dataclass
 class GroupInfo:
@@ -149,7 +150,6 @@ class NodeChanges:
     # If you need deleted group UUIDs elsewhere (like DeletionExecutor),
     # they are available in GroupChangeInfo.deleted[...].uuid
     deleted: Set[str] = field(default_factory=set)
-
 
 @dataclass
 class DumpChanges:

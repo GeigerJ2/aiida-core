@@ -104,10 +104,9 @@ class DumpRecord:
             return True
         return False
 
-    def update_stats(self, path: Optional[Path]) -> None:
-        """Update directory stats from the path of the DumpRecord or an optional given path."""
-        if not path:
-            path = self.path
+    def update_stats_from_path(self, path: Path) -> None:
+        """Update directory stats from the given path."""
+        from aiida.tools.dumping.utils.paths import DumpPaths
 
         self.dir_mtime, self.dir_size = DumpPaths.get_directory_stats(path)
 
@@ -247,11 +246,6 @@ class DumpTracker:
             except ValueError:
                 logger.warning(f'Could not parse last dump time string: {self._last_dump_time_str}')
         return None
-
-    # def add_entry(self, registry_key: RegistryNameType, uuid: str, entry: DumpRecord) -> None:
-    #     """Add a log entry for a node to the specified registry."""
-    #     registry = self.registries[registry_key]
-    #     registry.add_entry(uuid, entry)
 
     def del_entry(self, uuid: str) -> bool:
         """Delete a log entry by UUID (automatically finds the correct registry)."""

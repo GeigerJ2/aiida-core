@@ -20,7 +20,7 @@ from aiida import orm
 from aiida.common import timezone
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration import Profile
-from aiida.tools.dumping.config import DumpConfig, DumpMode
+from aiida.tools.dumping.config import DumpConfig
 
 logger = AIIDA_LOGGER.getChild('tools.dumping.utils.paths')
 
@@ -87,61 +87,6 @@ class DumpPaths:
             return Path('groups') / group_label_part
         return group_label_part
 
-    def get_path_for_group(self, group: orm.Group) -> Path:
-        """Get the absolute path for a group's content."""
-        if not self.config.organize_by_groups:
-            return self.base_output_path
-
-        # If this group is the main target, it goes at the root
-        if isinstance(self.dump_target_entity, orm.Group) and self.dump_target_entity.uuid == group.uuid:
-            return self.base_output_path
-
-        # Otherwise, it goes under groups/
-        return self.base_output_path / 'groups' / group.label
-
-    def get_path_for_node(
-        self,
-        node: orm.ProcessNode,
-        current_content_root: Path,
-    ) -> Path:
-        """
-        Determines the absolute path for dumping a specific node.
-
-        :param node: The aiida.orm.Node object.
-        :param current_content_root: The absolute root path for the current context
-            (e.g., a specific group's content path, or the path
-            for ungrouped nodes, or the base_output_path for a
-            single process dump).
-        :param group_context_for_node: The group under whose direct hierarchy this node is being dumped.
-            This is important if the node itself is also part of other groups,
-            to decide its primary dump location vs. symlinks.
-            If None, the node is considered ungrouped or dumped standalone.
-        :return: Absolute Path for the node's dump directory.
-        """
-        node_type_folder_name = self._get_node_type_folder_name(node)
-        node_dir_name = str(self.get_default_dump_path(node))
-
-        # Nodes are always placed in a type-specific subdirectory *within* the
-        # current_content_root. The current_content_root has already been determined
-        # by get_path_for_group or get_path_for_ungrouped_nodes.
-        return current_content_root / node_type_folder_name / node_dir_name
-
-    def get_path_for_ungrouped_nodes(self) -> Path:
-        """
-        Determines the absolute root path for storing ungrouped nodes.
-        Node type subdirectories will be created under this path.
-        """
-        if self.config.also_ungrouped:
-            if self.config.organize_by_groups:
-                # Ungrouped nodes go into "ungrouped/" at the top level
-                return self.base_output_path / self.UNGROUPED_DIR_NAME
-            else:
-                # Ungrouped nodes go into type folders directly at the base_output_path
-                return self.base_output_path
-        else:
-            # Should not be called if not dumping ungrouped, but return base as a fallback.
-            return self.base_output_path
-
     def _get_node_type_folder_name(self, node: orm.Node) -> str:
         if isinstance(node, orm.CalculationNode):
             return self.CALCULATIONS_DIR_NAME
@@ -150,42 +95,6 @@ class DumpPaths:
         else:
             msg = f'Wrong node type: {type(node)} was passed.'
             raise ValueError(msg)
-
-    def prepare_directory(self, path_to_prepare: Path, is_leaf_node_dir: bool = False) -> None:
-        """
-        Prepares a directory for dumping, creating it and a safeguard file.
-
-        :param path_to_prepare: The absolute directory path to prepare.
-        :param is_leaf_node_dir: True if this path is for a specific node's final dump,
-            False if it's an intermediate directory (like 'groups/' or 'calculations/').
-        """
-        if self.config.dump_mode == DumpMode.DRY_RUN:
-            return
-
-        elif self.config.dump_mode == DumpMode.OVERWRITE:
-            if path_to_prepare.exists():
-                if os.listdir(path_to_prepare) and not (path_to_prepare / self.SAFEGUARD_FILE_NAME).exists():
-                    if is_leaf_node_dir:
-                        self.safe_delete_directory(path_to_prepare)
-                    else:
-                        msg = f'Path {path_to_prepare} exists, is not empty, but safeguard file missing.'
-                        raise FileNotFoundError(msg)
-
-        path_to_prepare.mkdir(parents=True, exist_ok=True)
-        (path_to_prepare / self.SAFEGUARD_FILE_NAME).touch(exist_ok=True)
-
-    def safe_delete_directory(self, path: Path) -> None:
-        """
-        Safely deletes a directory if it contains a safeguard file.
-        """
-        if self.config.dump_mode == DumpMode.DRY_RUN:
-            return
-
-        safeguard = self.get_safeguard_path(path)
-        if path.is_dir() and safeguard.is_file():
-            import shutil
-
-            shutil.rmtree(path)
 
     @staticmethod
     def get_directory_stats(directory_path: Path) -> tuple[Optional[datetime], Optional[int]]:

@@ -1,11 +1,4 @@
 from .deletion import DeletionExecutor
-from .group import GroupDumpExecutor
-from .process import ProcessDumpExecutor
-from .profile import ProfileDumpExecutor
+from .simple import GroupProcessor, ProfileProcessor
 
-__all__ = (
-    'DeletionExecutor',
-    'GroupDumpExecutor',
-    'ProcessDumpExecutor',
-    'ProfileDumpExecutor',
-)
+__all__ = ('DeletionExecutor', 'GroupProcessor', 'ProfileProcessor')
