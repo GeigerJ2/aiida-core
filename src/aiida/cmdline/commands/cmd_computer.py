@@ -284,7 +284,6 @@ def set_template_vars_in_context(ctx, param, value):
             raise click.BadParameter(f'Invalid JSON in template-vars: {e}')
     return value
 
-
 @verdi_computer.command('setup')
 @options_computer.LABEL()
 @options_computer.HOSTNAME()
@@ -300,18 +299,13 @@ def set_template_vars_in_context(ctx, param, value):
 @options_computer.PREPEND_TEXT()
 @options_computer.APPEND_TEXT()
 @options.NON_INTERACTIVE()
-@options.TEMPLATE_VARS()  # This should come before TEMPLATE_FILE
-@options.TEMPLATE_FILE()  # This will process the template and set defaults
+@options.TEMPLATE_VARS()  # For template variable values in non-interactive mode
+@options.CONFIG_FILE()    # Now supports templates!
 @click.pass_context
 @with_dbenv()
 def computer_setup(ctx, non_interactive, **kwargs):
     """Create a new computer."""
     from aiida.orm.utils.builders.computer import ComputerBuilder
-
-    # Debug output
-    print(f"Debug: non_interactive = {non_interactive}")
-    print(f"Debug: kwargs keys = {list(kwargs.keys())}")
-    print(f"Debug: ctx.default_map = {ctx.default_map}")
 
     # Check for existing computer
     if kwargs.get('label') and kwargs['label'] in get_computer_names():
@@ -344,6 +338,7 @@ def computer_setup(ctx, non_interactive, **kwargs):
 
     profile = ctx.obj['profile']
     echo.echo_report(f'  verdi -p {profile.name} computer configure {computer.transport_type} {computer.label}')
+
 
 @verdi_computer.command('duplicate')
 @arguments.COMPUTER(callback=set_computer_builder)
