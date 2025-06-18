@@ -241,6 +241,48 @@ def set_log_level(ctx, _param, value):
     return log_level
 
 
+# Template processing callback
+def process_template_callback(ctx, param, value):
+    """Process template file and update context defaults."""
+    if not value:
+        return value
+
+    ctx.default_map = ctx.default_map or {}
+
+    # Get template vars from context if they were set by TEMPLATE_VARS option
+    template_vars = getattr(ctx, '_template_vars', None)
+
+    # Check if we're in non-interactive mode
+    non_interactive = ctx.params.get('non_interactive', False)
+
+    try:
+        # Load and process the template
+        config_data = load_and_process_template(value, interactive=not non_interactive, template_vars=template_vars)
+
+        # Update the default map with template values
+        for key, template_value in config_data.items():
+            if key not in ctx.default_map:
+                ctx.default_map[key] = template_value
+
+    except Exception as e:
+        echo.echo_critical(f'Error processing template: {e}')
+
+    return value
+
+
+# Template vars callback
+def set_template_vars_callback(ctx, param, value):
+    """Set template variables in the context for the template option to use."""
+    if value:
+        try:
+            template_var_dict = json.loads(value)
+            # Store template vars in context for the template option to use
+            ctx._template_vars = template_var_dict
+        except json.JSONDecodeError as e:
+            raise click.BadParameter(f'Invalid JSON in template-vars: {e}')
+    return value
+
+
 VERBOSITY = OverridableOption(
     '-v',
     '--verbosity',
@@ -731,10 +773,31 @@ WITH_ELEMENTS_EXCLUSIVE = OverridableOption(
     help='Only select objects containing only these and no other elements.',
 )
 
+# TODO: Here, the callback seems to be missing
 CONFIG_FILE = TemplateAwareConfigFileOption(
     '--config',
     type=types.FileOrUrl(),
     help='Load option values from configuration file in yaml format (local path or URL).',
+)
+
+TEMPLATE_VARS = OverridableOption(
+    '--template-vars',
+    type=click.STRING,
+    is_eager=True,  # Process before template option
+    callback=set_template_vars_callback,
+    expose_value=False,  # Don't pass to command function
+    help='JSON string containing template variable values for non-interactive mode. '
+    'Example: \'{"label": "my-computer", "slurm_account": "my_account"}\'',
+)
+
+TEMPLATE_FILE = OverridableOption(
+    '--template',
+    type=click.STRING,
+    is_eager=True,  # Process template before other options
+    callback=process_template_callback,
+    expose_value=False,  # Don't pass template to the command function
+    help='Load computer setup from configuration file in YAML format (local path or URL). '
+    'Supports Jinja2 templates with interactive prompting.',
 )
 
 IDENTIFIER = OverridableOption(
@@ -914,74 +977,4 @@ END_DATE = OverridableOption(
     default=None,
     show_default=True,
     help='End date for node mtime range selection for node collection dumping.',
-)
-
-import click
-
-from aiida.cmdline.utils import echo
-
-from .overridable import OverridableOption
-
-
-# Template processing callback
-def process_template_callback(ctx, param, value):
-    """Process template file and update context defaults."""
-    if not value:
-        return value
-
-    ctx.default_map = ctx.default_map or {}
-
-    # Get template vars from context if they were set by TEMPLATE_VARS option
-    template_vars = getattr(ctx, '_template_vars', None)
-
-    # Check if we're in non-interactive mode
-    non_interactive = ctx.params.get('non_interactive', False)
-
-    try:
-        # Load and process the template
-        config_data = load_and_process_template(value, interactive=not non_interactive, template_vars=template_vars)
-
-        # Update the default map with template values
-        for key, template_value in config_data.items():
-            if key not in ctx.default_map:
-                ctx.default_map[key] = template_value
-
-    except Exception as e:
-        echo.echo_critical(f'Error processing template: {e}')
-
-    return value
-
-
-# Template vars callback
-def set_template_vars_callback(ctx, param, value):
-    """Set template variables in the context for the template option to use."""
-    if value:
-        try:
-            template_var_dict = json.loads(value)
-            # Store template vars in context for the template option to use
-            ctx._template_vars = template_var_dict
-        except json.JSONDecodeError as e:
-            raise click.BadParameter(f'Invalid JSON in template-vars: {e}')
-    return value
-
-
-# Template options using simple OverridableOption with callbacks
-TEMPLATE_VARS = OverridableOption(
-    '--template-vars',
-    type=click.STRING,
-    is_eager=True,  # Process before template option
-    callback=set_template_vars_callback,
-    expose_value=False,  # Don't pass to command function
-    help='JSON string containing template variable values for non-interactive mode. '
-    'Example: \'{"label": "my-computer", "slurm_account": "my_account"}\'',
-)
-
-TEMPLATE_FILE = OverridableOption(
-    '--template',
-    type=click.STRING,
-    is_eager=True,  # Process template before other options
-    callback=process_template_callback,
-    expose_value=False,  # Don't pass template to the command function
-    help='Load computer setup from configuration file in YAML format (local path or URL). '
-    'Supports Jinja2 templates with interactive prompting.',
 )

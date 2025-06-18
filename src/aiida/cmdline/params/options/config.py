@@ -340,68 +340,137 @@ class ConfigFileOption(OverridableOption):
         return configuration_option(*self.args, **kw_copy)
 
 
+# In src/aiida/cmdline/params/options/config.py
+
+import json
+import click
+from aiida.cmdline.utils.template_config import load_and_process_template
+
+def template_vars_callback(ctx, param, value):
+    """Callback to store template variables in the context."""
+    if value:
+        try:
+            template_var_dict = json.loads(value)
+            ctx._template_vars = template_var_dict
+        except json.JSONDecodeError as e:
+            raise click.BadParameter(f'Invalid JSON in template-vars: {e}')
+    return value
+
 def template_aware_yaml_provider(file_path_or_handle, cmd_name):
     """Enhanced YAML config provider that handles Jinja2 templates."""
     import yaml
 
-    print(f'DEBUG: template_aware_yaml_provider called with: {file_path_or_handle}')
-
     # If it's a file handle, read the content and process as regular YAML
     if hasattr(file_path_or_handle, 'read'):
-        print('DEBUG: Processing as file handle')
         content = file_path_or_handle.read()
         if hasattr(content, 'decode'):
             content = content.decode('utf-8')
-        return yaml.safe_load(content)
+        config = yaml.safe_load(content)
+        # Remove metadata if present
+        if isinstance(config, dict):
+            config.pop('metadata', None)
+        return config
 
     # It's a file path or URL string - use template processing
     file_path_or_url = file_path_or_handle
-    print(f'DEBUG: Processing as file path/URL: {file_path_or_url}')
 
-    # Get the current Click context to access template vars and non_interactive setting
+    # Get template vars and interactive mode from context
+    template_vars = None
+    interactive = True  # Default to interactive
+
     try:
         ctx = click.get_current_context()
-        print(f'DEBUG: Got Click context: {ctx}')
-        print(f'DEBUG: Context params: {ctx.params}')
-
         template_vars = getattr(ctx, '_template_vars', None)
-        print(f'DEBUG: Template vars from context: {template_vars}')
 
-        non_interactive = ctx.params.get('non_interactive', False)
-        print(f'DEBUG: Non-interactive from context: {non_interactive}')
+        # Check command line args directly for non-interactive mode
+        import sys
+        if '--non-interactive' in sys.argv or '-n' in sys.argv:
+            interactive = False
+    except:
+        pass  # Context not available, use defaults
 
-        interactive = not non_interactive
-        print(f'DEBUG: Interactive mode: {interactive}')
+    # Use the template processing function
+    return load_and_process_template(file_path_or_url, interactive=interactive, template_vars=template_vars)
 
-        # Use the template processing function
-        print('DEBUG: Calling load_and_process_template...')
-        result = load_and_process_template(file_path_or_url, interactive=interactive, template_vars=template_vars)
-        print(f'DEBUG: Template processing result: {result}')
-        return result
-
-    except RuntimeError as e:
-        print(f'DEBUG: RuntimeError getting context: {e}')
-        # No current context available, fallback to regular YAML processing
-        import yaml
-
-        try:
-            with open(file_path_or_url, 'r', encoding='utf-8') as f:
-                content = f.read()
-                print(f'DEBUG: Fallback - loaded content: {content[:200]}...')
-                return yaml.safe_load(content)
-        except Exception as e2:
-            print(f'DEBUG: Fallback failed: {e2}')
-            # Could be a URL or other issue, fall back to original provider
-            return yaml_config_file_provider(file_path_or_url, cmd_name)
-    except Exception as e:
-        print(f'DEBUG: Unexpected error: {e}')
-        raise
-
-
-class TemplateAwareConfigFileOption(ConfigFileOption):
+class TemplateAwareConfigFileOption(OverridableOption):
     """Enhanced ConfigFileOption that supports Jinja2 templates with interactive prompting."""
 
     def __init__(self, *args, **kwargs):
         """Store the default args and kwargs."""
-        kwargs.update({'provider': template_aware_yaml_provider, 'implicit': False})
+        kwargs.update({
+            'provider': template_aware_yaml_provider,
+            'implicit': False
+        })
         super().__init__(*args, **kwargs)
+
+    def __call__(self, **kwargs):
+        """Override the stored kwargs and return the option."""
+        kw_copy = self.kwargs.copy()
+        kw_copy.update(kwargs)
+        return configuration_option(*self.args, **kw_copy)
+
+# def template_aware_yaml_provider(file_path_or_handle, cmd_name):
+#     """Enhanced YAML config provider that handles Jinja2 templates."""
+#     import yaml
+
+#     print(f'DEBUG: template_aware_yaml_provider called with: {file_path_or_handle}')
+
+#     # If it's a file handle, read the content and process as regular YAML
+#     if hasattr(file_path_or_handle, 'read'):
+#         print('DEBUG: Processing as file handle')
+#         content = file_path_or_handle.read()
+#         if hasattr(content, 'decode'):
+#             content = content.decode('utf-8')
+#         return yaml.safe_load(content)
+
+#     # It's a file path or URL string - use template processing
+#     file_path_or_url = file_path_or_handle
+#     print(f'DEBUG: Processing as file path/URL: {file_path_or_url}')
+
+#     # Get the current Click context to access template vars and non_interactive setting
+#     try:
+#         ctx = click.get_current_context()
+#         print(f'DEBUG: Got Click context: {ctx}')
+#         print(f'DEBUG: Context params: {ctx.params}')
+
+#         template_vars = getattr(ctx, '_template_vars', None)
+#         print(f'DEBUG: Template vars from context: {template_vars}')
+
+#         non_interactive = ctx.params.get('non_interactive', False)
+#         print(f'DEBUG: Non-interactive from context: {non_interactive}')
+
+#         interactive = not non_interactive
+#         print(f'DEBUG: Interactive mode: {interactive}')
+
+#         # Use the template processing function
+#         print('DEBUG: Calling load_and_process_template...')
+#         result = load_and_process_template(file_path_or_url, interactive=interactive, template_vars=template_vars)
+#         print(f'DEBUG: Template processing result: {result}')
+#         return result
+
+#     except RuntimeError as e:
+#         print(f'DEBUG: RuntimeError getting context: {e}')
+#         # No current context available, fallback to regular YAML processing
+#         import yaml
+
+#         try:
+#             with open(file_path_or_url, 'r', encoding='utf-8') as f:
+#                 content = f.read()
+#                 print(f'DEBUG: Fallback - loaded content: {content[:200]}...')
+#                 return yaml.safe_load(content)
+#         except Exception as e2:
+#             print(f'DEBUG: Fallback failed: {e2}')
+#             # Could be a URL or other issue, fall back to original provider
+#             return yaml_config_file_provider(file_path_or_url, cmd_name)
+#     except Exception as e:
+#         print(f'DEBUG: Unexpected error: {e}')
+#         raise
+
+
+# class TemplateAwareConfigFileOption(ConfigFileOption):
+#     """Enhanced ConfigFileOption that supports Jinja2 templates with interactive prompting."""
+
+#     def __init__(self, *args, **kwargs):
+#         """Store the default args and kwargs."""
+#         kwargs.update({'provider': template_aware_yaml_provider, 'implicit': False})
+#         super().__init__(*args, **kwargs)
