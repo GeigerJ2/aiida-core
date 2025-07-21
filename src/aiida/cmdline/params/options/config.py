@@ -18,10 +18,13 @@ the default provider is changed to :func:`yaml_config_file_provider`.
 from __future__ import annotations
 
 import functools
+import json
 import os
 import typing as t
 
 import click
+
+from aiida.cmdline.utils.template_config import load_and_process_template
 
 from .overridable import OverridableOption
 
@@ -75,6 +78,10 @@ def configuration_callback(
         except Exception as exception:
             raise click.BadOptionUsage(option_name, f'Error reading configuration file: {exception}', ctx)
 
+        # Remove the metadata section before validation (if it exists)
+        # This allows template files to include metadata without causing validation errors
+        config.pop('metadata', None)
+
         valid_params = [param.name for param in ctx.command.params if param.name != option_name]
         specified_params = list(config.keys())
         unknown_params = set(specified_params).difference(set(valid_params))
@@ -87,6 +94,60 @@ def configuration_callback(
         ctx.default_map.update(config)
 
     return saved_callback(ctx, param, value) if saved_callback else value
+
+
+# def configuration_callback(
+#     cmd_name: str | None,
+#     option_name: str,
+#     config_file_name: str,
+#     saved_callback: t.Callable[..., t.Any] | None,
+#     provider: t.Callable[..., t.Any],
+#     implicit: bool,
+#     ctx: click.Context,
+#     param: click.Parameter,
+#     value: t.Any,
+# ):
+#     """Callback for reading the config file.
+
+#     Also takes care of calling user specified custom callback afterwards.
+
+#     :param cmd_name: The command name. This is used to determine the configuration directory.
+#     :param option_name: The name of the option. This is used for error messages.
+#     :param config_file_name: The name of the configuration file.
+#     :param saved_callback: User-specified callback to be called later.
+#     :param provider: A callable that parses the configuration file and returns a dictionary of the configuration
+#         parameters. Will be called as ``provider(file_path, cmd_name)``. Default: ``yaml_config_file_provider``.
+#     :param implicit: Whether a implicit value should be applied if no configuration option value was provided.
+#     :param ctx: ``click`` context.
+#     :param param: ``click`` parameters.
+#     :param value: Value passed to the parameter.
+#     """
+#     ctx.default_map = ctx.default_map or {}
+#     cmd_name = cmd_name or ctx.info_name
+
+#     if implicit:
+#         default_value = os.path.join(click.get_app_dir(cmd_name), config_file_name)  # type: ignore[arg-type]
+#         param.default = default_value
+#         value = value or default_value
+
+#     if value:
+#         try:
+#             config = provider(value, cmd_name)
+#         except Exception as exception:
+#             raise click.BadOptionUsage(option_name, f'Error reading configuration file: {exception}', ctx)
+
+#         valid_params = [param.name for param in ctx.command.params if param.name != option_name]
+#         specified_params = list(config.keys())
+#         unknown_params = set(specified_params).difference(set(valid_params))
+
+#         if unknown_params:
+#             raise click.BadParameter(
+#                 f'Invalid configuration file, the following keys are not supported: {unknown_params}', ctx, param
+#             )
+
+#         ctx.default_map.update(config)
+
+#     return saved_callback(ctx, param, value) if saved_callback else value
 
 
 def configuration_option(*param_decls, **attrs):
@@ -183,4 +244,68 @@ class ConfigFileOption(OverridableOption):
         kw_copy = self.kwargs.copy()
         kw_copy.update(kwargs)
 
+        return configuration_option(*self.args, **kw_copy)
+
+
+def template_vars_callback(ctx, param, value):
+    """Callback to store template variables in the context."""
+    if value:
+        try:
+            template_var_dict = json.loads(value)
+            ctx._template_vars = template_var_dict
+        except json.JSONDecodeError as e:
+            raise click.BadParameter(f'Invalid JSON in template-vars: {e}')
+    return value
+
+
+def template_aware_yaml_provider(file_path_or_handle, cmd_name):
+    """Enhanced YAML config provider that handles Jinja2 templates."""
+    import yaml
+
+    # If it's a file handle, read the content and process as regular YAML
+    if hasattr(file_path_or_handle, 'read'):
+        content = file_path_or_handle.read()
+        if hasattr(content, 'decode'):
+            content = content.decode('utf-8')
+        config = yaml.safe_load(content)
+        # Remove metadata if present
+        if isinstance(config, dict):
+            config.pop('metadata', None)
+        return config
+
+    # It's a file path or URL string - use template processing
+    file_path_or_url = file_path_or_handle
+
+    # Get template vars and interactive mode from context
+    template_vars = None
+    interactive = True  # Default to interactive
+
+    try:
+        ctx = click.get_current_context()
+        template_vars = getattr(ctx, '_template_vars', None)
+
+        # Check command line args directly for non-interactive mode
+        import sys
+
+        if '--non-interactive' in sys.argv or '-n' in sys.argv:
+            interactive = False
+    except:
+        pass  # Context not available, use defaults
+
+    # Use the template processing function
+    return load_and_process_template(file_path_or_url, interactive=interactive, template_vars=template_vars)
+
+
+class TemplateAwareConfigFileOption(OverridableOption):
+    """Enhanced ConfigFileOption that supports Jinja2 templates with interactive prompting."""
+
+    def __init__(self, *args, **kwargs):
+        """Store the default args and kwargs."""
+        kwargs.update({'provider': template_aware_yaml_provider, 'implicit': False})
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, **kwargs):
+        """Override the stored kwargs and return the option."""
+        kw_copy = self.kwargs.copy()
+        kw_copy.update(kwargs)
         return configuration_option(*self.args, **kw_copy)

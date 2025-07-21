@@ -8,6 +8,7 @@
 ###########################################################################
 """`verdi computer` command."""
 
+import json
 import pathlib
 import traceback
 from copy import deepcopy
@@ -22,6 +23,7 @@ from aiida.cmdline.params.options.commands import computer as options_computer
 from aiida.cmdline.utils import echo, echo_tabulate
 from aiida.cmdline.utils.common import validate_output_filename
 from aiida.cmdline.utils.decorators import with_dbenv
+from aiida.cmdline.utils.template_config import load_and_process_template
 from aiida.common.exceptions import EntryPointError, ValidationError
 from aiida.plugins.entry_point import get_entry_point_names
 
@@ -270,6 +272,18 @@ def set_computer_builder(ctx, param, value):
     return value
 
 
+# Helper function to set template vars in context
+def set_template_vars_in_context(ctx, param, value):
+    """Set template variables in the context for the config provider to use."""
+    if value:
+        try:
+            template_var_dict = json.loads(value)
+            # Store template vars in context for the config provider
+            ctx._template_vars = template_var_dict
+        except json.JSONDecodeError as e:
+            raise click.BadParameter(f'Invalid JSON in template-vars: {e}')
+    return value
+
 @verdi_computer.command('setup')
 @options_computer.LABEL()
 @options_computer.HOSTNAME()
@@ -285,22 +299,27 @@ def set_computer_builder(ctx, param, value):
 @options_computer.PREPEND_TEXT()
 @options_computer.APPEND_TEXT()
 @options.NON_INTERACTIVE()
-@options.CONFIG_FILE()
+@options.TEMPLATE_VARS()  # For template variable values in non-interactive mode
+@options.CONFIG_FILE()    # Now supports templates!
 @click.pass_context
 @with_dbenv()
 def computer_setup(ctx, non_interactive, **kwargs):
     """Create a new computer."""
     from aiida.orm.utils.builders.computer import ComputerBuilder
 
-    if kwargs['label'] in get_computer_names():
+    # Check for existing computer
+    if kwargs.get('label') and kwargs['label'] in get_computer_names():
         echo.echo_critical(
             'A computer called {c} already exists. '
             'Use "verdi computer duplicate {c}" to set up a new '
             'computer starting from the settings of {c}.'.format(c=kwargs['label'])
         )
 
-    kwargs['transport'] = kwargs['transport'].name
-    kwargs['scheduler'] = kwargs['scheduler'].name
+    # Convert entry points to their names
+    if kwargs.get('transport'):
+        kwargs['transport'] = kwargs['transport'].name
+    if kwargs.get('scheduler'):
+        kwargs['scheduler'] = kwargs['scheduler'].name
 
     computer_builder = ComputerBuilder(**kwargs)
     try:
