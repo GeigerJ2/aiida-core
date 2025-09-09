@@ -13,6 +13,8 @@ from collections.abc import Mapping, MutableMapping
 from typing import TYPE_CHECKING, Any, Type
 from uuid import uuid4
 
+import yaml
+
 from aiida.engine.processes.ports import PortNamespace
 from aiida.orm import Dict, Node
 from aiida.orm.nodes.data.base import BaseType
@@ -23,6 +25,64 @@ if TYPE_CHECKING:
     from aiida.engine.processes.process import Process
 
 __all__ = ('ProcessBuilder', 'ProcessBuilderNamespace')
+
+
+def get_schema(self, keys_only: bool = True, show_descriptions: bool = False, show_types: bool = True) -> str:
+    """Print a clean schema of all available inputs.
+
+    Args:
+        keys_only: If True (default), only show the structure of keys. If False, include type/metadata info.
+        show_descriptions: Include help text for each input (only used when keys_only=False)
+        show_types: Include expected data types (only used when keys_only=False)
+
+    Returns:
+        YAML-formatted string of the input structure
+    """
+
+    def build_schema_dict(namespace, path=''):
+        """Recursively build schema dictionary"""
+        schema = {}
+
+        for name, port in namespace.items():
+            if hasattr(port, 'items'):  # It's a PortNamespace
+                schema[name] = build_schema_dict(port, f'{path}.{name}' if path else name)
+            elif keys_only:
+                # Just mark it as an input with no additional info
+                schema[name] = None
+            else:
+                # Include detailed information
+                port_info = {}
+                if show_types:
+                    port_info['type'] = str(port.valid_type) if hasattr(port, 'valid_type') else 'unknown'
+                if show_descriptions and hasattr(port, 'help') and port.help:
+                    port_info['help'] = port.help
+                if hasattr(port, 'required') and port.required:
+                    port_info['required'] = True
+                if hasattr(port, 'has_default') and port.has_default():
+                    port_info['has_default'] = True
+
+                # If we only have type info, just show the type string
+                if len(port_info) == 1 and 'type' in port_info:
+                    schema[name] = port_info['type']
+                else:
+                    schema[name] = port_info if port_info else 'input'
+
+        return schema
+
+    schema_dict = build_schema_dict(self._port_namespace)
+    return yaml.dump(schema_dict, default_flow_style=False, sort_keys=True)
+
+
+# def get_inputs(self, only_required: bool = False, path: Optional[str] = None) -> str: ...
+#
+#
+# def get_required(self) -> str:  ...
+#
+#
+# def get_help(self, input_name: str) -> str:
+#     """Get detailed help for a specific input."""
+#
+#
 
 
 class PrettyEncoder(json.JSONEncoder):
@@ -89,6 +149,21 @@ class ProcessBuilderNamespace(MutableMapping):
             getter = property(fgetter)
             getter.setter(fsetter)
             dynamic_properties[name] = getter
+
+        dynamic_properties['get_schema'] = get_schema
+        # dynamic_properties['get_inputs'] = get_inputs
+        # dynamic_properties['get_required'] = get_required
+        # dynamic_properties['get_help'] = get_help
+
+        def custom_dir(self):
+            """Custom __dir__ that includes enhancement methods"""
+            base_attrs = sorted(
+                set(self._valid_fields + [key for key, _ in self.__dict__.items() if key.startswith('_')])
+            )
+            enhancement_methods = ['get_schema', 'get_inputs', 'get_required', 'validate', 'apply_defaults', 'get_help']
+            return base_attrs + enhancement_methods
+
+        dynamic_properties['__dir__'] = custom_dir
 
         # The dynamic property can only be attached to a class and not an instance, however, we cannot attach it to
         # the ``ProcessBuilderNamespace`` class since it would interfere with other instances that may already
@@ -179,7 +254,7 @@ class ProcessBuilderNamespace(MutableMapping):
         :param kwds: keyword value pairs that should be mapped onto the ports.
         """
         if len(args) > 1:
-            raise TypeError(f'update expected at most 1 arguments, got {int(len(args))}')
+            raise TypeError(f'update expected at most 1 arguments, got {len(args)}')
 
         if args:
             for key, value in args[0].items():
