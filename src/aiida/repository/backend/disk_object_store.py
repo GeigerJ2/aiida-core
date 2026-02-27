@@ -114,7 +114,7 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
                 yield t.cast(t.BinaryIO, handle)
 
     def iter_object_streams(self, keys: t.Iterable[str]) -> t.Iterator[t.Tuple[str, t.BinaryIO]]:
-        with self._container.get_objects_stream_and_meta(keys) as triplets:  # type: ignore[arg-type]
+        with self._container.get_objects_stream_and_meta(keys) as triplets:
             for key, stream, _ in triplets:
                 assert stream is not None
                 yield key, stream  # type: ignore[misc]
@@ -204,7 +204,7 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
                         callback = create_callback(progress)
                         container.pack_all_loose(
                             compress=compress_mode,
-                            callback=callback,  # type: ignore[arg-type]  # must be on this line (not closing paren) to avoid ruff-format moving it; DOS uses `Arg`-typed named params, incompatible with plain `Callable`
+                            callback=callback,
                             clean_loose_per_pack=clean_loose_per_pack,
                         )
 
@@ -215,7 +215,7 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
                 if not dry_run:
                     with get_progress_reporter()(total=1) as progress:
                         callback = create_callback(progress)
-                        container.repack(callback=callback)  # type: ignore[arg-type]
+                        container.repack(callback=callback)
 
             if clean_storage:
                 logger.report(f'Cleaning the repository database (with `vacuum={do_vacuum}`) ...')
