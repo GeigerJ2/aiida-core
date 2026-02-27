@@ -8,7 +8,7 @@ import typing as t
 from aiida.common.lang import type_check
 from aiida.storage.log import STORAGE_LOGGER
 
-from .abstract import AbstractRepositoryBackend
+from .abstract import AbstractRepositoryBackend, InfoDictType
 
 if t.TYPE_CHECKING:
     from disk_objectstore import Container
@@ -33,8 +33,8 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
     """
 
     def __init__(self, container: 'Container'):
-        if not t.TYPE_CHECKING:
-            from disk_objectstore import Container
+        from disk_objectstore import Container
+
         type_check(container, Container)
         self._container = container
 
@@ -58,7 +58,7 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
         with self._container as container:
             return container.hash_type
 
-    def initialise(self, **kwargs) -> None:
+    def initialise(self, **kwargs: t.Any) -> None:
         """Initialise the repository if it hasn't already been initialised.
 
         :param kwargs: parameters for the initialisation.
@@ -72,7 +72,7 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
         with self._container as container:
             return container.is_initialised
 
-    def erase(self):
+    def erase(self) -> None:
         """Delete the repository itself and all its contents."""
         try:
             with self._container as container:
@@ -106,14 +106,15 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
         :raise FileNotFoundError: if the file does not exist.
         :raise OSError: if the file could not be opened.
         """
-        super().open(key)
 
+        if not self.has_object(key):
+            raise FileNotFoundError(f'object with key `{key}` does not exist.')
         with self._container as container:
             with container.get_object_stream(key) as handle:
-                yield handle  # type: ignore[misc]
+                yield t.cast(t.BinaryIO, handle)
 
-    def iter_object_streams(self, keys: t.List[str]) -> t.Iterator[t.Tuple[str, t.BinaryIO]]:
-        with self._container.get_objects_stream_and_meta(keys) as triplets:
+    def iter_object_streams(self, keys: t.Iterable[str]) -> t.Iterator[t.Tuple[str, t.BinaryIO]]:
+        with self._container.get_objects_stream_and_meta(keys) as triplets:  # type: ignore[arg-type]
             for key, stream, _ in triplets:
                 assert stream is not None
                 yield key, stream  # type: ignore[misc]
@@ -145,7 +146,7 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
                 return super().get_object_hash(key)
         return key
 
-    def maintain(  # type: ignore[override]
+    def maintain(
         self,
         dry_run: bool = False,
         live: bool = True,
@@ -155,7 +156,7 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
         do_vacuum: t.Optional[bool] = None,
         compress: bool = False,
         clean_loose_per_pack: bool = True,
-    ) -> dict:
+    ) -> None:
         """Performs maintenance operations.
 
         :param live: if True, will only perform operations that are safe to do while the repository is in use.
@@ -163,7 +164,8 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
         :param do_repack: flag for forcing the re-packing of already packed files.
         :param clean_storage: flag for forcing the cleaning of soft-deleted files from the repository.
         :param do_vacuum: flag for forcing the vacuuming of the internal database when cleaning the repository.
-        :param compress: flag for compressing the data when packing loose files. Set to ``Compress.AUTO`` if ``True``.
+        :param compress: flag for compressing the data when packing loose files.
+                         Set to ``CompressMode.AUTO`` if ``True``.
         :param clean_loose_per_pack: if True, the loose files that went into a `pack` are deleted immediately after this
             `pack` is created.
         :return: a dictionary with information on the operations performed.
@@ -174,13 +176,14 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
 
         if live and (do_repack or clean_storage or do_vacuum):
             overrides = {'do_repack': do_repack, 'clean_storage': clean_storage, 'do_vacuum': do_vacuum}
-            keys = ', '.join([key for key, override in overrides.items() if override is True])  # type: ignore
+            keys = ', '.join([key for key, override in overrides.items() if override is True])
             raise ValueError(f'The following overrides were enabled but cannot be if `live=True`: {keys}')
 
         pack_loose = True if pack_loose is None else pack_loose
 
+        compress_mode = CompressMode.NO
         if compress is True:
-            compress = CompressMode.AUTO
+            compress_mode = CompressMode.AUTO
 
         if live:
             do_repack = False
@@ -200,8 +203,8 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
                     with get_progress_reporter()(total=1) as progress:
                         callback = create_callback(progress)
                         container.pack_all_loose(
-                            compress=compress, callback=callback, clean_loose_per_pack=clean_loose_per_pack
-                        )
+                            compress=compress_mode, callback=callback, clean_loose_per_pack=clean_loose_per_pack
+                        )  # type: ignore[arg-type]
 
             if do_repack:
                 files_numb = container.count_objects().packed
@@ -210,19 +213,19 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
                 if not dry_run:
                     with get_progress_reporter()(total=1) as progress:
                         callback = create_callback(progress)
-                        container.repack(callback=callback)
+                        container.repack(callback=callback)  # type: ignore[arg-type]
 
             if clean_storage:
                 logger.report(f'Cleaning the repository database (with `vacuum={do_vacuum}`) ...')
                 if not dry_run:
                     container.clean_storage(vacuum=do_vacuum)
 
-    def get_info(  # type: ignore[override]
+    def get_info(
         self,
-        detailed=False,
-    ) -> t.Dict[str, t.Union[int, str, t.Dict[str, int], t.Dict[str, float]]]:
+        detailed: bool = False,
+    ) -> InfoDictType:
         """Return information on configuration and content of the repository."""
-        output_info: t.Dict[str, t.Union[int, str, t.Dict[str, int], t.Dict[str, float]]] = {}
+        output_info: InfoDictType = {}
 
         with self._container as container:
             output_info['SHA-hash algorithm'] = container.hash_type
