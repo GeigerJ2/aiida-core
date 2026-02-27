@@ -203,8 +203,10 @@ class DiskObjectStoreRepositoryBackend(AbstractRepositoryBackend):
                     with get_progress_reporter()(total=1) as progress:
                         callback = create_callback(progress)
                         container.pack_all_loose(
-                            compress=compress_mode, callback=callback, clean_loose_per_pack=clean_loose_per_pack
-                        )  # type: ignore[arg-type]
+                            compress=compress_mode,
+                            callback=callback,  # type: ignore[arg-type]  # must be on this line (not closing paren) to avoid ruff-format moving it; DOS uses `Arg`-typed named params, incompatible with plain `Callable`
+                            clean_loose_per_pack=clean_loose_per_pack,
+                        )
 
             if do_repack:
                 files_numb = container.count_objects().packed
