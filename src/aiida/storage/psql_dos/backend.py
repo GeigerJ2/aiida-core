@@ -21,7 +21,7 @@ from sqlalchemy import column, insert, update
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
 from aiida.common import exceptions
-from aiida.common.exceptions import ClosedStorage, ConfigurationError, IntegrityError
+from aiida.common.exceptions import ClosedStorage, IntegrityError
 from aiida.common.log import AIIDA_LOGGER
 from aiida.manage.configuration.profile import Profile
 from aiida.orm.entities import EntityTypes
@@ -29,6 +29,7 @@ from aiida.orm.implementation import BackendEntity, StorageBackend
 from aiida.storage.log import STORAGE_LOGGER
 from aiida.storage.psql_dos.migrator import REPOSITORY_UUID_KEY, PsqlDosMigrator
 from aiida.storage.psql_dos.models import base
+from aiida.storage.psql_dos.utils import get_filepath_container
 from aiida.storage.utils import _create_smarter_in_clause
 
 from .orm import authinfos, comments, computers, convert, groups, logs, nodes, querybuilder, users
@@ -39,36 +40,6 @@ if TYPE_CHECKING:
 __all__ = ('PsqlDosBackend',)
 
 LOGGER = AIIDA_LOGGER.getChild(__file__)
-CONTAINER_DEFAULTS: dict = {
-    'pack_size_target': 4 * 1024 * 1024 * 1024,
-    'loose_prefix_len': 2,
-    'hash_type': 'sha256',
-    'compression_algorithm': 'zlib+1',
-}
-
-
-def get_filepath_container(profile: Profile) -> pathlib.Path:
-    """Return the filepath of the disk-object store container."""
-    from urllib.parse import urlparse
-
-    from aiida.common.utils import url2pathname
-
-    try:
-        parts = urlparse(profile.storage_config['repository_uri'])
-    except KeyError:
-        raise KeyError(f'invalid profile {profile.name}: `repository_uri` not defined in `storage.config`.')
-
-    if parts.scheme != 'file':
-        raise ConfigurationError(
-            f'invalid profile {profile.name}: `storage.config.repository_uri` does not start with `file://`.'
-        )
-
-    filepath = pathlib.Path(url2pathname(parts.path))
-
-    if not filepath.is_absolute():
-        raise ConfigurationError(f'invalid profile {profile.name}: `storage.config.repository_uri` is not absolute')
-
-    return filepath.expanduser() / 'container'
 
 
 class PsqlDosBackend(StorageBackend):

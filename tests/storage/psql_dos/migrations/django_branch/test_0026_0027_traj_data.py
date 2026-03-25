@@ -13,10 +13,10 @@ import pytest
 
 from aiida.common import timezone
 from aiida.common.utils import get_new_uuid
-from aiida.storage.psql_dos.backend import get_filepath_container
 from aiida.storage.psql_dos.migrations.utils import utils
 from aiida.storage.psql_dos.migrations.utils.create_dbattribute import create_rows
 from aiida.storage.psql_dos.migrator import PsqlDosMigrator
+from aiida.storage.psql_dos.utils import get_filepath_container
 
 
 def test_traj_data(perform_migrations: PsqlDosMigrator):

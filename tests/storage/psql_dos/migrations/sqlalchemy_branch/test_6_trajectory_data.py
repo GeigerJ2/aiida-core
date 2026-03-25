@@ -13,10 +13,9 @@
 import numpy as np
 import pytest
 
-from aiida.storage.psql_dos.backend import get_filepath_container
 from aiida.storage.psql_dos.migrations.utils import utils
 from aiida.storage.psql_dos.migrator import PsqlDosMigrator
-from aiida.storage.psql_dos.utils import flag_modified
+from aiida.storage.psql_dos.utils import flag_modified, get_filepath_container
 
 
 def set_node_array(node, repo_path, name, array):

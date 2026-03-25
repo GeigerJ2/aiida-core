@@ -21,8 +21,8 @@ from sqlalchemy import Integer, String, cast
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import column, func, select, table
 
-from aiida.storage.psql_dos.backend import get_filepath_container
 from aiida.storage.psql_dos.migrations.utils.utils import load_numpy_array_from_repository
+from aiida.storage.psql_dos.utils import get_filepath_container
 
 # revision identifiers, used by Alembic.
 revision = '12536798d4d3'

@@ -26,7 +26,7 @@ from aiida.common import exceptions
 from aiida.repository.backend import AbstractRepositoryBackend
 from aiida.repository.common import File, FileType
 from aiida.repository.repository import Repository
-from aiida.storage.psql_dos.backend import get_filepath_container
+from aiida.storage.psql_dos.utils import get_filepath_container
 
 ISOFORMAT_DATETIME_REGEX = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(\+\d{2}:\d{2})?$')
 REGEX_SHARD_SUB_LEVEL = re.compile(r'^[0-9a-f]{2}$')

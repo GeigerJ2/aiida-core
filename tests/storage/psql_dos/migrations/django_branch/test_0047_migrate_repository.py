@@ -13,9 +13,9 @@ import os
 from uuid import uuid4
 
 from aiida.common import timezone
-from aiida.storage.psql_dos.backend import get_filepath_container
 from aiida.storage.psql_dos.migrations.utils import utils
 from aiida.storage.psql_dos.migrator import PsqlDosMigrator
+from aiida.storage.psql_dos.utils import get_filepath_container
 
 REPOSITORY_UUID_KEY = 'repository|uuid'
 

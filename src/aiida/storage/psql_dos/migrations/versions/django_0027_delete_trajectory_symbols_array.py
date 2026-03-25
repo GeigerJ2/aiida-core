@@ -20,8 +20,8 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import delete
 
-from aiida.storage.psql_dos.backend import get_filepath_container
 from aiida.storage.psql_dos.migrations.utils import utils
+from aiida.storage.psql_dos.utils import get_filepath_container
 
 revision = 'django_0027'
 down_revision = 'django_0026'

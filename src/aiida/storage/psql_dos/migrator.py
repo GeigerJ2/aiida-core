@@ -183,7 +183,7 @@ class PsqlDosMigrator:
         """
         from disk_objectstore import Container
 
-        from .backend import get_filepath_container
+        from .utils import get_filepath_container
 
         return Container(get_filepath_container(self.profile))
 
@@ -280,7 +280,7 @@ class PsqlDosMigrator:
 
     def initialise_repository(self) -> None:
         """Initialise the repository."""
-        from aiida.storage.psql_dos.backend import CONTAINER_DEFAULTS
+        from aiida.storage.psql_dos.utils import CONTAINER_DEFAULTS
 
         container = self.get_container()
         container.init_container(clear=True, **CONTAINER_DEFAULTS)

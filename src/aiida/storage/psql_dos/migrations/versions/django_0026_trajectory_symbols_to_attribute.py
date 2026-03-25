@@ -19,9 +19,9 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from aiida.storage.psql_dos.backend import get_filepath_container
 from aiida.storage.psql_dos.migrations.utils.create_dbattribute import create_rows
 from aiida.storage.psql_dos.migrations.utils.utils import load_numpy_array_from_repository
+from aiida.storage.psql_dos.utils import get_filepath_container
 
 revision = 'django_0026'
 down_revision = 'django_0025'

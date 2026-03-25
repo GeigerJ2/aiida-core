@@ -9,7 +9,42 @@
 """Utility functions specific to the SqlAlchemy backend."""
 
 import json
+import pathlib
 from typing import TypedDict
+
+from aiida.common.exceptions import ConfigurationError
+from aiida.manage.configuration.profile import Profile
+
+CONTAINER_DEFAULTS: dict = {
+    'pack_size_target': 4 * 1024 * 1024 * 1024,
+    'loose_prefix_len': 2,
+    'hash_type': 'sha256',
+    'compression_algorithm': 'zlib+1',
+}
+
+
+def get_filepath_container(profile: Profile) -> pathlib.Path:
+    """Return the filepath of the disk-object store container."""
+    from urllib.parse import urlparse
+
+    from aiida.common.utils import url2pathname
+
+    try:
+        parts = urlparse(profile.storage_config['repository_uri'])
+    except KeyError:
+        raise KeyError(f'invalid profile {profile.name}: `repository_uri` not defined in `storage.config`.')
+
+    if parts.scheme != 'file':
+        raise ConfigurationError(
+            f'invalid profile {profile.name}: `storage.config.repository_uri` does not start with `file://`.'
+        )
+
+    filepath = pathlib.Path(url2pathname(parts.path))
+
+    if not filepath.is_absolute():
+        raise ConfigurationError(f'invalid profile {profile.name}: `storage.config.repository_uri` is not absolute')
+
+    return filepath.expanduser() / 'container'
 
 
 class PsqlConfig(TypedDict, total=False):
