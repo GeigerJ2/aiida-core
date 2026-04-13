@@ -11,9 +11,9 @@
 
 import weakref
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Protocol, Type
+from typing import Any, Callable, Dict, Optional, Protocol, Type, cast
 
-from sqlalchemy import and_, join, select
+from sqlalchemy import CTE, and_, join, select
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import Query, aliased
 from sqlalchemy.orm.util import AliasedClass
@@ -420,7 +420,7 @@ class SqlaJoiner:
             .cte(recursive=True)
         )
 
-        aliased_walk = aliased(walk)
+        aliased_walk = cast(CTE, aliased(walk))
 
         selection_union_list = [
             aliased_walk.c.ancestor_id.label('ancestor_id'),
@@ -442,14 +442,14 @@ class SqlaJoiner:
                 )
                 .where(link2.type.in_((LinkType.CREATE.value, LinkType.INPUT_CALC.value)))
             )
-        )  # .alias()
+        )
 
         def new_query(q):
             return q.join(descendants_recursive, descendants_recursive.c.ancestor_id == joined_entity.id).join(
                 entity_to_join, descendants_recursive.c.descendant_id == entity_to_join.id, isouter=isouterjoin
             )
 
-        return JoinReturn(new_query, descendants_recursive.c)
+        return JoinReturn(new_query, descendants_recursive.c)  # type: ignore[arg-type]
 
     def _join_node_ancestors_recursive(
         self, joined_entity, entity_to_join, isouterjoin: bool, filter_dict: FilterType, expand_path=False
@@ -487,7 +487,7 @@ class SqlaJoiner:
             .cte(recursive=True)
         )
 
-        aliased_walk = aliased(walk)
+        aliased_walk = cast(CTE, aliased(walk))
 
         selection_union_list = [
             link2.input_id.label('ancestor_id'),
@@ -517,7 +517,7 @@ class SqlaJoiner:
                 entity_to_join, ancestors_recursive.c.ancestor_id == entity_to_join.id, isouter=isouterjoin
             )
 
-        return JoinReturn(new_query, ancestors_recursive.c)
+        return JoinReturn(new_query, ancestors_recursive.c)  # type: ignore[arg-type]
 
 
 def _check_dbentities(entities_cls_joined, entities_cls_to_join, relationship: str):

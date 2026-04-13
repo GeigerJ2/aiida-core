@@ -15,7 +15,7 @@ import uuid
 import warnings
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 from sqlalchemy import and_, not_, or_
 from sqlalchemy import func as sa_func
@@ -764,7 +764,9 @@ class SqlaQueryBuilder(BackendQueryBuilder):
             # Instead of plain `in` use `unnest()` (PSQL) or `json_each` (SQLite) to avoid parameter limits
             # For a regular `IN` clause, each value in the clause uses one parameter.
             # Instead, using `unnest()` or `json_each()` with an array uses only 1 parameter.
-            expr = _create_smarter_in_clause(session=self.get_session(), column=column, values=value)
+            expr = _create_smarter_in_clause(
+                session=self.get_session(), column=cast(ColumnElement, column), values=value
+            )
         else:
             raise ValueError(f'Unknown operator {operator} for filters on columns')
         return expr
