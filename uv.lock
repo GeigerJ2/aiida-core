@@ -202,7 +202,7 @@ requires-dist = [
     { name = "aiida-core", extras = ["atomic-tools", "rest"], marker = "extra == 'tests'" },
     { name = "aiida-core", extras = ["tests"], marker = "extra == 'pre-commit'" },
     { name = "aiida-export-migration-tests", marker = "extra == 'tests'", specifier = "==0.9.0" },
-    { name = "aiida-shell", marker = "extra == 'tutorials'", git = "https://github.com/GeigerJ2/aiida-shell.git?rev=fix%2Finstalledcode-model-rename" },
+    { name = "aiida-shell", marker = "extra == 'tutorials'", git = "https://github.com/aiidateam/aiida-shell.git?rev=master" },
     { name = "aiida-workgraph", marker = "extra == 'tutorials'", git = "https://github.com/GeigerJ2/aiida-workgraph.git?rev=fix%2Fmap-zone-output-retrieval" },
     { name = "alembic", specifier = "~=1.8" },
     { name = "archive-path", specifier = "~=0.4.2" },
@@ -325,7 +325,7 @@ wheels = [
 [[package]]
 name = "aiida-shell"
 version = "0.8.2"
-source = { git = "https://github.com/GeigerJ2/aiida-shell.git?rev=fix%2Finstalledcode-model-rename#9eee6994b2d457a9190cb30029539b637d2e09cf" }
+source = { git = "https://github.com/aiidateam/aiida-shell.git?rev=master#e2f4ff1c96e5e38d7bafacb0ca65495ebe492167" }
 dependencies = [
     { name = "aiida-core" },
     { name = "dill" },
