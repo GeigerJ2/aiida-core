@@ -43,7 +43,7 @@ jobs:
         docker exec "${{ job.services.slurm.id }}" bash -c "\
           export UV_PYTHON_INSTALL_DIR=/opt/uv-python && \
           uv venv /opt/gsrd --python 3.12 && \
-          uv pip install --python /opt/gsrd/bin/python \
+          uv pip install --python /opt/gsrd/bin/python --only-binary numpy \
             'gsrd @ https://github.com/aiidateam/gsrd/archive/refs/heads/main.zip' && \
           chmod -R a+rX /opt/gsrd /opt/uv-python"
 
