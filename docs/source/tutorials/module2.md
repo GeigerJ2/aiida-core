@@ -16,9 +16,11 @@ execution:
 (tutorial:module2)=
 # Module 2: Structured data and calcfunctions
 
+<!-- TODO: re-enable once the md->ipynb conversion script is verified
 :::{tip}
 This tutorial can be downloaded and run as a Jupyter notebook: {nb-download}`module2.ipynb` {octicon}`download`
 :::
+-->
 
 :::{note}
 This module reuses the tutorial profile and the `python_code` object created in {ref}`Module 1 <tutorial:module1>`. If you are following along locally, run that module first. To use your own profile instead, replace the setup cell at the top of the downloaded notebook with:
@@ -37,6 +39,7 @@ After this module, you will be able to:
 - Launch many tracked calculations programmatically
 - Use AiiDA's structured data types to obtain queryable results
 - Add input preparation and output parsing as tracked Python steps to the simulation's provenance
+- Organize results with extras and groups for quick retrieval
 
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
@@ -164,14 +167,18 @@ What if, instead of just files in and files out, we could register the simulatio
 AiiDA's {mod}`~aiida.orm` module provides data types like `Dict`, `Float`, `Int`, `Str`, `List`, and `SinglefileData` that are automatically persisted in the database and linked in the provenance graph.
 :::
 
-<!-- TODO: Add a "Built-in data types" subsection with a table of the most common types
-     (Dict, Float, Int, Str, List, ArrayData, XyData, SinglefileData) and when to use each.
-     Also mention richer 2D data types beyond files (e.g. ArrayData, XyData).
-     From meeting notes: "filters & 2D data types beyond files". -->
+### Built-in data types at a glance
 
-<!-- TODO: Add an "Extras" subsection or note — show how to attach arbitrary metadata
-     (extras) to nodes for tagging, filtering, and organizing results.
-     From meeting notes: "possibly introduce Extras here". -->
+AiiDA ships a range of data types for different use cases. The ones you will see most often:
+
+| Category | Type | When to use |
+|---|---|---|
+| Scalars | {py:class}`~aiida.orm.Int`, {py:class}`~aiida.orm.Float`, {py:class}`~aiida.orm.Str`, {py:class}`~aiida.orm.Bool` | Single values you want queryable in the database |
+| Collections | {py:class}`~aiida.orm.Dict`, {py:class}`~aiida.orm.List` | Key-value maps or ordered sequences of simple Python types |
+| Arrays | {py:class}`~aiida.orm.ArrayData`, {py:class}`~aiida.orm.XyData` | NumPy arrays (grids, spectra, x-y curves) |
+| Files | {py:class}`~aiida.orm.SinglefileData`, {py:class}`~aiida.orm.FolderData` | Opaque binary or text files, directory trees |
+
+The full catalogue is in {ref}`topics:data_types:core`.
 
 ## Tracking Python steps with `@calcfunction`
 
@@ -206,6 +213,9 @@ Inside a `calcfunction`, all parameters are AiiDA data nodes, not plain Python t
 
 When *calling* the function, AiiDA auto-serializes plain Python types (`int`, `float`, `str`, `bool`, `dict`, `list`) to the corresponding `orm` nodes, so `prepare_input(orm.Dict(params))` and `prepare_input(params)` both work.
 :::
+
+This also starts to address one of {ref}`Module 0 <tutorial:module0>`'s pain points: the parameters now live in a single `Dict` node, stored with full provenance and reviewable in one place, rather than a hand-edited YAML file whose mistyped keys vanish silently.
+The `Dict` alone still doesn't validate the keys, but real {ref}`CalcJob <topics:calculations:concepts:calcjobs>` plugins do: they declare typed, validated input ports in their process spec, rejecting unknown or malformed parameters before the calculation ever runs.
 
 The second, `parse_output`, takes the captured stdout of a `gsrd` run and extracts the two scalar diagnostics as `Float` nodes. We declare the two return keys as a {class}`~typing.TypedDict` so the function's return type is self-documenting (and so that {ref}`Module 3 <tutorial:module3>` can reuse the same annotation):
 
@@ -315,18 +325,49 @@ for r in enriched_results:
 
 The transition curve looks identical to the first sweep (same simulation, same parameters); what changed is *how* we got the numbers. The `Dict` inputs and `Float` outputs now live in the database with full provenance, ready to be queried.
 
-<!-- TODO: Add "Grouping results" subsection — collect all sweep runs into an AiiDA Group,
-     show `verdi group list`, `verdi group show`. Groups let you organize related
-     calculations (e.g. "all F-sweep runs") for later retrieval.
-     From meeting notes: "groups; AiiDA manages your FS". -->
+## Organizing your results
 
-<!-- TODO: Consider adding a benchmark/speed note on *result retrieval* at scale.
-     E.g. for 1k parameter values: without AiiDA you'd need 1k file opens + YAML loads
-     just to find interesting runs. With AiiDA, the parsed Float values live in the database
-     and can be queried instantly via QueryBuilder.
-     (The file I/O during parse_output still happens, but in real-world scenarios
-     that runs asynchronously in the background via AiiDA daemon workers.)
-     From meeting notes: "show speed impact (benchmark?)". -->
+### Extras
+
+Every AiiDA node has an **extras** dictionary: mutable key-value metadata you can attach at any time, even long after the node was created.
+Extras are useful for tagging, filtering, and organizing nodes without changing the provenance graph.
+
+```{code-cell} ipython3
+# Tag each enriched-sweep CalcJob with its F value and a sweep label.
+for r in enriched_results:
+    calc_node = r['parsed']['variance_V'].creator  # the parse_output CalcFunctionNode
+    calc_node.base.extras.set('F', r['F'])
+    calc_node.base.extras.set('sweep', 'F_scan')
+
+print(f"Extras on first node: {enriched_results[0]['parsed']['variance_V'].creator.base.extras.all}")
+```
+
+Unlike node attributes (which are immutable once stored), extras can be updated freely. This makes them the right tool for bookkeeping that evolves over time: quality flags, review status, experiment labels, etc.
+
+### Groups
+
+A {py:class}`~aiida.orm.Group` is a named collection of nodes. Groups let you organize related calculations (e.g. "all F-sweep runs") for retrieval and sharing:
+
+```{code-cell} ipython3
+# Collect all enriched-sweep CalcJobs into a Group.
+sweep_group, created = orm.Group.collection.get_or_create('tutorial/F-sweep')
+if created:
+    for r in enriched_results:
+        calc_node = r['parsed']['variance_V'].creator
+        sweep_group.add_nodes(calc_node)
+
+print(f"Group '{sweep_group.label}' contains {sweep_group.count()} nodes")
+```
+
+```{code-cell} ipython3
+:tags: ["hide-output"]
+
+%verdi group list
+```
+
+Groups are purely organizational and do not affect provenance. You can add or remove nodes at any time, and a node can belong to multiple groups.
+
+---
 
 This is what {class}`~aiida.orm.QueryBuilder` enables: structured search over the provenance graph. A few examples on the `Float` nodes we just stored:
 
@@ -345,6 +386,10 @@ print(f'  with value > 0.01:      {qb.count()}')
 qb = orm.QueryBuilder().append(orm.Float, project='attributes.value')
 values = sorted(row[0] for row in qb.all())
 print(f'All Float values (sorted): {[round(v, 4) for v in values]}')
+
+# 4. Filter by extras (find nodes tagged by the sweep above).
+qb = orm.QueryBuilder().append(orm.CalcFunctionNode, filters={'extras.sweep': 'F_scan'})
+print(f'Nodes tagged sweep=F_scan: {qb.count()}')
 ```
 
 QueryBuilder can also join across the provenance graph: filter `Float` nodes by the calcfunction that created them, by output label, by the workflow they belong to, etc. We'll cover those patterns properly in {ref}`Module 5 <tutorial:module5>`.

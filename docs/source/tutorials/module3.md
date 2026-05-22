@@ -16,9 +16,11 @@ execution:
 (tutorial:module3)=
 # Module 3: Writing simple workflows
 
+<!-- TODO: re-enable once the md->ipynb conversion script is verified
 :::{tip}
 This tutorial can be downloaded and run as a Jupyter notebook: {nb-download}`module3.ipynb` {octicon}`download`
 :::
+-->
 
 :::{note}
 This module reuses the tutorial profile and the `python_code` object created in {ref}`Module 1 <tutorial:module1>`. If you are following along locally, run that module first. To use your own profile instead, replace the setup cell at the top of the downloaded notebook with:
@@ -70,9 +72,23 @@ You define the steps and their connections once, and AiiDA handles execution, da
 AiiDA offers two workflow systems. **WorkChain** (imperative, class-based) is the classical, long-standing API for defining workflows in AiiDA. **WorkGraph** (declarative, graph-based) was added more recently as a simplified API for composing tasks, and is what this tutorial uses; it is more intuitive for composing tasks and scales naturally to complex graphs.
 :::
 
-<!-- TODO: Add a comparison table between AiiDA core concepts and WorkGraph concepts:
-     CalcJob / WorkChain ↔ WorkGraph task / graph, process nodes, etc.
-     From meeting notes: "comparison table between core and WG, make analogous". -->
+::::{dropdown} AiiDA core ↔ WorkGraph concept mapping
+:icon: table
+
+If you encounter AiiDA core terminology in other documentation or plugins, here is how it maps to the WorkGraph abstractions this tutorial uses:
+
+| AiiDA core concept | WorkGraph equivalent | Notes |
+|---|---|---|
+| `CalcJob` | `task` wrapping a `CalcJob` | `shelljob()` is a convenience for `ShellJob` CalcJobs |
+| `calcfunction` | `@task` / `@task.graph` | WorkGraph tasks can wrap any calcfunction |
+| `WorkChain` | `WorkGraph` | Both are workflow-level process nodes |
+| `WorkChain.define()` outline | Graph definition (linking tasks) | WorkGraph replaces the imperative outline with a declarative graph |
+| `spec.input` / `spec.output` | Input/output sockets | `spec.input(...)` and `spec.output(...)` in `@task.graph` |
+| Process node | Process node | Both systems produce the same provenance nodes |
+| `submit()` / `run()` | `wg.submit()` / `wg.run()` | Identical semantics |
+| `ToContext` / `self.ctx` | Implicit (data flows through links) | WorkGraph passes data via socket connections |
+
+::::
 
 ## The WorkGraph mental model
 
@@ -448,6 +464,7 @@ You now have the core building blocks: tracked external codes, structured data, 
 - AiiDA's workflow concepts in depth: {ref}`topics:workflows`
 - CalcJob concept (for `ShellJob` background): {ref}`topics:calculations:concepts:calcjobs`
 - Calcfunctions refresher: {ref}`topics:processes:functions`
+- Control flow (`If`, `While`, dynamic graph construction): {ref}`Module 6 <tutorial:module6>`
 - WorkGraph imperative form (`with WorkGraph() as wg:`) and `spec` helpers: [aiida-workgraph documentation](https://aiida-workgraph.readthedocs.io)
 - Running versus submitting processes: {ref}`topics:processes:usage:launching`
 - The AiiDA daemon (architecture and management): {ref}`topics:daemon`, {ref}`how-to:manage-daemon`

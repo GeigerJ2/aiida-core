@@ -61,10 +61,10 @@ Development-only checklist. Tracks what each module should teach and current sta
 - [x] Plot transition curve from structured AiiDA data
 - [x] QueryBuilder teaser (tip box with example query)
 - [x] `verdi process list`
-- [ ] Built-in data types table (Dict, Float, Int, Str, List, ArrayData, XyData, SinglefileData)
-- [ ] Extras subsection (attach arbitrary metadata to nodes for tagging/filtering)
-- [ ] Grouping results (collect sweep runs into an AiiDA Group, `verdi group list/show`)
-- [ ] Keep Groups + Extras + light QB teaser here, *before* Querying (per 2026-05-12 notes); scale benchmark (QB vs file I/O) moved to Module 5
+- [x] Built-in data types table (Dict, Float, Int, Str, List, ArrayData, XyData, SinglefileData)
+- [x] Extras subsection (attach arbitrary metadata to nodes for tagging/filtering)
+- [x] Grouping results (collect sweep runs into an AiiDA Group, `verdi group list/show`)
+- [x] Keep Groups + Extras + light QB teaser here, *before* Querying (per 2026-05-12 notes); scale benchmark (QB vs file I/O) moved to Module 5
 
 ---
 
@@ -91,26 +91,28 @@ Development-only checklist. Tracks what each module should teach and current sta
 - [x] Notes on Map usage (dict keys, no dots, item.value is a socket)
 - [x] Inspect sweep with `verdi process status` and `verdi process show`
 - [x] Analyze results (print variances, plot transition curve)
-- [ ] Comparison table: AiiDA core concepts vs WorkGraph concepts
-- [ ] Control flow: If/While examples (deferred to future modules)
+- [x] Comparison table: AiiDA core concepts vs WorkGraph concepts
+- [x] Control flow: dropped from M3, added link to Module 6 in Further Reading
 
 ---
 
-## Module 4: Remote submission (coming soon)
+## Module 4: Remote submission
 
 **Goal:** Run on remote HPC clusters.
 
-- [ ] Setting up a remote Computer (SSH transport, scheduler)
-- [ ] Setting up a remote Code
-- [ ] Queue management and job scheduling
-- [ ] Monitoring remote jobs (`verdi process list`, `verdi process watch`)
-- [ ] Set up Computer + Code from a real `aiida-resource-registry` CSCS YAML (`include/computer-cscs.yaml`, `include/code-cscs.yaml`) via `verdi computer/code ... --config`
-- [ ] BLOCKER: resource-registry YAMLs carry AiiDAlab metadata that breaks `verdi computer setup --config` in aiida-core (JG has open PR); ship hand-cleaned copies until merged
-- [ ] Mention `aiida-code-registry` vs `aiida-resource-registry` (JG view: should be merged)
+- [x] Setting up a remote Computer (SSH transport, scheduler)
+- [x] Setting up a remote Code
+- [x] Queue management and job scheduling (note about `submit()` vs blocking `launch_shell_job`)
+- [x] Monitoring remote jobs (`verdi process show`)
+- [x] Mention `aiida-resource-registry` as tip (link to repo, reference PR #7378 for YAML support)
+- [x] Also show a typical manual InstalledCode (with `prepend-text` / `module load`)
+- [x] Mention the three code types: InstalledCode / PortableCode / ContainerizedCode (inline bold list)
+- [x] DECIDED: use `xenonmiddleware/slurm:17` container for live executable cells; illustrative `daint` examples for realistic cluster setup
+- [x] CI plumbing: slurm service in `docs-build.yml`, gsrd installed on container via `uv`
+- [x] `setup_slurm.py` hidden cell: SSH config, computer/code registration via Python API
+- [x] `core.ssh_async` transport (note vs `core.ssh`)
 - [ ] Forward-looking only: `verdi computer/code search` endpoint (JG WIP, open PR, unreleased — mention, don't demo)
-- [ ] Also show a typical manual InstalledCode (with prepend/append `module load`)
-- [ ] Mention the three code types: InstalledCode / PortableCode / ContainerizedCode
-- [ ] DECIDE (before implementing): replace invented host with the real `xenonmiddleware/slurm` container (aiida-core CI's own target; configs already in `.github/config/slurm-ssh*.yaml`). Trade-off: requires Docker vs. "keep it simple"; leaning toward optional "run it for real" dropdown
+- [ ] Mention `aiida-code-registry` vs `aiida-resource-registry` (JG view: should be merged)
 
 ---
 

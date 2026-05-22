@@ -17,9 +17,11 @@ execution:
 (tutorial:intro)=
 # Module 0: Calculations without AiiDA
 
+<!-- TODO: re-enable once the md->ipynb conversion script is verified
 :::{tip}
 This tutorial can be downloaded and run as a Jupyter notebook: {nb-download}`module0.ipynb` {octicon}`download`
 :::
+-->
 
 In this module, we run a simulation the traditional way, without AiiDA, to experience the pain points it is built to solve.
 
@@ -43,8 +45,8 @@ The interplay of these processes, controlled primarily by the feed rate F and ki
 Identical starting conditions (same initial grid) can produce wildly different patterns just by tweaking F and k.
 :::
 
-The concrete code we will be wrapping is [`gsrd`](https://github.com/aiidateam/gsrd), a small command-line simulator deliberately written to *emulate the conventions and quirks of real-world scientific codes*: a single positional argument, hardcoded output filenames, scalar results scattered across stdout, citation banners, and unreliable exit codes.
-None of this is necessary for a Gray-Scott solver, but all of it is depressingly common in established scientific software, which is exactly the situation a workflow manager has to deal with.
+The concrete code we will be wrapping is [`gsrd`](https://github.com/aiidateam/gsrd), a small command-line simulator deliberately written to *mirror the conventions and quirks of real-world scientific codes*: a single positional argument, hardcoded output filenames, scalar results scattered across stdout, citation banners, and unreliable exit codes.
+None of this is essential to a Gray-Scott solver, but all of it is common in scientific software that has grown over the years around the science rather than the interface, which is exactly the situation a scientific workflow manager needs to handle gracefully.
 
 ## Running the simulation
 
@@ -53,7 +55,8 @@ None of this is necessary for a Gray-Scott solver, but all of it is depressingly
      an input file that produces output, where critical results are scattered
      across stdout and the output file. -->
 
-The simulation is invoked like a typical scientific code: a command-line executable that reads an input file and writes its output to the current directory.
+The simulation is invoked like a typical scientific code: a single positional argument, no `--help` to guide you, and whatever real documentation exists buried in a separate manual.
+It reads an input file and writes its output to the current directory.
 
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
@@ -73,7 +76,7 @@ $ gsrd input.yaml
 ```
 
 ```{code-cell} ipython3
-:tags: ["remove-input"]
+:tags: ["remove-input", "hide-output"]
 
 # Actually run the simulation in a clean working directory (hidden from
 # rendered output, since the real banner+progress block is too noisy).
@@ -90,9 +93,8 @@ if result.stderr:
 print(f'Exit code: {result.returncode}')
 ```
 
-That is a lot of output for what is essentially a 2D PDE solve.
-Banner, fake citation block, per-iteration progress, a diagnostics box at the end, all interleaved on stdout.
-This is a deliberately tame rendition; many production scientific codes are an order of magnitude noisier.
+Expand the output above and you'll see how much there is: a banner, a citation block, per-iteration progress, and a diagnostics box at the end, all interleaved on stdout.
+This is a deliberately tame example; many production codes produce considerably more.
 
 Let's see what `gsrd` actually wrote to disk:
 
@@ -123,6 +125,7 @@ with np.load(work_dir / 'results.npz') as data:
 So the headline numbers of the run are only in the log.
 If you forgot to redirect stdout to a file, you have to re-run the simulation to recover them.
 And `results.npz` is a fixed filename in the current directory: run `gsrd` again in the same directory and it silently overwrites the previous results.
+Some codes go further and implicitly *read* leftover files from the working directory to "restart", so the very same command can produce different results depending on what happens to be lying around.
 
 :::{admonition} Results scattered across stdout and the output file
 :class: warning
@@ -140,6 +143,7 @@ And `results.npz` is a fixed filename in the current directory: run `gsrd` again
 
 What if we want to try a different feed rate?
 Open `input.yaml` in a text editor and change `F` from `0.04` to `0.055`.
+Editing inputs by hand has its own hazard: like many scientific codes, `gsrd` silently ignores keys it doesn't recognize, so a mistyped parameter name runs cleanly using the default value instead of raising an error.
 
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
@@ -174,7 +178,7 @@ With `F=0.055`, the pattern looks completely different:
 However, note that we just overwrote our input file, *and* the `results.npz` of the first run, in one go.
 The original parameters are gone, and so is the previous output. Nothing on disk now records that the first run ever happened.
 
-Quickly tweaking parameters and re-running like this is exactly how the exploratory phase of a project tends to look in practice, which makes the pain points below easy to walk into.
+Quickly tweaking parameters and re-running like this is exactly how the exploratory phase of a scientific project tends to look in practice, which makes the pain points below easy to walk into.
 
 :::{admonition} No systematic record of your work
 :class: warning
@@ -221,7 +225,7 @@ Three things are simultaneously wrong with that failure mode:
 - The only signal that something failed is a single terse `ERR:` line on stderr (and the *absence* of `*** JOB DONE ***` on stdout). Both are easy to miss in a sea of progress output.
 - `results.npz` was not written. Combined with the zero exit code, an automation script downstream will happily try to open a non-existent file, or worse, pick up a stale `results.npz` from a previous run.
 
-In real scientific software this is typically much worse, with pages of unrelated output drowning out anything useful. But even the minimal version here doesn't tell you what to fix or how to recover.
+In practice this is often harder to spot, with the relevant line buried among pages of other output. But even the minimal version here doesn't tell you what to fix or how to recover.
 
 :::{admonition} Failures are hard to diagnose and easy to lose
 :class: warning
@@ -231,37 +235,15 @@ In real scientific software this is typically much worse, with pages of unrelate
 - Even when error messages exist, connecting them back to the right inputs and parameters is up to you
 :::
 
-## So, what's the problem?
+## How this becomes even worse at real-world scale
 
-<!-- MOTIVATION: The punchline of Module 0. Connect the concrete pain
-     points above to what AiiDA solves, then paint the picture at scale
-     to make the case compelling. -->
+<!-- MOTIVATION: The punchline of Module 0. We already surfaced the concrete
+     pain points inline as they appeared; here we project them to real-world
+     scale to make the case for AiiDA compelling. -->
 
-### What we already saw
-
-We ran just a couple of simulations and already hit these problems:
-
-- **Inputs disconnected from outputs**: there is no automatic link between what you ran and what you got, unless you track it yourself
-- **Results scattered across files and logs**: arrays in a binary file, scalars on stdout, parameters in a separate YAML; reuniting them is your job
-- **Original parameters lost**: we edited the input file in place, and the previous version is gone
-- **Fixed output filename**: re-running in the same directory silently overwrites the previous results
-- **Failures are hard to detect**: exit codes can be uninformative, error messages cryptic, and failed runs may leave no trace at all
-
-### What scientific software tends to look like
-
-The pain points above are not bugs in `gsrd`; they are a faithful caricature of the established scientific codes that workflow managers actually have to wrap.
-A typical legacy simulation code in the wild has some mix of:
-
-- A single positional argument and no `--help`, with the real interface buried in a PDF manual
-- Critical scalar results printed only to stdout, mixed in with banners and progress lines, and parsed by everyone with a slightly different regex
-- Output files with fixed names in the current directory
-- Tolerant input parsers that silently accept misspelled or unsupported keys
-- "Restart" mechanisms that pick up files from the working directory implicitly, so the same command can produce different results depending on what is already there
-- Uninformative exit codes; success and failure both reported as `0`
-
-These conventions reflect decades of HPC habits more than any deliberate API design, and they are precisely what makes scientific software hard to compose and automate. A workflow manager has to wrap them, hide them, and make the result usable.
-
-### What happens at real-world scale
+We ran just two simulations and already had to track inputs by hand, hunt for scalars in stdout, watch a re-run silently overwrite the previous one, and nearly miss a failure that still reported a successful exit code of `0`.
+None of these are bugs in `gsrd`; they are the everyday texture of scientific software.
+Mildly annoying at two runs, they turn into real problems once you scale up.
 
 :::{note}
 Now imagine doing this not for 2 runs, but for **100 different parameter combinations**.
@@ -269,7 +251,7 @@ You'd need a naming convention, a spreadsheet, and custom scripts to execute and
 Those approaches are fragile, and the resulting data (and the workflow that produced it) is hard to pass on to a colleague.
 :::
 
-Some more things that can go wrong at scale:
+At that scale, more things start to go wrong:
 
 - **Scattered data**: input and output files can end up on scratch filesystems across different clusters, your local machine, and shared drives. Months later, just tracking down which directory holds the converged results becomes a chore in itself.
 - **Multi-step workflows**: one code prepares the geometry, another runs the simulation, a third post-processes the results. If step 2 fails for 15 out of 100 runs, how do you figure out which ones failed, why, and how to re-run just those? You'd have to manually identify the failures, fix or adjust the inputs, and re-run each.
@@ -290,11 +272,11 @@ It gives you:
 - **Structured output parsing**: AiiDA plugins provide parsers that extract structured results from a code's output files *and* its stdout, store them as queryable database entries, and let you search and filter across all your calculations without ever opening a single file.
 - **Community knowledge**: AiiDA plugins for popular codes ship with workflows, parsers, and error handlers, encoding years of domain expertise. You benefit from best practices without having to painfully discover them yourself.
 
-The promise is not just "more throughput". It is that the scaffolding around your simulations &mdash; bookkeeping, parsing, restart logic, retries &mdash; stops being your problem, so the time you'd otherwise spend fighting tooling goes back to doing science.
+The promise is not just "more throughput". It is that the scaffolding around your simulations (bookkeeping, parsing, restart logic, retries) stops being your problem, so the time you'd otherwise spend fighting tooling goes back to doing science.
 
 Buckle up: in {ref}`Module 1 <tutorial:module1>`, we'll run the same `gsrd` simulation through AiiDA and start seeing the benefits in action.
 
 ## Further reading
 
 - The `gsrd` package and the conventions it deliberately mimics: <https://github.com/aiidateam/gsrd>
-- AiiDA's provenance model: {ref}`topics:provenance:concepts`
+- AiiDA's provenance model: {ref}`topics:provenance`

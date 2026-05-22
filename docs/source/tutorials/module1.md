@@ -16,9 +16,11 @@ execution:
 (tutorial:module1)=
 # Module 1: Calculations with AiiDA
 
+<!-- TODO: re-enable once the md->ipynb conversion script is verified
 :::{tip}
 This tutorial can be downloaded and run as a Jupyter notebook: {nb-download}`module1.ipynb` {octicon}`download`
 :::
+-->
 
 ## What you will learn
 

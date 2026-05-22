@@ -17,6 +17,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
+    services:
+      slurm:
+        image: xenonmiddleware/slurm:17
+        ports:
+        - 5001:22
+
     steps:
     - uses: actions/checkout@v6
 
@@ -29,6 +35,17 @@ jobs:
         python-version: '3.10'
         extras: docs,tutorials,tests,rest,atomic_tools
         from-lock: 'false'
+
+    - name: Install gsrd on SLURM container
+      run: |
+        cp "$(readlink -f "$(which uv)")" /tmp/uv-binary
+        docker cp /tmp/uv-binary "${{ job.services.slurm.id }}:/usr/local/bin/uv"
+        docker exec "${{ job.services.slurm.id }}" bash -c "\
+          export UV_PYTHON_INSTALL_DIR=/opt/uv-python && \
+          uv venv /opt/gsrd --python 3.12 && \
+          uv pip install --python /opt/gsrd/bin/python --only-binary :all: \
+            'gsrd @ https://github.com/aiidateam/gsrd/archive/refs/heads/main.zip' && \
+          chmod -R a+rX /opt/gsrd /opt/uv-python"
 
     - name: Build HTML docs
       id: linkcheck
