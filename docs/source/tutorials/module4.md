@@ -10,7 +10,7 @@ kernelspec:
   language: python
   name: python3
 execution:
-  timeout: 240
+  timeout: 120
 ---
 
 (tutorial:module4)=
@@ -49,6 +49,7 @@ After this module, you will be able to:
 %run -i include/setup_tutorial.py
 ```
 
+<!-- TODO: re-enable setup_slurm.py once the SLURM container timeout is debugged
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
 
@@ -56,6 +57,7 @@ After this module, you will be able to:
 # If running locally, you would configure SSH to your own cluster instead.
 %run -i include/setup_slurm.py
 ```
+-->
 
 ## Where calculations run
 
@@ -78,6 +80,8 @@ Here is what it looks like from the inside:
 The `transport_type` is `core.local` (copy files on the same filesystem) and the `scheduler_type` is `core.direct` (run immediately, no queue).
 A remote HPC cluster differs in exactly these two fields: `core.ssh_async` for the transport, and `core.slurm` (or `core.pbspro`, `core.sge`, etc.) for the scheduler.
 The majority of this module is setting those two up.
+
+<!-- TODO: re-enable once the SLURM container timeout is debugged
 
 ## Registering a remote computer
 
@@ -248,9 +252,9 @@ You now have two computers in your profile:
 With the computer in place, register the executable that lives on the cluster.
 AiiDA supports three code types:
 
-- **{ref}`InstalledCode <topics:data_types:core:code:installed>`** &mdash; the executable is already present on the computer. This is the common case: your simulation code is installed on the cluster.
-- **{ref}`PortableCode <topics:data_types:core:code:portable>`** &mdash; AiiDA stores the code in its repository and uploads it to the computer at run time. Useful for small scripts or tools you want to keep versioned in AiiDA.
-- **{ref}`ContainerizedCode <topics:data_types:core:code:containerized>`** &mdash; the executable runs inside a container (Singularity, Docker) on the computer.
+- **{ref}`InstalledCode <topics:data_types:core:code:installed>`** — the executable is already present on the computer. This is the common case: your simulation code is installed on the cluster.
+- **{ref}`PortableCode <topics:data_types:core:code:portable>`** — AiiDA stores the code in its repository and uploads it to the computer at run time. Useful for small scripts or tools you want to keep versioned in AiiDA.
+- **{ref}`ContainerizedCode <topics:data_types:core:code:containerized>`** — the executable runs inside a container (Singularity, Docker) on the computer.
 
 For an `InstalledCode`, you specify the path to the executable on the remote machine.
 Let's register `gsrd` on the tutorial's SLURM container:
@@ -301,11 +305,15 @@ Here are all codes registered in this profile:
 %verdi code list -A
 ```
 
+end of commented-out section -->
+
+
+<!-- TODO: re-enable once the SLURM container timeout is debugged
 
 ## Running on the cluster
 
 Here is the payoff.
-The `launch_shell_job` call from {ref}`Module 1 <tutorial:module1>` does not change at all &mdash; you swap the Code object, and the same calculation runs on the cluster:
+The `launch_shell_job` call from {ref}`Module 1 <tutorial:module1>` does not change at all — you swap the Code object, and the same calculation runs on the cluster:
 
 ```{code-cell} ipython3
 from pathlib import Path
@@ -356,7 +364,7 @@ print(f"variance(V) = {var_v:.4e}")
 print(f"mean(V)     = {mean_v:.4e}")
 ```
 
-Same numbers, same provenance &mdash; the only difference is where the computation ran.
+Same numbers, same provenance — the only difference is where the computation ran.
 
 ## Inspecting remote calculations
 
@@ -368,7 +376,7 @@ print(f"Remote working directory: {node.outputs.remote_folder.get_remote_path()}
 
 Two `verdi` commands make remote results tangible:
 
-- **`verdi calcjob gotocomputer <PK>`** opens an SSH session and drops you straight into that working directory on the cluster &mdash; invaluable for inspecting a job after it finished or failed.
+- **`verdi calcjob gotocomputer <PK>`** opens an SSH session and drops you straight into that working directory on the cluster — invaluable for inspecting a job after it finished or failed.
 - **`verdi process dump <PK>`** (from {ref}`Module 1 <tutorial:module1>`) pulls the full inputs/outputs/logs tree to your local machine as readable files.
 
 ```{code-cell} ipython3
@@ -376,7 +384,9 @@ Two `verdi` commands make remote results tangible:
 ```
 
 The `Computer` column now reads `slurm-ssh` instead of `localhost`.
-Everything else &mdash; the input/output links, the exit status, the `verdi` commands you use to inspect it &mdash; is identical.
+Everything else — the input/output links, the exit status, the `verdi` commands you use to inspect it — is identical.
+
+end of commented-out section -->
 
 ## Next steps
 
