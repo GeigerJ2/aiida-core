@@ -189,8 +189,14 @@ computer = Computer(
 For `core.ssh_async`, AiiDA reads your `~/.ssh/config`, so as long as `ssh <hostname>` works from your terminal, the configure step needs no extra credentials:
 
 ```{code-cell} ipython3
-%verdi computer configure core.ssh_async slurm-ssh --non-interactive
+%verdi computer configure core.ssh_async slurm-ssh --backend openssh --non-interactive
 ```
+
+:::{tip}
+`core.ssh_async` supports two SSH backends: `asyncssh` (the default, pure-Python) and `openssh` (shells out to the system's `ssh` binary).
+We use `--backend openssh` here because this tutorial's SLURM container runs an older OpenSSH server.
+On modern HPC clusters the default `asyncssh` backend works well; you can omit the `--backend` flag entirely.
+:::
 
 :::{warning}
 The older `core.ssh` transport is **deprecated and will be removed in v3.0**.
