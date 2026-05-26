@@ -107,6 +107,14 @@ myst_heading_anchors = 4
 
 nb_execution_show_tb = 'READTHEDOCS' in os.environ
 nb_merge_streams = True
+
+# Module 4 requires a live SLURM cluster reachable over SSH (the
+# `xenonmiddleware/slurm` container in local dev and CI). Read the Docs
+# build environments cannot run Docker and have no such endpoint, so the
+# notebook is skipped there; code cells render without outputs.
+nb_execution_excludepatterns = []
+if 'READTHEDOCS' in os.environ:
+    nb_execution_excludepatterns.append('tutorials/module4.md')
 nb_mime_priority_overrides = [
     ('gettext', 'application/vnd.jupyter.widget-view+json', 0),
     ('gettext', 'application/javascript', 10),
