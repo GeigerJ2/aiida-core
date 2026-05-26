@@ -68,13 +68,19 @@ For more advanced high-throughput production setups (PostgreSQL, RabbitMQ), see 
 # created here. Legacy bare `tutorial` profiles (without a hash suffix) are
 # left alone — they predate the current setup and should be cleaned up
 # manually with `verdi profile delete tutorial`.
-from aiida.engine.daemon.client import get_daemon_client
+from contextlib import suppress
+
+from aiida.engine.daemon.client import DaemonNotRunningException, get_daemon_client
 from aiida.manage.configuration import get_config
 _config = get_config()
 for _stale_name in [n for n in _config.profile_names if n.startswith('tutorial-')]:
     _daemon_client = get_daemon_client(_stale_name)
     if _daemon_client.is_daemon_running:
-        _daemon_client.stop_daemon(wait=True)
+        # Tolerate the case where the daemon's PID file is stale: `is_daemon_running`
+        # checks pidfile presence, but the underlying circus process may already be
+        # gone, in which case `stop_daemon` cleans the pidfile and then raises.
+        with suppress(DaemonNotRunningException):
+            _daemon_client.stop_daemon(wait=True)
     _config.delete_profile(_stale_name, delete_storage=True)
 
 %run -i include/setup_tutorial.py
