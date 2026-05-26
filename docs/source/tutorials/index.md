@@ -156,7 +156,15 @@ Use the QueryBuilder to search, filter, and analyze your provenance graph at sca
 
 +++
 
-*Coming soon*
+```{button-ref} module5
+:ref-type: doc
+:click-parent:
+:expand:
+:color: primary
+:outline:
+
+Go to Module 5
+```
 :::
 
 :::{grid-item-card} {fa}`code-branch;mr-1` Module 6: Complex workflows

@@ -120,16 +120,17 @@ Development-only checklist. Tracks what each module should teach and current sta
 
 ---
 
-## Module 5: Querying and analysis (coming soon)
+## Module 5: Querying and analysis
 
 **Goal:** Use QueryBuilder for searching and analyzing provenance.
 
-- [ ] QueryBuilder basics (append, filters, project)
-- [ ] Filtering by node type, attributes, extras
-- [ ] Traversing relationships (inputs, outputs, ancestors, descendants)
-- [ ] Aggregation and statistics
-- [ ] Exporting and sharing results (AiiDA archive)
-- [ ] Benchmark/speed: result retrieval at scale, QueryBuilder vs file I/O (per 2026-05-12 notes; only a light teaser in Module 2)
+- [x] QueryBuilder basics (append, filters, project)
+- [x] Filtering by node type, attributes, extras
+- [x] Traversing relationships (inputs, outputs, ancestors, descendants, with_group)
+- [x] Aggregation note: rolled into the basics tip ("after projection it is just Python on a list") instead of a dedicated section, since the JG-confirmed Python-side aggregation reduces to stdlib `min`/`max`/`statistics.mean` with no AiiDA-native angle
+- [x] Exporting and sharing results (AiiDA archive; pointer to `verdi archive create` + `how-to:share`)
+- [x] Benchmark/speed: result retrieval at scale, QueryBuilder vs file I/O (live `time.perf_counter()` comparison on the existing F-sweep)
+- [x] Final payoff cell: rebuild the Module 2 transition curve purely from QueryBuilder, no `enriched_results` list
 
 ---
 
