@@ -176,7 +176,8 @@ With `F=0.055`, the pattern looks completely different:
 &nbsp;
 
 However, note that we just overwrote our input file, *and* the `results.npz` of the first run, in one go.
-The original parameters are gone, and so is the previous output. Nothing on disk now records that the first run ever happened.
+The original parameters are gone, and so is the previous output.
+Nothing on disk now records that the first run ever happened.
 
 Quickly tweaking parameters and re-running like this is exactly how the exploratory phase of a scientific project tends to look in practice, which makes the pain points below easy to walk into.
 
@@ -194,7 +195,8 @@ Quickly tweaking parameters and re-running like this is exactly how the explorat
      and leave no useful trace. The user has no idea what went wrong, and
      no record that the run even happened. -->
 
-What happens when things go wrong? Let's try a feed rate where V dies out before any pattern can form (`F=0.1`):
+What happens when things go wrong?
+Let's try a feed rate where V dies out before any pattern can form (`F=0.1`):
 
 ```console
 $ gsrd input.yaml
@@ -225,7 +227,8 @@ Three things are simultaneously wrong with that failure mode:
 - The only signal that something failed is a single terse `ERR:` line on stderr (and the *absence* of `*** JOB DONE ***` on stdout). Both are easy to miss in a sea of progress output.
 - `results.npz` was not written. Combined with the zero exit code, an automation script downstream will happily try to open a non-existent file, or worse, pick up a stale `results.npz` from a previous run.
 
-In practice this is often harder to spot, with the relevant line buried among pages of other output. But even the minimal version here doesn't tell you what to fix or how to recover.
+In practice this is often harder to spot, with the relevant line buried among pages of other output.
+But even the minimal version here doesn't tell you what to fix or how to recover.
 
 :::{admonition} Failures are hard to diagnose and easy to lose
 :class: warning
@@ -272,7 +275,8 @@ It gives you:
 - **Structured output parsing**: AiiDA plugins provide parsers that extract structured results from a code's output files *and* its stdout, store them as queryable database entries, and let you search and filter across all your calculations without ever opening a single file.
 - **Community knowledge**: AiiDA plugins for popular codes ship with workflows, parsers, and error handlers, encoding years of domain expertise. You benefit from best practices without having to painfully discover them yourself.
 
-The promise is not just "more throughput". It is that the scaffolding around your simulations (bookkeeping, parsing, restart logic, retries) stops being your problem, so the time you'd otherwise spend fighting tooling goes back to doing science.
+The promise is not just "more throughput".
+It is that the scaffolding around your simulations (bookkeeping, parsing, restart logic, retries) stops being your problem, so the time you'd otherwise spend fighting tooling goes back to doing science.
 
 Buckle up: in {ref}`Module 1 <tutorial:module1>`, we'll run the same `gsrd` simulation through AiiDA and start seeing the benefits in action.
 

@@ -137,7 +137,15 @@ Run calculations on remote HPC clusters with schedulers, transports, and queue m
 
 +++
 
-*Coming soon*
+```{button-ref} module4
+:ref-type: doc
+:click-parent:
+:expand:
+:color: primary
+:outline:
+
+Go to Module 4
+```
 :::
 
 :::{grid-item-card} {fa}`magnifying-glass-chart;mr-1` Module 5: Querying and analysis

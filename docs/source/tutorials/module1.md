@@ -66,7 +66,7 @@ For more advanced high-throughput production setups (PostgreSQL, RabbitMQ), see 
 # Stop any leftover daemon and delete any past tutorial profiles created by
 # this script, so each docs build starts fresh. Modules 2+ reuse the profile
 # created here. Legacy bare `tutorial` profiles (without a hash suffix) are
-# left alone — they predate the current setup and should be cleaned up
+# left alone, since they predate the current setup and should be cleaned up
 # manually with `verdi profile delete tutorial`.
 from contextlib import suppress
 
@@ -94,7 +94,8 @@ You can verify that the profile is set up correctly with `verdi status`:
 ```
 
 :::{note}
-We use IPython magic commands like `%verdi <cmd>` in Code cells (`%verdi` runs a `verdi` CLI command from the notebook). To execute in a terminal, drop the `%` prefix.
+We use IPython magic commands like `%verdi <cmd>` in Code cells (`%verdi` runs a `verdi` CLI command from the notebook).
+To execute in a terminal, drop the `%` prefix.
 :::
 
 ## Running the simulation with `aiida-shell`
@@ -166,7 +167,8 @@ In the graph:
 This graph answers questions like *"Where did this number come from?"* and *"What parameters produced this result?"*, even months later.
 
 :::{tip}
-Open the image in a new tab for a larger view. You can also generate provenance graphs from the command line with `verdi node graph generate <PK>`.
+Open the image in a new tab for a larger view.
+You can also generate provenance graphs from the command line with `verdi node graph generate <PK>`.
 :::
 
 ## Inspecting the calculation
@@ -209,7 +211,8 @@ for label, output_node in sorted(results.items()):
 ```
 
 :::{note}
-The output label `results_npz` corresponds to the file we declared as `results.npz` in the `outputs=` argument to `launch_shell_job`. AiiDA replaces dots with underscores because link labels must be valid Python identifiers.
+The output label `results_npz` corresponds to the file we declared as `results.npz` in the `outputs=` argument to `launch_shell_job`.
+AiiDA replaces dots with underscores because link labels must be valid Python identifiers.
 :::
 
 Each output plays a different role:
@@ -228,7 +231,8 @@ print(f"Remote folder: {node.outputs.remote_folder.get_remote_path()}")
 From the command line, `verdi calcjob gotocomputer <PK>` SSHes into the Computer and drops you directly into that working directory.
 :::
 
-Now to the actual numbers. Recall from {ref}`Module 0 <tutorial:module0>` that `gsrd` splits its output across two places: the arrays go into `results.npz`, but the scalar diagnostics (`variance(V)`, `mean(V)`) appear *only* on stdout.
+Now to the actual numbers.
+Recall from {ref}`Module 0 <tutorial:module0>` that `gsrd` splits its output across two places: the arrays go into `results.npz`, but the scalar diagnostics (`variance(V)`, `mean(V)`) appear *only* on stdout.
 Both are now tracked by AiiDA: the binary file is a {py:class}`~aiida.orm.SinglefileData` node, and `stdout` is a captured-text node we can open just like any other:
 
 ```{code-cell} ipython3
@@ -251,9 +255,10 @@ print(f"variance(V) = {var_v:.4e}")
 print(f"mean(V)     = {mean_v:.4e}")
 ```
 
-That regex is the price of admission for a code that prints its headline scalars only to stdout. We did exactly the same thing manually in {ref}`Module 0 <tutorial:module0>`; the difference now is that the stdout text, the regex result, and the input that produced them all live as tracked nodes in the provenance graph. {ref}`Module 2 <tutorial:module2>` turns this hand-written extraction into a proper {func}`@calcfunction <aiida.engine.processes.functions.calcfunction>`, so it becomes a first-class step in the pipeline.
+That regex is the price of admission for a code that prints its headline scalars only to stdout.
+We did exactly the same thing manually in {ref}`Module 0 <tutorial:module0>`; the difference now is that the stdout text, the regex result, and the input that produced them all live as tracked nodes in the provenance graph. {ref}`Module 2 <tutorial:module2>` turns this hand-written extraction into a proper {func}`@calcfunction <aiida.engine.processes.functions.calcfunction>`, so it becomes a first-class step in the pipeline.
 
-<!-- TODO: Add `verdi shell` subsection — interactive exploration of the database
+<!-- TODO: Add `verdi shell` subsection: interactive exploration of the database
      (load nodes, inspect attributes, follow links). From meeting notes. -->
 
 ## Dumping calculation data
@@ -279,7 +284,7 @@ dump_path = tempfile.mkdtemp(prefix='aiida_tutorial_dump_')
 All the relevant entities of the calculation are there: the input file, the simulation script, the submission script, captured stdout and stderr, and AiiDA metadata.
 This is useful for debugging or sharing calculation data outside of AiiDA.
 
-<!-- TODO: Add "Handling failures" section — re-run with bad params (F=0.1),
+<!-- TODO: Add "Handling failures" section: re-run with bad params (F=0.1),
      show how AiiDA records the failed CalcJob (exit code, stderr in provenance),
      contrast with Module 0 where the failure left no trace. From meeting notes. -->
 

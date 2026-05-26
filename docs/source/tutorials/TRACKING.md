@@ -102,10 +102,14 @@ Development-only checklist. Tracks what each module should teach and current sta
 
 - [x] Setting up a remote Computer (SSH transport, scheduler)
 - [x] Setting up a remote Code
-- [x] Queue management and job scheduling (note about `submit()` vs blocking `launch_shell_job`)
+- [x] Per-calculation scheduler options (resources / queue_name / account / max_wallclock_seconds) via `metadata.options`
 - [x] Monitoring remote jobs (`verdi process show`)
 - [x] Mention `aiida-resource-registry` as tip (link to repo, reference PR #7378 for YAML support)
 - [x] Also show a typical manual InstalledCode (with `prepend-text` / `module load`)
+- [x] Computer-level `prepend_text` / `append_text` tip (vs per-code `--prepend-text`)
+- [x] `verdi code test` after `verdi code create` (executable-exists check)
+- [x] Multi-computers-per-profile prose: profiles are not tied to a single cluster
+- [x] Production-rate-limit warning: tutorial uses aggressive `--safe-interval 0` + `set_minimum_job_poll_interval(1)`; real clusters need 30s+
 - [x] Mention the three code types: InstalledCode / PortableCode / ContainerizedCode (inline bold list)
 - [x] DECIDED: use `xenonmiddleware/slurm:17` container for live executable cells; illustrative `daint` examples for realistic cluster setup
 - [x] CI plumbing: slurm service in `docs-build.yml`, gsrd installed on container via `uv`

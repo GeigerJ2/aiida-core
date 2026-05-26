@@ -24,7 +24,8 @@ This tutorial can be downloaded and run as a Jupyter notebook: {nb-download}`mod
 
 :::{note}
 This module reuses the tutorial profile created in {ref}`Module 1 <tutorial:module1>`.
-If you are following along locally, run that module first. To use your own profile instead, replace the setup cell at the top of the downloaded notebook with:
+If you are following along locally, run that module first.
+To use your own profile instead, replace the setup cell at the top of the downloaded notebook with:
 
 ```python
 from aiida import load_profile
@@ -37,9 +38,10 @@ load_profile()
 
 After this module, you will be able to:
 
-- Understand where a calculation runs: the Computer, how AiiDA connects to it, and how its jobs are queued
-- Configure a remote HPC cluster and register a code that lives on it
-- Send a calculation to the cluster instead of your own machine
+- Register a remote HPC cluster (setup → configure → test) and a code that lives on it
+- Submit a calculation to that cluster and inspect the result with the same commands as for a local run
+- Set per-job scheduler options (resources, queue, account, wall-time) via `metadata.options`
+- Switch a workflow between local and remote execution without changing the workflow itself
 
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
@@ -63,9 +65,9 @@ Every calculation so far has run on `localhost`, your own machine.
 Real research rarely does: simulations run on **HPC clusters**, shared machines you reach over the network, where jobs wait in a scheduler queue until resources free up.
 
 You do **not** have to rewrite your workflow for that.
-In {ref}`Module 1 <tutorial:module1>` we met the two objects AiiDA uses to abstract *where* work happens:
+In {ref}`Module 1 <tutorial:module1>` we met the two objects AiiDA uses to abstract where work happens:
 
-- A **{ref}`Computer <how-to:run-codes:computer>`** describes *where* to run. It bundles the hostname, a **transport** (how AiiDA connects and moves files: `core.local` for your machine, `core.ssh_async` for a remote one) and a **scheduler** (how the machine runs jobs: `core.direct` runs them immediately, `core.slurm` / `core.pbspro` queue them through a batch system).
+- A **{ref}`Computer <how-to:run-codes:computer>`** describes *where* to run. It bundles the hostname, a **transport**, and a **scheduler**.
 - A **{ref}`Code <how-to:run-codes:code>`** describes *what* runs there: the executable's path on that computer.
 
 The tutorial's `localhost` is just the simplest case: local transport, direct scheduler.
@@ -82,7 +84,8 @@ The majority of this module is setting those two up.
 ## Registering a remote computer
 
 Registering a remote computer is a one-time, three-step process: **setup** (describe the machine), **configure** (provide connection credentials), and **test** (verify everything works).
-We walk through each step with `verdi` commands, but the same operations are also available through the Python API (AiiDA is fundamentally a Python library, so the Python API is the native interface; `verdi` is a convenience layer on top). See the dropdowns for the equivalent code.
+We walk through each step with `verdi` commands, but the same operations are of course also available through the Python API.
+We include the relevant code via dropdowns below.
 
 :::{note}
 This tutorial uses a SLURM container reachable over SSH so that every cell executes automatically during the docs build.
@@ -124,11 +127,13 @@ with suppress(NotExistent):
 ```{code-cell} ipython3
 %verdi computer setup \
     --label slurm-ssh \
+    --description 'Containerized SLURM cluster used by the AiiDA tutorial.' \
     --hostname slurm-ssh \
     --transport core.ssh_async \
     --scheduler core.slurm \
     --work-dir /home/{username}/workdir \
     --mpiprocs-per-machine 1 \
+    --default-memory-per-machine 1024 \
     --non-interactive
 ```
 
@@ -137,31 +142,49 @@ The key flags:
 - `--transport core.ssh_async`: AiiDA connects and moves files over SSH.
 - `--scheduler core.slurm`: jobs go through SLURM (`sbatch`, `squeue`, `scancel`). Other options include `core.pbspro`, `core.sge`, `core.lsf`, and `core.direct` (no scheduler, run immediately).
 - `--work-dir`: where AiiDA creates per-calculation working directories on the remote machine. `{username}` is expanded at runtime.
+- `--mpiprocs-per-machine` and `--default-memory-per-machine` (the latter in kB): per-node defaults used as fallbacks when a calculation doesn't specify them. Most production HPC schedulers require both, and setting them at the computer level means individual calculations don't have to repeat them. They are easily overridden per submission via `metadata.options` (shown later in this module). We use a tiny `1024` kB (1 MB) here for the tutorial; on a real cluster, raise this to your node's actual per-machine RAM.
 
 On a real HPC cluster, the hostname typically is the cluster's login node and the work directory is on a scratch filesystem.
 
-::::{tip}
 Instead of providing individual CLI flags, you can also pass a YAML file:
 
 ```console
 $ verdi computer setup --config slurm-ssh-setup.yaml
 ```
 
-:::{dropdown} Example  `slurm-ssh-setup.yaml`
+:::{dropdown} Example:&nbsp;`slurm-ssh-setup.yaml`
 ```yaml
 label: slurm-ssh
+description: Containerized SLURM cluster used by the AiiDA tutorial.
 hostname: slurm-ssh
 transport: core.ssh_async
 scheduler: core.slurm
 work_dir: /home/{username}/workdir
 mpiprocs_per_machine: 1
+default_memory_per_machine: 1024  # tutorial container; raise on real clusters
 ```
 :::
+
+This YAML is the equivalent of the CLI invocation in the live cell above (same keys, same values), and is the config we use to register the SLURM container that runs this tutorial's live remote-submission cells.
 
 The [AiiDA resource registry](https://github.com/aiidateam/aiida-resource-registry) maintains ready-made YAML configs for common HPC centres.
 Download the one for your cluster and pass it directly.
 If your cluster is not listed yet, contributions are more than welcome: open a PR to add your YAML files so others can benefit too.
-::::
+
+Going the other way: once you have a working setup, export it back to YAML for sharing, version control, or a registry PR:
+
+```console
+$ verdi computer export setup slurm-ssh slurm-ssh-setup.yaml
+$ verdi computer export config slurm-ssh slurm-ssh-config.yaml
+```
+
+The same works for codes: `verdi code export <code> <file>`.
+
+:::{tip}
+Run interactively (no `--non-interactive`), `verdi computer setup` opens an editor at the end where you can set `prepend_text` and `append_text`: shell snippets that run on the remote machine *before* and *after* every job on this computer.
+Use them for site-wide setup that applies regardless of which code is running (sourcing a profile, exporting cluster-specific variables, etc.).
+These are computer-level; codes can override or extend them with their own `prepend_text` / `append_text` (shown below for `verdi code create`).
+:::
 
 :::{dropdown} Python API: computer setup
 ```python
@@ -169,10 +192,15 @@ from aiida.orm import Computer
 
 computer = Computer(
     label='slurm-ssh',
+    description='Containerized SLURM cluster used by the AiiDA tutorial.',
     hostname='slurm-ssh',
     transport_type='core.ssh_async',
     scheduler_type='core.slurm',
     workdir='/home/{username}/workdir',
+    metadata={
+        'default_mpiprocs_per_machine': 1,
+        'default_memory_per_machine': 1024,  # 1 MB; raise on real clusters
+    },
 ).store()
 ```
 :::
@@ -187,9 +215,18 @@ For `core.ssh_async`, AiiDA reads your `~/.ssh/config`, so as long as `ssh <host
 %verdi computer configure core.ssh_async slurm-ssh --safe-interval 0 --non-interactive
 ```
 
-:::{tip}
-`core.ssh_async` supports two SSH backends: `asyncssh` (the default, pure-Python) and `openssh` (shells out to the system's `ssh` binary).
-The default `asyncssh` backend works well for most use cases. The `openssh` backend can be useful when you need SSH connection multiplexing or have a complex SSH setup that asyncssh doesn't handle.
+`--safe-interval` is the minimum cooldown, in seconds, between opening successive SSH connections to this computer.
+AiiDA uses it to space out concurrent tasks so they don't overwhelm the login node or the shared SSH daemon.
+The default for SSH-based transports (`core.ssh`, `core.ssh_async`) is `15` seconds.
+We use `0` here so the tutorial cells return quickly against the local SLURM container. **Do not do this on a real cluster**: no cooldown can get your account flagged or banned.
+Leave the default in place unless the cluster's documentation recommends otherwise (see {ref}`how-to:run-codes:computer:connection`).
+
+:::{dropdown} Python API: computer configure
+```python
+computer.configure(safe_interval=0)
+```
+
+`configure()` accepts the same keyword arguments as the `verdi computer configure` prompts; valid keys are whatever `transport_cls.get_valid_auth_params()` returns for the chosen transport (for `core.ssh_async`: `safe_interval`, `host`, `port`, `username`, ...).
 :::
 
 :::{warning}
@@ -198,22 +235,14 @@ It requires configuring username, port, key path, and other SSH parameters throu
 `core.ssh_async` replaces it: it is significantly faster and delegates connection settings to your `~/.ssh/config`, which is simpler and more consistent with how you already manage SSH connections.
 :::
 
-:::{dropdown} Python API: computer configure
-```python
-computer.configure()
-```
-
-`configure()` accepts the same keyword arguments as the `verdi computer configure` prompts (e.g. `host='slurm-ssh'`).
-:::
-
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
 
-# Speed up job polling for the tutorial (default interval is too slow).
+# Hidden: drop the scheduler-poll interval to 1s so the SLURM-container
+# round-trip below finishes quickly during the docs build. Not something
+# you would normally tweak; the default value is fine on real clusters.
 from aiida.orm import load_computer
-
-slurm_computer = load_computer('slurm-ssh')
-slurm_computer.set_minimum_job_poll_interval(1)
+load_computer('slurm-ssh').set_minimum_job_poll_interval(1)
 ```
 
 Let's inspect the computer we just registered:
@@ -231,15 +260,39 @@ All checks must pass before the computer is usable:
 %verdi computer test slurm-ssh
 ```
 
+```{code-cell} ipython3
+:tags: ["remove-cell"]
+
+# Fail-fast assertion: `verdi computer test` only WARNS on failure, so a
+# broken connection sails past that cell and any later cell that actually
+# uses the transport (e.g. `launch_shell_job` below) hangs until the
+# notebook execution timeout fires, masking the real cause. Open the
+# transport directly here so a connection failure raises with a real
+# traceback at the cell where the diagnosis actually lives.
+from aiida.orm import load_computer
+with load_computer('slurm-ssh').get_transport() as _t:
+    _t.whoami()
+```
+
 You now have two computers in your profile:
 
 ```{code-cell} ipython3
 %verdi computer list
 ```
 
+A profile is not tied to a single cluster.
+Register as many computers as you have access to, once each, and any subsequent submission picks one by label. The workflow code stays the same regardless of how many clusters are configured.
+
+:::{tip}
+AiiDA itself runs on your local machine, not on the HPC.
+The cluster only ever sees standard SSH connections and scheduler commands (`sbatch`, `squeue`, ...), so **nothing needs to be installed on the HPC and no sudo rights are required** (neither of which most users would have anyway).
+From a single local installation you can drive jobs against several heterogeneous clusters at the same time (different schedulers, different work directories, different codes), each registered as its own `Computer`.
+The same workflow, unchanged, can submit some calculations to one cluster and others to another.
+:::
+
 ## Registering a remote code
 
-With the computer in place, register the executable that lives on the cluster.
+With the computer in place, you can now register executables that are available on the cluster.
 AiiDA supports three code types:
 
 - **{ref}`InstalledCode <topics:data_types:core:code:installed>`**: the executable is already present on the computer. This is the common case: your simulation code is installed on the cluster.
@@ -260,6 +313,26 @@ Let's register `gsrd` on the tutorial's SLURM container:
 
 The code is now addressable as `gsrd@slurm-ssh`, just like the local code is `gsrd@localhost`.
 
+Just as `verdi computer test` checks the connection, `verdi code test` verifies the code is usable.
+For an `InstalledCode`, it checks that the computer is reachable and that the specified executable exists at the given path:
+
+```{code-cell} ipython3
+%verdi code test gsrd@slurm-ssh
+```
+
+:::{dropdown} Python API: code registration
+```python
+from aiida.orm import InstalledCode
+
+code = InstalledCode(
+    label='gsrd',
+    computer=computer,
+    filepath_executable='/opt/gsrd/bin/gsrd',
+    default_calc_job_plugin='core.shell',
+).store()
+```
+:::
+
 :::{tip}
 On a real cluster, the executable is usually activated through a module system.
 The `--prepend-text` flag adds lines to the job script *before* the executable, typically `module load` commands:
@@ -276,19 +349,6 @@ $ verdi code create core.code.installed \
 This is the single most common customization for HPC codes: the executable exists, but the environment must be set up first.
 :::
 
-:::{dropdown} Python API: code registration
-```python
-from aiida.orm import InstalledCode
-
-code = InstalledCode(
-    label='gsrd',
-    computer=computer,
-    filepath_executable='/opt/gsrd/bin/gsrd',
-    default_calc_job_plugin='core.shell',
-).store()
-```
-:::
-
 Here are all codes registered in this profile:
 
 ```{code-cell} ipython3
@@ -298,19 +358,40 @@ Here are all codes registered in this profile:
 
 ## Running on the cluster
 
-Here is the payoff.
-The `launch_shell_job` call from {ref}`Module 1 <tutorial:module1>` does not change at all. You swap the Code object, and the same calculation runs on the cluster:
+The only thing that changes between running locally and running on a cluster is a single string: `'gsrd@localhost'` becomes `'gsrd@slurm-ssh'`.
+Everything else stays exactly the same: same arguments, same inputs, same outputs, same provenance graph.
+
+:::{important}
+That swap is so cheap because **AiiDA abstracts away the transport and scheduler layers** that normally make HPC submission painful.
+The user-facing API is the same regardless of where work actually runs, so changing target cluster amounts to swapping a label (or a `Code` node).
+
+The trade is that you pay an upfront, one-time cost for each cluster you want to use (computer setup → configure → test → code create), and from then on every calculation or workflow targets it by label.
+:::
+
+Concretely, the only line of the {ref}`Module 1 <tutorial:module1>` example that differs is the code we load:
 
 ```{code-cell} ipython3
+from aiida.orm import load_code
+
+# The only line that changes vs Module 1: the @-suffix points to the
+# remote cluster (`@slurm-ssh`) instead of the local machine (`@localhost`).
+gsrd_remote = load_code('gsrd@slurm-ssh')
+```
+
+The submission itself is then byte-for-byte identical to the local run from {ref}`Module 1 <tutorial:module1>`. We just pass `gsrd_remote` as the code argument to `launch_shell_job`.
+Expand the cell below to see the call and its output:
+
+```{code-cell} ipython3
+:tags: ["hide-cell"]
+
 from pathlib import Path
 
-from aiida.orm import load_code
 from aiida_shell import launch_shell_job
 
 input_path = Path('include/input.yaml').resolve()
 
 results, node = launch_shell_job(
-    load_code('gsrd@slurm-ssh'),
+    gsrd_remote,
     arguments='{input}',
     nodes={'input': input_path},
     outputs=['results.npz'],
@@ -321,7 +402,15 @@ print(f"Computer:    {node.computer.label}")
 print(f"Exit status: {node.exit_status}")
 ```
 
-AiiDA handled everything: it opened the SSH connection, uploaded the inputs, submitted the job to the SLURM scheduler, polled until it finished, and retrieved the outputs.
+In the printed output, `Computer` now reads `slurm-ssh` instead of `localhost`.
+That single change in the output mirrors the single change in the call.
+Everything in between, the full remote-job lifecycle, was driven by AiiDA on your behalf; you have to do none of it manually:
+
+- Opening the SSH connection to the cluster.
+- Transporting the input files to the remote working directory.
+- Submitting the job to the scheduler (`sbatch` under the hood).
+- Monitoring it until it finishes (`squeue` polling).
+- Pulling the outputs back to your local repository.
 
 :::{note}
 We used `launch_shell_job(...)`, which blocks until the job finishes.
@@ -329,9 +418,13 @@ For real work, you would `submit()` the calculation (or a workflow wrapping it) 
 While a job sits in the cluster queue, it shows up as `Waiting` in `verdi process list`.
 :::
 
-Let's verify the outputs are there, just like in Module 1:
+The outputs are present and identical to Module 1's local run: same numbers, same provenance, only the computation location differs.
+Click *Show cell* below to expand the same parsing code we used in Module 1 and convince yourself that the result is identical:
 
 ```{code-cell} ipython3
+:tags: ["hide-cell"]
+
+# Inspect the outputs (same parsing as Module 1).
 import io
 import re
 
@@ -350,7 +443,53 @@ print(f"variance(V) = {var_v:.4e}")
 print(f"mean(V)     = {mean_v:.4e}")
 ```
 
-Same numbers, same provenance. The only difference is where the computation ran.
+The same swap also isn't specific to `launch_shell_job`: it works for the pipeline from {ref}`Module 2 <tutorial:module2>`, the `gray_scott_sweep` workflow from {ref}`Module 3 <tutorial:module3>`, and any {ref}`CalcJob <topics:calculations:concepts:calcjobs>` or {ref}`WorkChain <topics:workflows>` you may write in the future.
+
+### Per-calculation scheduler options
+
+The submission above worked because the tutorial's SLURM container has no queue limits, no project accounting, and no wallclock enforcement.
+Real HPC centres almost always require you to specify, per job: how many nodes and MPI processes, which queue (partition), which project account, and how long the job is allowed to run.
+These are not computer-level defaults; they vary per calculation.
+
+You can set them through `metadata.options` on the submission.
+With `aiida-shell`'s `launch_shell_job`, that means passing `metadata=...`:
+
+```python
+results, node = launch_shell_job(
+    gsrd_remote,
+    arguments='{input}',
+    nodes={'input': input_path},
+    outputs=['results.npz'],
+    metadata={
+        'options': {
+            'resources': {'num_machines': 2, 'num_mpiprocs_per_machine': 16},
+            'queue_name': 'debug',
+            'account': 'proj123',
+            'max_wallclock_seconds': 2 * 60 * 60,  # 2 hours
+        },
+    },
+)
+```
+
+The same `metadata.options` namespace is available on `CalcJob` and `WorkChain` builders.
+For workflows, you set them once at the entry point of your workflow and they propagate downstream.
+
+Compared to the local-run call this makes the submission code visibly more verbose, but that verbosity is not an AiiDA artefact: those flags are simply what every batch scheduler needs to size, schedule, and bill a job, regardless of how you submit.
+Filling them in is part of running on HPC.
+
+:::{dropdown} The most commonly used&nbsp;`metadata.options`&nbsp;keys
+| Key | Purpose |
+|---|---|
+| `resources` | `num_machines`, `num_mpiprocs_per_machine`, etc. The minimum the scheduler needs to size the job. |
+| `queue_name` | Scheduler queue/partition (`debug`, `normal`, `gpu`, ...). |
+| `account` | Project/account code for billing. Often mandatory at supercomputer centres. |
+| `max_wallclock_seconds` | Wall-time limit. Real HPC centres almost always require this. |
+| `custom_scheduler_commands` | Raw extra scheduler directives (e.g. `#SBATCH --constraint=mc`) for anything not covered by the keys above. |
+| `environment_variables` | Per-job env vars exported in the job script. |
+| `prepend_text` / `append_text` | Per-job shell snippets (in addition to whatever is set at the code and computer level). |
+
+The full list lives in {ref}`how-to:real-world-tricks` ("Full list of metadata available").
+:::
 
 ## Inspecting remote calculations
 
@@ -360,12 +499,20 @@ Every CalcJob exposes a `remote_folder` output, a {ref}`RemoteData <topics:data_
 print(f"Remote working directory: {node.outputs.remote_folder.get_remote_path()}")
 ```
 
+:::{note}
+The path looks like `<work-dir>/<aa>/<bb>/<rest-of-uuid>` because AiiDA shards the working directory by the calculation node's UUID.
+The first two characters form the top-level directory, the next two the second-level directory, and the remaining 32 characters the leaf.
+This keeps any single directory from accumulating millions of entries on long-running profiles, which would slow down `ls`, scheduler scans, and backup tools.
+:::
+
 Two `verdi` commands make remote results tangible:
 
 - **`verdi calcjob gotocomputer <PK>`** opens an SSH session and drops you straight into that working directory on the cluster. Invaluable for inspecting a job after it finished or failed.
-- **`verdi process dump <PK>`** (from {ref}`Module 1 <tutorial:module1>`) pulls the full inputs/outputs/logs tree to your local machine as readable files.
+- **`verdi process dump <PK>`** (from {ref}`Module 1 <tutorial:module1>`) writes out the inputs, outputs, and logs that AiiDA has already retrieved into its local file repository, as a human-readable directory tree on disk.
 
 ```{code-cell} ipython3
+:tags: ["hide-output"]
+
 %verdi process show {node.pk}
 ```
 

@@ -15,7 +15,8 @@ kernelspec:
 # Module 5: Querying and analysis (coming soon)
 
 :::{note}
-This module is under development. Planned topics:
+This module is under development.
+Planned topics:
 
 - Searching the provenance graph with the QueryBuilder (filter, project, join)
 - Analyzing trends across many runs at scale
@@ -39,36 +40,28 @@ After this module, you will be able to:
 
 ### Basic queries: find, filter, project
 
-TODO: introduce QueryBuilder
-TODO: find all CalcJobs, filter by state or input parameters
-TODO: project specific output values (variance_V, mean_V)
+TODO: introduce QueryBuilder TODO: find all CalcJobs, filter by state or input parameters TODO: project specific output values (variance_V, mean_V)
 
 ### Combining filters
 
-TODO: filter by multiple criteria (e.g., F value AND successful exit code)
-TODO: show how to extract results into a table
+TODO: filter by multiple criteria (e.g., F value AND successful exit code) TODO: show how to extract results into a table
 
 ## Organizing data with Groups
 
-TODO: create a Group
-TODO: add calculations/data to the Group
-TODO: query within a Group
+TODO: create a Group TODO: add calculations/data to the Group TODO: query within a Group
 
 ## Inspecting and exporting data
 
 ### `verdi process dump`
 
-TODO: dump a calculation's full directory to disk
-TODO: inspect the dumped files
+TODO: dump a calculation's full directory to disk TODO: inspect the dumped files
 
 ### Exporting `.aiida` archives
 
-Archives include full provenance — not just the data, but how it was produced,
-with which inputs, by which code version.
+Archives include full provenance — not just the data, but how it was produced, with which inputs, by which code version.
 A colleague importing your archive can trace every result back to its origin.
 
-TODO: export a Group as a portable archive
-TODO: explain how archives enable reproducibility and sharing
+TODO: export a Group as a portable archive TODO: explain how archives enable reproducibility and sharing
 
 ## Summary
 

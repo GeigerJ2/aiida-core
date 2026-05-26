@@ -47,9 +47,18 @@ if not _container_reachable():
         'Start the container with: docker run -d -p 5001:22 xenonmiddleware/slurm:17'
     )
 else:
-    if slurm_key_src.exists():
+    # Key copy and ssh-config block are independent and each one self-heals.
+    # A previous run may have written one but not the other (e.g. the key
+    # source did not yet exist at the time, or `~/.ssh` was cleaned out
+    # afterwards), so check and fix each on every run.
+
+    if not slurm_key_src.exists():
+        msg = f'expected SSH key for the SLURM container at {slurm_key_src}, but the file is missing'
+        raise FileNotFoundError(msg)
+
+    if not slurm_key_dst.exists() or slurm_key_dst.read_bytes() != slurm_key_src.read_bytes():
         shutil.copy(slurm_key_src, slurm_key_dst)
-        slurm_key_dst.chmod(0o600)
+    slurm_key_dst.chmod(0o600)
 
     ssh_config = ssh_dir / 'config'
     marker = f'# --- AiiDA tutorial ({COMPUTER_LABEL}) ---'

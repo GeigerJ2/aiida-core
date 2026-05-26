@@ -23,7 +23,9 @@ This tutorial can be downloaded and run as a Jupyter notebook: {nb-download}`mod
 -->
 
 :::{note}
-This module reuses the tutorial profile and the `python_code` object created in {ref}`Module 1 <tutorial:module1>`. If you are following along locally, run that module first. To use your own profile instead, replace the setup cell at the top of the downloaded notebook with:
+This module reuses the tutorial profile and the `python_code` object created in {ref}`Module 1 <tutorial:module1>`.
+If you are following along locally, run that module first.
+To use your own profile instead, replace the setup cell at the top of the downloaded notebook with:
 
 ```python
 from aiida import load_profile
@@ -88,7 +90,8 @@ for f_val in F_VALUES:
     calc_nodes.append((f_val, calc_node))
 ```
 
-We saw in {ref}`Module 1 <tutorial:module1>` that `gsrd` only prints its scalar diagnostics (`variance(V)`, `mean(V)`) to stdout. So to get the numbers for plotting, we have to grep stdout for each run, same regex as before, just inside a `for` loop now:
+We saw in {ref}`Module 1 <tutorial:module1>` that `gsrd` only prints its scalar diagnostics (`variance(V)`, `mean(V)`) to stdout.
+So to get the numbers for plotting, we have to grep stdout for each run, same regex as before, just inside a `for` loop now:
 
 ```{code-cell} ipython3
 # Extract and print results from each run by regexing stdout.
@@ -162,14 +165,15 @@ What if, instead of just files in and files out, we could register the simulatio
 - The input parameters as a {py:class}`~aiida.orm.Dict` (queryable key-value pairs in the database)
 - The output scalars as {py:class}`~aiida.orm.Float` nodes (directly searchable)
 
-:::{tip}
+:::{note}
 `orm` stands for **Object-Relational Mapping**: it lets you work with database-stored objects as regular Python classes.
 AiiDA's {mod}`~aiida.orm` module provides data types like `Dict`, `Float`, `Int`, `Str`, `List`, and `SinglefileData` that are automatically persisted in the database and linked in the provenance graph.
 :::
 
 ### Built-in data types at a glance
 
-AiiDA ships a range of data types for different use cases. The ones you will see most often:
+AiiDA ships a range of data types for different use cases.
+The ones you will see most often:
 
 | Category | Type | When to use |
 |---|---|---|
@@ -209,7 +213,8 @@ def prepare_input(parameters: orm.Dict) -> orm.SinglefileData:
 ```
 
 :::{note}
-Inside a `calcfunction`, all parameters are AiiDA data nodes, not plain Python types. That is why the function calls `parameters.get_dict()` to extract the dictionary.
+Inside a `calcfunction`, all parameters are AiiDA data nodes, not plain Python types.
+That is why the function calls `parameters.get_dict()` to extract the dictionary.
 
 When *calling* the function, AiiDA auto-serializes plain Python types (`int`, `float`, `str`, `bool`, `dict`, `list`) to the corresponding `orm` nodes, so `prepare_input(orm.Dict(params))` and `prepare_input(params)` both work.
 :::
@@ -217,7 +222,8 @@ When *calling* the function, AiiDA auto-serializes plain Python types (`int`, `f
 This also starts to address one of {ref}`Module 0 <tutorial:module0>`'s pain points: the parameters now live in a single `Dict` node, stored with full provenance and reviewable in one place, rather than a hand-edited YAML file whose mistyped keys vanish silently.
 The `Dict` alone still doesn't validate the keys, but real {ref}`CalcJob <topics:calculations:concepts:calcjobs>` plugins do: they declare typed, validated input ports in their process spec, rejecting unknown or malformed parameters before the calculation ever runs.
 
-The second, `parse_output`, takes the captured stdout of a `gsrd` run and extracts the two scalar diagnostics as `Float` nodes. We declare the two return keys as a {class}`~typing.TypedDict` so the function's return type is self-documenting (and so that {ref}`Module 3 <tutorial:module3>` can reuse the same annotation):
+The second, `parse_output`, takes the captured stdout of a `gsrd` run and extracts the two scalar diagnostics as `Float` nodes.
+We declare the two return keys as a {class}`~typing.TypedDict` so the function's return type is self-documenting (and so that {ref}`Module 3 <tutorial:module3>` can reuse the same annotation):
 
 ```{code-cell} ipython3
 # Define parse_output: a calcfunction that regexes scalars out of gsrd stdout.
@@ -244,7 +250,8 @@ def parse_output(stdout: orm.SinglefileData) -> ParseOutputs:
 ```
 
 :::{note}
-This is the small price of wrapping a code that prints headline numbers only to stdout: a custom parser. The win is that the parser itself becomes a tracked AiiDA process &mdash; its inputs (the stdout node) and its outputs (the `Float`s) get linked into the provenance graph, so the regex result lives at the same level as the simulation's other data.
+This is the small price of wrapping a code that prints headline numbers only to stdout: a custom parser.
+The win is that the parser itself becomes a tracked AiiDA process: its inputs (the stdout node) and its outputs (the `Float`s) get linked into the provenance graph, so the regex result lives at the same level as the simulation's other data.
 :::
 
 :::{note}
@@ -252,7 +259,8 @@ A calcfunction can return either a single data node or a plain `dict` mapping st
 When returning a dict, AiiDA registers each value as a named output on the process node, accessible via `node.outputs.<label>`.
 :::
 
-Now chain them: `prepare_input` → `launch_shell_job` → `parse_output`. Each step is tracked, and the inputs and outputs are stored as structured, queryable nodes:
+Now chain them: `prepare_input` → `launch_shell_job` → `parse_output`.
+Each step is tracked, and the inputs and outputs are stored as structured, queryable nodes:
 
 ```{code-cell} ipython3
 # Run the enriched pipeline: prepare_input → ShellJob → parse_output.
@@ -323,7 +331,8 @@ for r in enriched_results:
     print(f"F={r['F']:.3f}  variance(V)={r['parsed']['variance_V'].value:.4e}")
 ```
 
-The transition curve looks identical to the first sweep (same simulation, same parameters); what changed is *how* we got the numbers. The `Dict` inputs and `Float` outputs now live in the database with full provenance, ready to be queried.
+The transition curve looks identical to the first sweep (same simulation, same parameters); what changed is *how* we got the numbers.
+The `Dict` inputs and `Float` outputs now live in the database with full provenance, ready to be queried.
 
 ## Organizing your results
 
@@ -342,11 +351,13 @@ for r in enriched_results:
 print(f"Extras on first node: {enriched_results[0]['parsed']['variance_V'].creator.base.extras.all}")
 ```
 
-Unlike node attributes (which are immutable once stored), extras can be updated freely. This makes them the right tool for bookkeeping that evolves over time: quality flags, review status, experiment labels, etc.
+Unlike node attributes (which are immutable once stored), extras can be updated freely.
+This makes them the right tool for bookkeeping that evolves over time: quality flags, review status, experiment labels, etc.
 
 ### Groups
 
-A {py:class}`~aiida.orm.Group` is a named collection of nodes. Groups let you organize related calculations (e.g. "all F-sweep runs") for retrieval and sharing:
+A {py:class}`~aiida.orm.Group` is a named collection of nodes.
+Groups let you organize related calculations (e.g. "all F-sweep runs") for retrieval and sharing:
 
 ```{code-cell} ipython3
 # Collect all enriched-sweep CalcJobs into a Group.
@@ -365,11 +376,13 @@ print(f"Group '{sweep_group.label}' contains {sweep_group.count()} nodes")
 %verdi group list
 ```
 
-Groups are purely organizational and do not affect provenance. You can add or remove nodes at any time, and a node can belong to multiple groups.
+Groups are purely organizational and do not affect provenance.
+You can add or remove nodes at any time, and a node can belong to multiple groups.
 
 ---
 
-This is what {class}`~aiida.orm.QueryBuilder` enables: structured search over the provenance graph. A few examples on the `Float` nodes we just stored:
+This is what {class}`~aiida.orm.QueryBuilder` enables: structured search over the provenance graph.
+A few examples on the `Float` nodes we just stored:
 
 ```{code-cell} ipython3
 # Three QueryBuilder examples on the Float nodes stored by parse_output.
@@ -404,7 +417,8 @@ QueryBuilder can also join across the provenance graph: filter `Float` nodes by 
 ## Next steps
 
 We now have a tracked pipeline with structured data, but it's still a Python `for` loop that runs each step in a blocking manner.
-If one step fails, the loop stops. There's no single "sweep" object to query, and no way to run steps in parallel.
+If one step fails, the loop stops.
+There's no single "sweep" object to query, and no way to run steps in parallel.
 In {ref}`Module 3 <tutorial:module3>`, you'll wrap the pipeline into a **WorkGraph workflow** and turn the loop into a mapped workflow too.
 
 ## Further reading
