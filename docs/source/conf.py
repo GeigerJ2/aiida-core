@@ -115,6 +115,28 @@ nb_merge_streams = True
 nb_execution_excludepatterns = []
 if 'READTHEDOCS' in os.environ:
     nb_execution_excludepatterns.append('tutorials/module4.md')
+
+# --- Optional: bake module4 outputs into RTD via a pre-executed .ipynb ----
+# Future work, currently disabled. The intent is:
+#   - CI's docs-build job (which already runs module4 live against the
+#     xenonmiddleware/slurm service container) copies the executed
+#     `_build/jupyter_execute/tutorials/module4.ipynb` to
+#     `docs/source/tutorials/module4.ipynb` and pushes it back to the
+#     branch when `module4.md` itself changed.
+#   - On Read the Docs, sphinx would pick up `module4.ipynb` instead of
+#     `module4.md` so the rendered page shows real outputs from the live
+#     CI run rather than empty code cells.
+#   - Locally and in CI, sphinx would build `module4.md` (live), and
+#     skip `module4.ipynb` so there is no double-build of the same
+#     docname.
+# Trade-off to revisit: every push that touches `module4.md` adds one
+# bot commit on top with the freshly-baked notebook, which is noisy on
+# PR history. A leaner variant would bake only at merge-to-main time.
+#
+# if 'READTHEDOCS' in os.environ:
+#     exclude_patterns.append('tutorials/module4.md')
+# else:
+#     exclude_patterns.append('tutorials/module4.ipynb')
 nb_mime_priority_overrides = [
     ('gettext', 'application/vnd.jupyter.widget-view+json', 0),
     ('gettext', 'application/javascript', 10),
