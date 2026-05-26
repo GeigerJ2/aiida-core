@@ -49,7 +49,6 @@ After this module, you will be able to:
 %run -i include/setup_tutorial.py
 ```
 
-<!-- TODO: re-enable setup_slurm.py once the SLURM container timeout is debugged
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
 
@@ -57,17 +56,16 @@ After this module, you will be able to:
 # If running locally, you would configure SSH to your own cluster instead.
 %run -i include/setup_slurm.py
 ```
--->
 
 ## Where calculations run
 
-Every calculation so far has run on `localhost` &mdash; your own machine.
+Every calculation so far has run on `localhost`, your own machine.
 Real research rarely does: simulations run on **HPC clusters**, shared machines you reach over the network, where jobs wait in a scheduler queue until resources free up.
 
 You do **not** have to rewrite your workflow for that.
 In {ref}`Module 1 <tutorial:module1>` we met the two objects AiiDA uses to abstract *where* work happens:
 
-- A **{ref}`Computer <how-to:run-codes:computer>`** describes *where* to run. It bundles the hostname, a **transport** (how AiiDA connects and moves files &mdash; `core.local` for your machine, `core.ssh_async` for a remote one) and a **scheduler** (how the machine runs jobs &mdash; `core.direct` runs them immediately, `core.slurm` / `core.pbspro` queue them through a batch system).
+- A **{ref}`Computer <how-to:run-codes:computer>`** describes *where* to run. It bundles the hostname, a **transport** (how AiiDA connects and moves files: `core.local` for your machine, `core.ssh_async` for a remote one) and a **scheduler** (how the machine runs jobs: `core.direct` runs them immediately, `core.slurm` / `core.pbspro` queue them through a batch system).
 - A **{ref}`Code <how-to:run-codes:code>`** describes *what* runs there: the executable's path on that computer.
 
 The tutorial's `localhost` is just the simplest case: local transport, direct scheduler.
@@ -81,11 +79,10 @@ The `transport_type` is `core.local` (copy files on the same filesystem) and the
 A remote HPC cluster differs in exactly these two fields: `core.ssh_async` for the transport, and `core.slurm` (or `core.pbspro`, `core.sge`, etc.) for the scheduler.
 The majority of this module is setting those two up.
 
-<!-- TODO: re-enable once the SLURM container timeout is debugged
-
 ## Registering a remote computer
 
 Registering a remote computer is a one-time, three-step process: **setup** (describe the machine), **configure** (provide connection credentials), and **test** (verify everything works).
+We walk through each step with `verdi` commands, but the same operations are also available through the Python API (AiiDA is fundamentally a Python library, so the Python API is the native interface; `verdi` is a convenience layer on top). See the dropdowns for the equivalent code.
 
 :::{note}
 This tutorial uses a SLURM container reachable over SSH so that every cell executes automatically during the docs build.
@@ -141,36 +138,30 @@ The key flags:
 - `--scheduler core.slurm`: jobs go through SLURM (`sbatch`, `squeue`, `scancel`). Other options include `core.pbspro`, `core.sge`, `core.lsf`, and `core.direct` (no scheduler, run immediately).
 - `--work-dir`: where AiiDA creates per-calculation working directories on the remote machine. `{username}` is expanded at runtime.
 
+On a real HPC cluster, the hostname typically is the cluster's login node and the work directory is on a scratch filesystem.
+
 ::::{tip}
-On a real HPC cluster the hostname would be the cluster's login node (e.g. `daint.alps.cscs.ch`), and the work directory typically a scratch filesystem.
-Instead of typing flags, you can pass a YAML file:
+Instead of providing individual CLI flags, you can also pass a YAML file:
 
 ```console
-$ verdi computer setup --config computer.yaml
+$ verdi computer setup --config slurm-ssh-setup.yaml
 ```
 
-:::{dropdown} Example `computer.yaml` for a SLURM cluster
+:::{dropdown} Example  `slurm-ssh-setup.yaml`
 ```yaml
----
-label: "daint"
-hostname: "daint.alps.cscs.ch"
-transport: "core.ssh_async"
-scheduler: "core.slurm"
-work_dir: "/scratch/{username}/aiida"
-mpirun_command: "srun -n {tot_num_mpiprocs}"
-mpiprocs_per_machine: 36
-prepend_text: |
-    module load cray-python
+label: slurm-ssh
+hostname: slurm-ssh
+transport: core.ssh_async
+scheduler: core.slurm
+work_dir: /home/{username}/workdir
+mpiprocs_per_machine: 1
 ```
 :::
 
 The [AiiDA resource registry](https://github.com/aiidateam/aiida-resource-registry) maintains ready-made YAML configs for common HPC centres.
 Download the one for your cluster and pass it directly.
-If your cluster is not listed yet, contributions are welcome: open a PR to add your YAML files so others can benefit too.
+If your cluster is not listed yet, contributions are more than welcome: open a PR to add your YAML files so others can benefit too.
 ::::
-
-Everything `verdi` can do is also available through the Python API.
-Look for the dropdowns below each section to see the equivalent Python code.
 
 :::{dropdown} Python API: computer setup
 ```python
@@ -193,13 +184,12 @@ computer = Computer(
 For `core.ssh_async`, AiiDA reads your `~/.ssh/config`, so as long as `ssh <hostname>` works from your terminal, the configure step needs no extra credentials:
 
 ```{code-cell} ipython3
-%verdi computer configure core.ssh_async slurm-ssh --backend openssh --non-interactive
+%verdi computer configure core.ssh_async slurm-ssh --safe-interval 0 --non-interactive
 ```
 
 :::{tip}
 `core.ssh_async` supports two SSH backends: `asyncssh` (the default, pure-Python) and `openssh` (shells out to the system's `ssh` binary).
-We use `--backend openssh` here because this tutorial's SLURM container runs an older OpenSSH server.
-On modern HPC clusters the default `asyncssh` backend works well; you can omit the `--backend` flag entirely.
+The default `asyncssh` backend works well for most use cases. The `openssh` backend can be useful when you need SSH connection multiplexing or have a complex SSH setup that asyncssh doesn't handle.
 :::
 
 :::{warning}
@@ -213,7 +203,7 @@ It requires configuring username, port, key path, and other SSH parameters throu
 computer.configure()
 ```
 
-`configure()` accepts the same keyword arguments as the `verdi computer configure` prompts (e.g. `host='slurm-ssh'`, `backend='openssh'`).
+`configure()` accepts the same keyword arguments as the `verdi computer configure` prompts (e.g. `host='slurm-ssh'`).
 :::
 
 ```{code-cell} ipython3
@@ -252,9 +242,9 @@ You now have two computers in your profile:
 With the computer in place, register the executable that lives on the cluster.
 AiiDA supports three code types:
 
-- **{ref}`InstalledCode <topics:data_types:core:code:installed>`** — the executable is already present on the computer. This is the common case: your simulation code is installed on the cluster.
-- **{ref}`PortableCode <topics:data_types:core:code:portable>`** — AiiDA stores the code in its repository and uploads it to the computer at run time. Useful for small scripts or tools you want to keep versioned in AiiDA.
-- **{ref}`ContainerizedCode <topics:data_types:core:code:containerized>`** — the executable runs inside a container (Singularity, Docker) on the computer.
+- **{ref}`InstalledCode <topics:data_types:core:code:installed>`**: the executable is already present on the computer. This is the common case: your simulation code is installed on the cluster.
+- **{ref}`PortableCode <topics:data_types:core:code:portable>`**: AiiDA stores the code in its repository and uploads it to the computer at run time. Useful for small scripts or tools you want to keep versioned in AiiDA.
+- **{ref}`ContainerizedCode <topics:data_types:core:code:containerized>`**: the executable runs inside a container (Singularity, Docker) on the computer.
 
 For an `InstalledCode`, you specify the path to the executable on the remote machine.
 Let's register `gsrd` on the tutorial's SLURM container:
@@ -305,15 +295,11 @@ Here are all codes registered in this profile:
 %verdi code list -A
 ```
 
-end of commented-out section -->
-
-
-<!-- TODO: re-enable once the SLURM container timeout is debugged
 
 ## Running on the cluster
 
 Here is the payoff.
-The `launch_shell_job` call from {ref}`Module 1 <tutorial:module1>` does not change at all — you swap the Code object, and the same calculation runs on the cluster:
+The `launch_shell_job` call from {ref}`Module 1 <tutorial:module1>` does not change at all. You swap the Code object, and the same calculation runs on the cluster:
 
 ```{code-cell} ipython3
 from pathlib import Path
@@ -364,7 +350,7 @@ print(f"variance(V) = {var_v:.4e}")
 print(f"mean(V)     = {mean_v:.4e}")
 ```
 
-Same numbers, same provenance — the only difference is where the computation ran.
+Same numbers, same provenance. The only difference is where the computation ran.
 
 ## Inspecting remote calculations
 
@@ -376,7 +362,7 @@ print(f"Remote working directory: {node.outputs.remote_folder.get_remote_path()}
 
 Two `verdi` commands make remote results tangible:
 
-- **`verdi calcjob gotocomputer <PK>`** opens an SSH session and drops you straight into that working directory on the cluster — invaluable for inspecting a job after it finished or failed.
+- **`verdi calcjob gotocomputer <PK>`** opens an SSH session and drops you straight into that working directory on the cluster. Invaluable for inspecting a job after it finished or failed.
 - **`verdi process dump <PK>`** (from {ref}`Module 1 <tutorial:module1>`) pulls the full inputs/outputs/logs tree to your local machine as readable files.
 
 ```{code-cell} ipython3
@@ -384,18 +370,16 @@ Two `verdi` commands make remote results tangible:
 ```
 
 The `Computer` column now reads `slurm-ssh` instead of `localhost`.
-Everything else — the input/output links, the exit status, the `verdi` commands you use to inspect it — is identical.
-
-end of commented-out section -->
+Everything else (the input/output links, the exit status, the `verdi` commands you use to inspect it) is identical.
 
 ## Next steps
 
 You can now run calculations on remote HPC clusters with full provenance.
 The remaining modules each pick up an independent thread and can be tackled in any order:
 
-- {ref}`Module 5 <tutorial:module5>` &mdash; querying the database with the `QueryBuilder`
-- {ref}`Module 6 <tutorial:module6>` &mdash; more advanced workflow patterns (conditionals, dynamic graphs, sub-workflow composition)
-- {ref}`Module 7 <tutorial:module7>` &mdash; handling failures and recovering from them
+- {ref}`Module 5 <tutorial:module5>`: querying the database with the `QueryBuilder`
+- {ref}`Module 6 <tutorial:module6>`: more advanced workflow patterns (conditionals, dynamic graphs, sub-workflow composition)
+- {ref}`Module 7 <tutorial:module7>`: handling failures and recovering from them
 
 ## Further reading
 
