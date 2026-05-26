@@ -175,7 +175,15 @@ Conditional logic (If/While), nested sub-workflows, and dynamic workflow constru
 
 +++
 
-*Coming soon*
+```{button-ref} module6
+:ref-type: doc
+:click-parent:
+:expand:
+:color: primary
+:outline:
+
+Go to Module 6
+```
 :::
 
 :::{grid-item-card} {fa}`shield-halved;mr-1` Module 7: Error handling

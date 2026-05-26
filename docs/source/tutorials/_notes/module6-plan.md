@@ -106,8 +106,17 @@ Module 5 closed with a satisfying payoff (rebuild the M2 plot from QB alone). Mo
 
 - WorkChain-style API (`while_()`, `if_()`, `@process_handler`). That's Module 7's territory unless judgment call #3 says otherwise.
 - Multi-parameter (F &times; k) phase diagrams. Mentioned in the boss notes as "advanced topics" but a clean adaptive single-parameter story already exercises every feature this module needs.
-- Remote submission. The module assumes local execution; the `metadata.options` story for remote belongs to Module 4.
+> JG: could be something we at least show somewhere once, though, no? As the 2D plot, would be nice, and not as boring as a single sweep!
+>
+> CC: Agreed it's visually nicer. I left it out of M6 because mechanically a 2D phase diagram is just `Map`-of-`Map` (or one `Map` over the Cartesian product), which doesn't really demonstrate a new M6 feature; M3 introduces `Map`, so the cleanest place to slot it is *as an extension of M3*, not M6. Cost is real though: 8 F &times; 8 k = 64 gsrd runs (~2 min in CI at `n_steps=3000`). My instinct: leave it for now, drop the 2D plot into the *teaser* page (the commented-out `AiiDA in Action` card on `tutorials/index.md`) where it earns its keep visually rather than pedagogically. Happy to add it to M3 instead if you'd rather, let me know.
+- Remote submission. The module assumes local execution; the `metadata.options` story for remote belongs to Module 4
+> JG: yes, run locally here, keep remote to module 4
+>
+> CC: Confirmed, kept local. Done.
 - Heavy theory of dataflow / Petri nets / process algebras. Keep the framing operational.
+> JG: wtf is that?
+>
+> CC: Just pre-emptively heading off a rabbit hole &mdash; a WorkGraph is, in CS theory, a "dataflow graph" (computations as nodes, values as edges), and the same idea has been formalised under names like Petri nets and process algebras. Pure trivia for the tutorial's audience. Dropped from anything reader-facing; left this bullet in the plan only because the boss notes mentioned the keywords.
 
 ## Notes pulled in from elsewhere
 

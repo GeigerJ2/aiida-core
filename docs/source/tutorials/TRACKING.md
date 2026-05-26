@@ -134,14 +134,15 @@ Development-only checklist. Tracks what each module should teach and current sta
 
 ---
 
-## Module 6: Complex workflows (coming soon)
+## Module 6: Complex workflows
 
 **Goal:** Conditional logic, nested sub-workflows, dynamic construction.
 
-- [ ] If/While context managers
-- [ ] Nested sub-workflows
-- [ ] Dynamic workflow construction
-- [ ] Error handlers within workflows
+- [x] `If` zone (conditional FFT analysis gated on `variance_V`)
+- [x] `While` zone with `wg.ctx` for iterative state (extend `n_steps` until saturation), plus dropdown on `dt`-convergence vs `tmax`-convergence
+- [x] Nested sub-workflows (`@task.graph()` composition: `pipeline_with_optional_fft` inside `conditional_sweep`; `simulate` sub-graph reused twice inside `adaptive_sweep`)
+- [x] Dynamic workflow construction (`identify_transition_region` builds the refined `Map` source at runtime)
+- [x] Error handlers moved to Module 7 (depends on Module 1 "Handling failures" being filled in first; the gsrd CLI's always-exit-0 behaviour also makes the standalone error-handler example contrived without a custom shell parser, see notes)
 
 ---
 
@@ -149,8 +150,9 @@ Development-only checklist. Tracks what each module should teach and current sta
 
 **Goal:** Exit code checking, error handlers, automatic retries.
 
-- [ ] Exit codes and how AiiDA uses them
-- [ ] Defining error handlers
+- [ ] Exit codes and how AiiDA uses them (foundation; depends on Module 1 "Handling failures" subsection landing first)
+- [ ] WorkGraph error handlers (`ErrorHandlerSpec`) — moved here from the Module 6 plan
+- [ ] WorkChain error handlers (`@process_handler`)
 - [ ] Automatic retries with modified inputs
 - [ ] Combining error handling with workflows
 
