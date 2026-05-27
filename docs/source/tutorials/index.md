@@ -186,15 +186,23 @@ Go to Module 6
 ```
 :::
 
-:::{grid-item-card} {fa}`shield-halved;mr-1` Module 7: Error handling
+:::{grid-item-card} {fa}`compass;mr-1` Module 7: Where to go next
 :text-align: center
 :shadow: md
 
-Exit code checking, error handlers, and automatic retries in your workflows.
+Error handlers, CalcJob plugins, WorkChains, caching, and a map of the wider plugin ecosystem.
 
 +++
 
-*Coming soon*
+```{button-ref} module7
+:ref-type: doc
+:click-parent:
+:expand:
+:color: primary
+:outline:
+
+Go to Module 7
+```
 :::
 ::::
 

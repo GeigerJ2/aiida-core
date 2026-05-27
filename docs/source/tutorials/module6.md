@@ -57,8 +57,8 @@ WorkGraph supports all these use cases through three additional building blocks,
 
 - `If` and `While` are **control-flow regions**, written as Python context managers in your graph definition; they select which tasks belong to a region of the graph that may run zero, one, or many times.
 
-  :::{tip} A note on terminology
-  :class: dropdown
+  :::{dropdown} A note on terminology
+  :icon: info
   aiida-workgraph calls these *zone tasks* in its API. The underlying idea is the same as a *sub-process* in BPMN, a *TaskGroup* in Airflow, or a *region* in a compiler control-flow graph &mdash; a region of the graph that groups tasks under structured control flow.
   :::
 - The graph's `ctx` is a shared, mutable key-value store, the WorkGraph analogue of the WorkChain `ctx`. Writing into it from inside a `While` region is what lets the loop iterate over evolving state.
@@ -341,8 +341,9 @@ wg_loop = extend_to_plateau.build(
 )
 ```
 
-:::{note} The same loop with a named predicate task
-:class: dropdown
+:::{dropdown} The same loop with a named predicate task
+:icon: info
+
 For a one-line `>=`, the operator-overload form above is concise and consistent with the rest of the module. If the stopping criterion were more involved (multi-line logic, a learned classifier, pattern detection on the V-field), wrapping it as a `@task()` makes the graph self-documenting and gives the predicate a meaningful name in the provenance:
 
 ```python

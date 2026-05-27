@@ -233,7 +233,18 @@ From the command line, `verdi calcjob gotocomputer <PK>` SSHes into the Computer
 
 Now to the actual numbers.
 Recall from {ref}`Module 0 <tutorial:module0>` that `gsrd` splits its output across two places: the arrays go into `results.npz`, but the scalar diagnostics (`variance(V)`, `mean(V)`) appear *only* on stdout.
-Both are now tracked by AiiDA: the binary file is a {py:class}`~aiida.orm.SinglefileData` node, and `stdout` is a captured-text node we can open just like any other:
+Both are now tracked by AiiDA: the binary file is a {py:class}`~aiida.orm.SinglefileData` node, and `stdout` is a captured-text node we can open just like any other.
+
+For reference, this is what `gsrd` actually printed &mdash; the banner, the parsed parameters, the periodic progress lines, and the diagnostics block at the end:
+
+```{code-cell} ipython3
+# Show the raw stdout captured by AiiDA. Module 2 turns this into a tracked parser
+# (see `parse_output`); from then on, the banner and progress chatter are still
+# captured but the headline scalars are also available as queryable `Float` nodes.
+print(node.outputs.stdout.get_content())
+```
+
+In later modules we extract just the diagnostics block from this text, so the banner and progress lines are elided from the displayed output. They are always present in the captured stdout node, just collapsed for readability.
 
 ```{code-cell} ipython3
 # Pull the final V field out of the .npz, and grep the scalars out of stdout.
@@ -258,8 +269,8 @@ print(f"mean(V)     = {mean_v:.4e}")
 That regex is the price of admission for a code that prints its headline scalars only to stdout.
 We did exactly the same thing manually in {ref}`Module 0 <tutorial:module0>`; the difference now is that the stdout text, the regex result, and the input that produced them all live as tracked nodes in the provenance graph. {ref}`Module 2 <tutorial:module2>` turns this hand-written extraction into a proper {func}`@calcfunction <aiida.engine.processes.functions.calcfunction>`, so it becomes a first-class step in the pipeline.
 
-:::{tip} Interactive exploration with&nbsp;`verdi shell`
-:class: dropdown
+:::{dropdown} Interactive exploration with&nbsp;`verdi shell`
+:icon: info
 
 Notebooks are great for tutorials, but day-to-day debugging often happens in a shell.
 `verdi shell` drops you into an IPython session with your active profile already loaded, plus a handful of convenience symbols imported:

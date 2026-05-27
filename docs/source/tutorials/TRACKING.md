@@ -38,7 +38,8 @@ Development-only checklist. Tracks what each module should teach and current sta
 - [x] `verdi process show` and `verdi process list`
 - [x] Provenance graph visualization
 - [x] `verdi process dump` (export calculation data to disk)
-- [x] `verdi shell` subsection added as a foldable tip admonition (interactive database exploration: `load_node`, output traversal, QueryBuilder shorthand)
+- [x] `verdi shell` subsection added as a foldable dropdown (interactive database exploration: `load_node`, output traversal, QueryBuilder shorthand)
+- [x] Raw `gsrd` stdout shown once via `print(node.outputs.stdout.get_content())` so the banner + progress lines are visible at least once. Later modules elide them but they are always captured in the stdout node.
 - [ ] Handling failures section (re-run with F=0.1, show AiiDA records failed CalcJob, contrast with Module 0)
 
 ---
@@ -155,15 +156,24 @@ Development-only checklist. Tracks what each module should teach and current sta
 
 ---
 
-## Module 7: Error handling (coming soon)
+## Module 7: Where to go next
 
-**Goal:** Exit code checking, error handlers, automatic retries.
+**Goal:** Survey module &mdash; error handling, CalcJob plugins, WorkChains, caching, plugin ecosystem.
 
-- [ ] Exit codes and how AiiDA uses them (foundation; depends on Module 1 "Handling failures" subsection landing first)
-- [ ] WorkGraph error handlers (`ErrorHandlerSpec`) — moved here from the Module 6 plan
-- [ ] WorkChain error handlers (`@process_handler`)
-- [ ] Automatic retries with modified inputs
-- [ ] Combining error handling with workflows
+- [x] Module retitled "Where to go next" (was "Error handling"); broadened scope per the M7 plan in `_notes/module7-plan.md`
+- [x] Error handling section: synthetic `gsrd` failure (`dt = 10.0` &rarr; numerical instability &rarr; missing `results.npz` &rarr; ShellJob exit 303), WorkGraph error handler (`add_error_handler`) that halves `dt` and rebuilds the YAML input as a fresh `SinglefileData`, ShellJob retries and succeeds. Both attempts visible in provenance.
+- [x] "When to write an error handler &mdash; and when not to" dropdown (transient/recoverable vs hard programmer errors)
+- [x] WorkChain `@process_handler` callout pointing at `BaseRestartWorkChain` and `how-to:restart-workchain`
+- [x] CalcJob plugin section: motivation, sketch of `GsrdCalculation` subclass (`define`, `prepare_for_submission`, exit codes), entry-point wiring snippet, pointer to `how-to:plugin-codes` and `aiida-plugin-cutter`
+- [x] "How to choose &mdash; `aiida-shell` vs a CalcJob plugin" dropdown
+- [x] WorkChain side-by-side section: `MultiplyAddWorkChain` via `{literalinclude}` of `src/aiida/workflows/arithmetic/multiply_add.py`, comparison table (mental model, state passing, dynamic graphs, ecosystem, when to pick which)
+- [x] Caching section: single-ShellJob demo (`enable_caching` context manager, `node.base.caching.get_cache_source()`, `verdi process list -P pk process_label exit_status cached_from`), plus a sweep cache demo on `gray_scott_sweep` showing ~Nx speedup on the second run
+- [x] "Local vs daemon caching" important admonition (`enable_caching` only affects local interpreter; `verdi config set caching.default_enabled True` for the daemon)
+- [x] "Caveats &mdash; what gets cached" dropdown (plugin author marking hashable inputs, `_aiida_hash`, `_hash_ignored_inputs`)
+- [x] Plugin ecosystem 8-card grid: aiida-project, aiida-hyperqueue, aiida-workgraph, aiida-shell, aiida-submission-controller, aiida-code-registry, AiiDAlab, domain plugins
+- [x] "Where to go next" closing pointers: write a CalcJob plugin, write a parser, try a domain plugin, browse the registry, AiiDA Discourse, CONTRIBUTING.md
+- [x] `tutorials/index.md` M7 card updated: title "Where to go next", description rewritten, button now active (was "Coming soon")
+- [ ] Optional: synthetic-failure section currently uses `dt = 10.0` instability; could also demo a walltime-style recovery once M4-style remote runs are reachable from the tutorial profile
 
 ---
 
@@ -175,4 +185,5 @@ Development-only checklist. Tracks what each module should teach and current sta
 - [x] Shared workflows: `workflows.py` (`gray_scott_pipeline` with `GrayScottOutputs` TypedDict exposing `variance_V`, `mean_V`, `results_npz` so M6 can reuse the same pipeline)
 - [x] **gsrd** package: removed the `TrivialStateError` post-hoc quality gate (`simulate.py` no longer raises when V decays to the trivial state), so dead-zone `(F, k)` combinations now report `variance(V) ≈ 0` instead of failing the ShellJob. This unblocks the M3 2D phase-diagram sweep without needing error handling. Other failure modes (`DiffusionError`, `TimeStepError`, `InstabilityError`) intact &mdash; still material for M7.
 - [x] Static images: `reaction-diffusion-fields.png`, `reaction-diffusion-fields-2.png`
+- [x] Sphinx `-W` admonition cleanup: converted `:::{tip}/:note: <title> :class: dropdown` into plain `:::{dropdown} <title> :icon: info` across M1, M6, M7. The sphinx-design renderer treats the former as "splitting content across first line and body with options", which becomes a hard error under `-W`. Affected lines were M1:261, M6:60, M6:344, plus the five new admonitions in M7.
 - [ ] Compare the new modules against the classic tutorial (`basic.md`); check nothing important was dropped (per 2026-05-12 notes)

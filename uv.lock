@@ -220,7 +220,7 @@ requires-dist = [
     { name = "flask-cors", marker = "extra == 'rest'", specifier = "~=4.0" },
     { name = "flask-restful", marker = "extra == 'rest'", specifier = "~=0.3.10" },
     { name = "graphviz", specifier = "~=0.19" },
-    { name = "gsrd", marker = "extra == 'tutorials'", git = "https://github.com/aiidateam/gsrd.git?rev=main" },
+    { name = "gsrd", marker = "extra == 'tutorials'", git = "https://github.com/GeigerJ2/gsrd.git?rev=fix%2Fdont-raise-on-trivial-state" },
     { name = "gssapi", marker = "extra == 'ssh-kerberos'", specifier = "~=1.6" },
     { name = "ipykernel", marker = "extra == 'tests'", specifier = "~=6.9" },
     { name = "ipython", specifier = ">=7.6" },
@@ -1841,7 +1841,7 @@ wheels = [
 [[package]]
 name = "gsrd"
 version = "0.1.0"
-source = { git = "https://github.com/aiidateam/gsrd.git?rev=main#568d5211cf27cf55c22c1714723b815bc14aecfe" }
+source = { git = "https://github.com/GeigerJ2/gsrd.git?rev=fix%2Fdont-raise-on-trivial-state#a246798f01c1ccbd7e1c51f50fcb7066e500716e" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
