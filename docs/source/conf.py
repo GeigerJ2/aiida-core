@@ -147,6 +147,14 @@ nb_mime_priority_overrides = [
     ('gettext', 'text/markdown', 60),
     ('gettext', 'text/latex', 70),
     ('gettext', 'text/plain', 80),
+    # HTML builders: prefer text/html over the Jupyter widget-view mime, so
+    # that printing a bare WorkGraph in a cell renders the self-contained
+    # srcdoc-iframe returned by ``WorkGraph._repr_html_`` (the interactive
+    # Rete.js viewer) instead of the widget-view mime, which only works in
+    # live Jupyter sessions with the ipywidgets JS bundle loaded.
+    ('html', 'text/html', 5),
+    ('dirhtml', 'text/html', 5),
+    ('singlehtml', 'text/html', 5),
 ]
 
 # -- Options for HTML output ---------------------------------------------------

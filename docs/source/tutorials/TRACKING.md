@@ -38,7 +38,7 @@ Development-only checklist. Tracks what each module should teach and current sta
 - [x] `verdi process show` and `verdi process list`
 - [x] Provenance graph visualization
 - [x] `verdi process dump` (export calculation data to disk)
-- [ ] `verdi shell` subsection (interactive database exploration)
+- [x] `verdi shell` subsection added as a foldable tip admonition (interactive database exploration: `load_node`, output traversal, QueryBuilder shorthand)
 - [ ] Handling failures section (re-run with F=0.1, show AiiDA records failed CalcJob, contrast with Module 0)
 
 ---
@@ -93,6 +93,10 @@ Development-only checklist. Tracks what each module should teach and current sta
 - [x] Analyze results (print variances, plot transition curve)
 - [x] Comparison table: AiiDA core concepts vs WorkGraph concepts
 - [x] Control flow: dropped from M3, added link to Module 6 in Further Reading
+- [x] `gray_scott_pipeline` promoted to `include/workflows.py` (canonical home), with M3 using `{literalinclude}` to display the source and `from include.workflows import gray_scott_pipeline` to bring it into the kernel. Pipeline now also exposes `results_npz` so Module 6 can read the V-field for the FFT diagnostic.
+- [x] Interactive WorkGraph viz cells (`wg_preview`, `wg_sweep`) using bare-`wg` trailing expression + `nb_mime_priority_overrides` flip in `conf.py` so the self-contained Rete.js srcdoc iframe renders inline.
+- [x] Closing 2D F&times;k phase-diagram section: 5&times;5 `Map`-over-Cartesian-product through the same `gray_scott_sweep`, rendered as a log-scale heatmap via `plot_2d_variance_heatmap` in `include/plotting.py`.
+- [x] `wg_sweep.outputs.summary_plot.value` dereference now works against current aiida-workgraph; embedded transition curve PNG inline at the end of the sweep section (previously a `# TODO:` block).
 
 ---
 
@@ -140,9 +144,14 @@ Development-only checklist. Tracks what each module should teach and current sta
 
 - [x] `If` zone (conditional FFT analysis gated on `variance_V`)
 - [x] `While` zone with `wg.ctx` for iterative state (extend `n_steps` until saturation), plus dropdown on `dt`-convergence vs `tmax`-convergence
-- [x] Nested sub-workflows (`@task.graph()` composition: `pipeline_with_optional_fft` inside `conditional_sweep`; `simulate` sub-graph reused twice inside `adaptive_sweep`)
+- [x] Nested sub-workflows (`@task.graph()` composition: `pipeline_with_optional_fft` inside `conditional_sweep`; all three featured graphs reuse the shared `gray_scott_pipeline` from `include/workflows.py`)
 - [x] Dynamic workflow construction (`identify_transition_region` builds the refined `Map` source at runtime)
 - [x] Error handlers moved to Module 7 (depends on Module 1 "Handling failures" being filled in first; the gsrd CLI's always-exit-0 behaviour also makes the standalone error-handler example contrived without a custom shell parser, see notes)
+- [x] `help(If)`, `help(While)`, `help(Map)` signature cells at first introduction of each control-flow region (foldable behind a "Show signature" toggle).
+- [x] Interactive WorkGraph viz cells after every substantial graph definition (`pipeline_with_optional_fft`, `extend_to_plateau`, `conditional_sweep`, `adaptive_sweep`), each with a one-sentence prose hint pointing at the specific tasks/edges to look for.
+- [x] `:::{important}` admonition on `wg.ctx`: explains *why* it exists (only channel for state across `While` iterations, since the loop body is a static sub-graph) and flags the type-safety gap honestly (same complaint people have raised about WorkChain `ctx`).
+- [x] `:::{note}` admonition on `get_current_graph()`: explains the `ContextVar`-based "ambient graph" pattern (Flask `current_app`-style dynamic scoping).
+- [x] FFT diagnostic plot (`plot_fft_spectrum` in `include/plotting.py`): 2D power spectrum + radial profile, called right after the descendants-diff cell so the reader can *see* what the `If`-gated FFT recovered.
 
 ---
 
@@ -161,7 +170,9 @@ Development-only checklist. Tracks what each module should teach and current sta
 ## Cross-cutting concerns (not module-specific)
 
 - [ ] Teaser page (AiiDA in Action demo, currently commented out in index)
-- [x] Shared include files: `constants.py`, `tasks.py`, `setup_tutorial.py` (custom `reaction-diffusion.py` replaced by the `gsrd` package, a docs dep in `pyproject.toml` `[project.optional-dependencies.tutorials]`)
-- [x] Shared plot helpers: `plotting.py` (`plot_provenance`, `plot_transition_curve`, `plot_uv_fields`)
+- [x] Shared include files: `constants.py`, `tasks.py`, `setup_tutorial.py`, `workflows.py` (custom `reaction-diffusion.py` replaced by the `gsrd` package, a docs dep in `pyproject.toml` `[project.optional-dependencies.tutorials]`)
+- [x] Shared plot helpers: `plotting.py` (`plot_provenance`, `plot_transition_curve`, `plot_uv_fields`, `plot_2d_variance_heatmap`, `plot_fft_spectrum`)
+- [x] Shared workflows: `workflows.py` (`gray_scott_pipeline` with `GrayScottOutputs` TypedDict exposing `variance_V`, `mean_V`, `results_npz` so M6 can reuse the same pipeline)
+- [x] **gsrd** package: removed the `TrivialStateError` post-hoc quality gate (`simulate.py` no longer raises when V decays to the trivial state), so dead-zone `(F, k)` combinations now report `variance(V) ≈ 0` instead of failing the ShellJob. This unblocks the M3 2D phase-diagram sweep without needing error handling. Other failure modes (`DiffusionError`, `TimeStepError`, `InstabilityError`) intact &mdash; still material for M7.
 - [x] Static images: `reaction-diffusion-fields.png`, `reaction-diffusion-fields-2.png`
 - [ ] Compare the new modules against the classic tutorial (`basic.md`); check nothing important was dropped (per 2026-05-12 notes)

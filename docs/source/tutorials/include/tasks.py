@@ -17,8 +17,9 @@ from typing import Annotated, TypedDict
 
 import numpy as np
 import yaml
-from aiida import engine, orm
 from aiida_workgraph import dynamic, task
+
+from aiida import engine, orm
 
 _VARIANCE_RE = re.compile(r'Variance of V field\s*:\s*([\d.eE+-]+)')
 _MEAN_RE = re.compile(r'Mean\s+of V field\s*=\s*([\d.eE+-]+)')
@@ -69,12 +70,22 @@ def make_transition_plot(variances: Annotated[dict, dynamic(float)]) -> orm.Sing
     """
     import matplotlib.pyplot as plt
 
-    def _key_to_f(key: str) -> float:
-        """Reverse the `F_0_038` → 0.038 encoding used by `param_sweep`."""
-        _, integer, fractional = key.split('_')
-        return float(f'{integer}.{fractional}')
+    def _key_to_f(key: str) -> float | None:
+        """Reverse the `F_0_038` → 0.038 encoding used by `param_sweep`.
 
-    items = sorted((_key_to_f(k), float(v)) for k, v in variances.items())
+        Returns ``None`` for keys that don't follow the 1D `F_<int>_<frac>`
+        shape (e.g. multi-parameter sweep keys), so callers can skip them
+        instead of crashing.
+        """
+        parts = key.split('_')
+        if len(parts) != 3 or parts[0] != 'F':
+            return None
+        try:
+            return float(f'{parts[1]}.{parts[2]}')
+        except ValueError:
+            return None
+
+    items = sorted((f, float(v)) for k, v in variances.items() if (f := _key_to_f(k)) is not None)
     f_values = [f for f, _ in items]
     var_values = [v for _, v in items]
 

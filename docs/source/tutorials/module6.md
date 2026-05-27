@@ -25,9 +25,9 @@ If you are following along locally, run those first.
 
 After this module, you will be able to:
 
-- Decide a workflow's **shape at runtime** using `If` and `While` zone tasks, so steps run only when they should and loops iterate until convergence.
-- Construct a workflow's structure from data that **was not known in advance**, using a calcfunction to turn coarse-sweep results into a refined parameter set.
-- Pull these features together into an **adaptive sweep** that focuses computational effort where the physics is most interesting.
+- Decide a workflow's **shape at runtime** using `If` and `While` control-flow regions, so steps run only when they should and loops iterate until convergence.
+- Construct parts of a workflow's structure from **data that wasn't known when you wrote the graph**, using a calcfunction as the bridge between an earlier stage's outputs and a later stage's parameter set.
+- Combine these features into a single workflow whose shape **emerges at runtime** from its own intermediate results.
 
 ```{code-cell} ipython3
 :tags: ["remove-cell"]
@@ -53,16 +53,21 @@ Real research is rarely that tidy:
 - A simulation has a free parameter (a time step, a tolerance, a grid size) that has to be *driven* until a quantity stabilises.
 - The interesting parameter range only becomes clear *after* a first cheap scan.
 
-WorkGraph supports all three through three small pieces of machinery, on top of what you already know:
+WorkGraph supports all these use cases through three additional building blocks, on top of what you already know:
 
-- `If` and `While` are **zone tasks**, written as Python context managers in your graph definition; they select which tasks belong to a region of the graph that may run zero, one, or many times.
-- The graph's `ctx` is a shared, mutable key-value store, the WorkGraph analogue of the WorkChain `ctx`. Writing into it from inside a `While` zone is what lets the loop iterate over evolving state.
+- `If` and `While` are **control-flow regions**, written as Python context managers in your graph definition; they select which tasks belong to a region of the graph that may run zero, one, or many times.
+
+  :::{tip} A note on terminology
+  :class: dropdown
+  aiida-workgraph calls these *zone tasks* in its API. The underlying idea is the same as a *sub-process* in BPMN, a *TaskGroup* in Airflow, or a *region* in a compiler control-flow graph &mdash; a region of the graph that groups tasks under structured control flow.
+  :::
+- The graph's `ctx` is a shared, mutable key-value store, the WorkGraph analogue of the WorkChain `ctx`. Writing into it from inside a `While` region is what lets the loop iterate over evolving state.
 - Any calcfunction whose output is a `dict` can be used to **build a parameter set for a downstream `Map`**, because calcfunctions are AiiDA processes whose outputs flow through normal socket connections.
 
 :::{important}
-The single mental shift this module is built on is this: **the workflow graph is data that you build**.
-Once you accept that, control flow is just normal Python that *adds tasks* to the graph, gated on the outputs of *other* tasks.
-`If`, `While`, and `Map` zones don't run Python branches; they declare regions of the graph whose execution is decided at runtime by AiiDA from the values of the sockets you wired in.
+This module pushes Module 3's central insight further: **the workflow graph is data that you build**, and control flow is just normal Python that *adds tasks* to the graph, gated on the outputs of *other* tasks.
+`If`, `While`, and `Map` regions don't run Python branches; they declare regions of the graph whose execution is decided at runtime by AiiDA from the values of the sockets you wired in.
+(See the Module 3 *"building and running are separate steps"* callout if the sockets-vs-values distinction is not fresh.)
 :::
 
 ## Conditional analysis with `If`
@@ -84,49 +89,78 @@ help(fft_peak_wavelength)
 
 The recipe is the gating itself.
 We extend the Module 3 pipeline with one `If` zone: the FFT task is only added to the *running* graph when the cheap predicate exceeds a threshold.
+`If` is a Python context manager that takes a *condition socket* and an optional `invert_condition` flag (useful for `else`-style zones):
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show `If` signature and docstring'
+:    code_prompt_hide: 'Hide signature'
+
+from aiida_workgraph import If
+help(If)
+```
+
+With the signature in hand, the building blocks are the same as Module 3.
+We import `gray_scott_pipeline` from `include/workflows.py` &mdash; the canonical version we wrote there exposes `variance_V`, `mean_V`, *and* `results_npz`, so the FFT downstream can read the V-field directly.
 
 ```{code-cell} ipython3
 from typing import Annotated
 
 from aiida import orm
-from aiida_workgraph import If, task, shelljob
+from aiida_workgraph import If, task
 
 from include.constants import BASE_PARAMS
-from include.tasks import prepare_input, parse_output
+from include.workflows import gray_scott_pipeline
+```
 
+`pipeline_with_optional_fft` then becomes a thin wrapper: call `gray_scott_pipeline`, and gate the FFT on the variance socket.
 
+```{code-cell} ipython3
 @task.graph()
 def pipeline_with_optional_fft(
     parameters: orm.Dict,
     command: orm.AbstractCode,
     variance_threshold: float,
 ):
-    """Run gsrd, parse it, and run an FFT analysis *only if* the run looks interesting."""
-    prepared = task(prepare_input)(parameters=parameters)
-    simulation = shelljob(
-        command=command,
-        arguments=['{input}'],
-        nodes={'input': prepared.result},
-        outputs=['results.npz'],
-    )
-    parsed = task(parse_output)(stdout=simulation.stdout)
-
-    with If(parsed.variance_V > variance_threshold):
-        task(fft_peak_wavelength)(results_npz=simulation.results_npz)
+    """Run the Module 3 pipeline, then run the FFT only if the run looks interesting."""
+    result = gray_scott_pipeline(parameters=parameters, command=command)
+    with If(result.variance_V > variance_threshold):
+        task(fft_peak_wavelength)(results_npz=result.results_npz)
 ```
 
 :::{note}
 Two details worth noticing:
 
-- **`parsed.variance_V > variance_threshold` is not a Python boolean.** It is a comparison between an output socket and a value, which WorkGraph compiles into a tiny operator task whose output is itself a socket. That socket is what `If(...)` reads to decide whether to enter the zone at runtime.
+- **`result.variance_V > variance_threshold` is not a Python boolean.** It is a comparison between an output socket and a value, which WorkGraph compiles into a tiny operator task whose output is itself a socket. That socket is what `If(...)` reads to decide whether to enter the zone at runtime.
 - **The body of the `with If(...)`** is not skipped at definition time. Every task inside it is registered into the graph; it is the *execution* of those tasks that the zone gates. This is the same dual-life idea as Module 3's `Map`: build now, decide later.
 :::
 
-To see the difference, build the same workflow twice with the same threshold but different `F`.
+The graph shape itself makes this concrete: an automatically inserted comparison task (`op_gt`) reads `variance_V` and feeds its boolean output into the `if_zone`, whose single child is `fft_peak_wavelength`. Everything outside the `if_zone` runs unconditionally; the FFT task runs only when the comparison output is `True`.
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show interactive workflow graph'
+:    code_prompt_hide: 'Hide interactive workflow graph'
+
+pipeline_with_optional_fft.build(
+    parameters=orm.Dict({**BASE_PARAMS, 'F': 0.040}),
+    command=gsrd_code,
+    variance_threshold=0.005,
+)
+```
+
+To see the *execution-time* difference, build the same workflow twice with the same threshold but different `F`.
 At `F = 0.04` the pattern is strong (`variance(V) ≈ 1e-2`), so the FFT fires.
 At `F = 0.060` the pattern is much weaker (`variance(V) ≈ 5e-4`), so the FFT is skipped entirely.
 
 ```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show workflow execution log'
+:    code_prompt_hide: 'Hide workflow execution log'
+
 wg_strong = pipeline_with_optional_fft.build(
     parameters=orm.Dict({**BASE_PARAMS, 'F': 0.040}),
     command=gsrd_code,
@@ -142,17 +176,66 @@ wg_weak.run()
 ```
 
 ```{code-cell} ipython3
-def labels_in(process):
+:tags: [hide-input]
+:mystnb:
+:    code_prompt_show: 'Show inspection code (helper that returns descendant count and process labels)'
+
+
+def descendants(process):
     return sorted({c.process_label for c in process.called_descendants})
 
 
-print(f'F = 0.040 ({len(wg_strong.process.called_descendants)} child processes): {labels_in(wg_strong.process)}')
-print(f'F = 0.060 ({len(wg_weak.process.called_descendants)} child processes): {labels_in(wg_weak.process)}')
+def show(label, items):
+    print(f'{label}:')
+    for item in items:
+        print(f'    - {item}')
+
+
+strong = descendants(wg_strong.process)
+weak = descendants(wg_weak.process)
+
+show('F = 0.040', strong)
+print()
+show('F = 0.060', weak)
+print()
+show('Only in F = 0.040', sorted(set(strong) - set(weak)))
 ```
 
 The first run records a `fft_peak_wavelength` process; the second doesn't. Both runs took the same code through the same `@task.graph()` definition; the **shape** of what AiiDA ran (and recorded) is different.
 
-::::{dropdown} A different shape: skip an expensive *rerun*, not an expensive *analysis*
+What did that FFT actually see?
+The strong-pattern V-field, when transformed into k-space, shows a ring of energy at a characteristic radius &mdash; that radius is the inverse of the dominant pattern wavelength.
+The radial profile picks out the peak:
+
+```{code-cell} ipython3
+:tags: [hide-input]
+:mystnb:
+:    code_prompt_show: 'Show inspection code (recover the strong run''s `results.npz` from provenance)'
+
+from include.plotting import plot_fft_spectrum
+
+strong_npz = next(
+    c for c in wg_strong.process.called_descendants
+    if c.process_label == 'ShellJob<gsrd@localhost>'
+).outputs.results_npz
+plot_fft_spectrum(strong_npz)
+```
+
+::::{dropdown} What am I looking at? The physics of the FFT panels
+:icon: question
+
+The Gray-Scott V-field is a 2D image. The **2D Fourier transform** decomposes that image into a sum of plane waves &mdash; sinusoidal patterns of varying *wavelength* and *direction*. Each pixel in the left panel corresponds to one plane wave: its position `(k_x, k_y)` is the wave's spatial frequency in each direction, and its brightness is how much of that wave is in the original V-field.
+
+The **centre** of the panel (`k_x = k_y = 0`) is the "DC component" &mdash; the spatial average of V. We subtract the mean before the FFT (`centred = v_field - v_field.mean()`) so this term sits near zero and doesn't drown out the pattern.
+
+A **uniform field** would show energy only at the centre. A **field with a single dominant wavelength** &mdash; the case here &mdash; shows a *ring* of energy at one radius: the wavelength sets the radius, but the pattern has no preferred orientation, so the energy is spread around the ring. That is exactly the structure you see: a bright annulus around the centre, with the diamond-pattern lobes coming from the square grid's discrete sampling.
+
+The **radial profile** (right panel) collapses that 2D image to 1D by averaging over all angles at each radius `k`. The peak in this 1D curve is the dominant radial wavenumber `k_peak`. Converting back to real space: a pattern with wavenumber `k` repeats every `(grid_size / k)` cells, so `k_peak = 4` on a `64`-cell grid means the dominant feature has a **wavelength of about 16 cells** &mdash; roughly four stripes/spots across the simulation box, which matches what you can see by eye in the V-field image from Module 2.
+
+The peak shifts as the pattern type changes (spots vs stripes vs labyrinthine), which is why the wavelength is a useful diagnostic to gate downstream analysis on, rather than just "is there a pattern at all" (which `variance(V)` already captures).
+::::
+
+::::{dropdown} A different shape: skip an expensive&nbsp;*rerun*, not an expensive&nbsp;*analysis*
 :icon: code
 
 The same `If` machinery covers the related case where the expensive thing isn't a post-processing task but a *second simulation* (e.g., a higher-resolution rerun for runs that look pattern-forming).
@@ -185,58 +268,126 @@ That kind of feedback loop needs three things WorkGraph exposes through `wg.ctx`
 - A condition that **reads** ctx and is recomputed every iteration (the `While(...)` argument).
 - Tasks inside the zone that **write back** into ctx, so the next iteration sees updated values.
 
-To express the loop directly we drop into WorkGraph's imperative form (`with WorkGraph() as wg:`).
-This is the same WorkGraph object you would get from `@task.graph().build(...)`; the imperative form just gives us a name (`wg`) we can attach `wg.ctx` to.
+To attach `wg.ctx = {...}` from inside a `@task.graph()` body, we need a handle on the graph being built.
+`get_current_graph()` returns that handle: it gives us the same `WorkGraph` object `@task.graph().build(...)` would return, while we are still inside the decorated function.
+
+:::{note}
+Under the hood, `get_current_graph()` reads from a [`ContextVar`](https://docs.python.org/3/library/contextvars.html) that aiida-workgraph sets before invoking the decorated body (the same mechanism `with WorkGraph() as wg:` uses internally).
+That makes the "current graph" an *ambient* value scoped to the executing coroutine or thread, in the same spirit as Flask's `current_app` or Django's request-local user.
+The trade-off is ergonomics versus explicitness: it lets the `If` / `While` / `Map` context managers work without you passing `wg` around, at the cost of the dependency being implicit at the call site.
+:::
+
+:::{important}
+**About `wg.ctx`**: think of it as the engine's per-graph dictionary that survives between iterations and between zones.
+It is the WorkGraph analogue of the WorkChain `ctx` in aiida-core, and it is the *only* channel a `While` body has to thread state from one iteration to the next: the loop body is a *static* sub-graph (built once, executed many times), so the engine has no Python frame to carry local variables across repetitions. Without `ctx`, the growing `n_steps` could not survive the jump from "end of iteration `n`" to "start of iteration `n+1`".
+
+It is also **untyped on purpose**: `wg.ctx = {'parameters': initial, 'done': orm.Bool(False)}` accepts any Python value with no schema or validation, the same as a regular dict. That openness is what makes it useful &mdash; the engine cannot know in advance what state a given workflow needs to carry around, so it does not force you to declare it.
+The cost is the usual one for freeform key-value stores: if you write the wrong type and read it back later, you find out deep inside a task body at runtime. This is the same trade-off the WorkChain `ctx` has (and that workflow context stores in Airflow, Prefect, and friends all have). A *strictly* typed ctx would defeat its purpose; a more useful direction would be an *optional* per-graph schema you opt into when you want the safety, but that does not exist today in aiida-workgraph.
+For now, the working discipline is to define the keys explicitly at the initialisation site and stick to them.
+:::
+
+`While` is a Python context manager that takes a condition socket and an optional max-iterations cap:
 
 ```{code-cell} ipython3
-from aiida_workgraph import While, WorkGraph
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show `While` signature and docstring'
+:    code_prompt_hide: 'Hide signature'
+
+from aiida_workgraph import While
+help(While)
+```
+
+The only new helper we need is one that bumps `n_steps` in a parameters dict between iterations &mdash; a small calcfunction in `include/tasks.py`:
+
+```{literalinclude} include/tasks.py
+:language: python
+:pyobject: bump_n_steps
+```
+
+```{code-cell} ipython3
+from aiida_workgraph import While, get_current_graph
 from include.tasks import bump_n_steps
 
-prepare_input_task = task(prepare_input)
-parse_output_task = task(parse_output)
 bump_n_steps_task = task(bump_n_steps)
+```
+
+Each iteration runs gsrd at the current `n_steps`, measures `variance(V)`, and either stops (target reached) or bumps `n_steps` and goes again.
+The stopping criterion is just `variance >= target`, which we can write directly on the socket: WorkGraph overloads the comparison operators on sockets, so `result.variance_V >= target` builds an `op_ge` task implicitly (the same way `wg.ctx.done == False` builds an `op_eq` task as the loop condition, or `variance_V > variance_threshold` did for the `If` example earlier).
+
+```{code-cell} ipython3
+@task.graph()
+def extend_to_plateau(initial, command, target):
+    wg = get_current_graph()
+    wg.ctx = {
+        'parameters': initial,
+        'done': orm.Bool(False),
+    }
+    # E712 = "comparison to False should be 'is False' or 'not <x>'". Suppressed here:
+    # `wg.ctx.done` is a socket, not a bool, so `==` builds an `op_eq` task; `is`/`not` would not.
+    with While(wg.ctx.done == False, max_iterations=8):  # noqa: E712
+        result = gray_scott_pipeline(parameters=wg.ctx.parameters, command=command)
+        wg.ctx.parameters = bump_n_steps_task(
+            parameters=wg.ctx.parameters, increment=orm.Int(1000)
+        ).result
+        wg.ctx.done = result.variance_V >= target
 
 
+initial_params = orm.Dict({**BASE_PARAMS, 'F': 0.040, 'n_steps': 1000})
+wg_loop = extend_to_plateau.build(
+    initial=initial_params,
+    command=gsrd_code,
+    target=0.012,
+)
+```
+
+:::{note} The same loop with a named predicate task
+:class: dropdown
+For a one-line `>=`, the operator-overload form above is concise and consistent with the rest of the module. If the stopping criterion were more involved (multi-line logic, a learned classifier, pattern detection on the V-field), wrapping it as a `@task()` makes the graph self-documenting and gives the predicate a meaningful name in the provenance:
+
+```python
 @task()
 def reached_plateau(variance: float, target: float) -> bool:
     """Return True once variance(V) reaches the saturation target."""
     return float(variance) >= float(target)
+
+# ... inside the While body:
+done = reached_plateau(variance=parsed.variance_V, target=target)
+wg.ctx.done = done.result
 ```
 
-Each iteration runs gsrd at the current `n_steps`, measures `variance(V)`, and either stops (target reached) or bumps `n_steps` and goes again.
+The graph looks the same except the `op_ge` task is replaced by a `reached_plateau` PyFunction. `@task()` is enough here because the predicate is stateless and the inputs are plain Python values (`float`, not `orm.Float`); `@calcfunction` would also work but persists every iteration's call as a `CalcFunctionNode`, which is overkill for a one-line check.
+:::
+
+The graph contains the loop body **once**, even though it will run several times: an `op_eq` task wraps the `wg.ctx.done == False` comparison and feeds the `while_zone`, whose body holds the `gray_scott_pipeline` sub-graph task, the `bump_n_steps` calcfunction, and the `op_ge` task that compares `variance_V` against `target`. The two write-back edges from inside the zone to `graph_ctx` (`op_ge.result → ctx.done` and `bump_n_steps.result → ctx.parameters`) are what closes the loop.
 
 ```{code-cell} ipython3
-initial_params = orm.Dict({**BASE_PARAMS, 'F': 0.040, 'n_steps': 1000})
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show interactive workflow graph'
+:    code_prompt_hide: 'Hide interactive workflow graph'
 
-with WorkGraph('extend_to_plateau') as wg_loop:
-    wg_loop.ctx = {
-        'parameters': initial_params,
-        'done': orm.Bool(False),
-    }
-    with While(wg_loop.ctx.done == False, max_iterations=8):  # noqa: E712
-        prepared = prepare_input_task(parameters=wg_loop.ctx.parameters)
-        simulation = shelljob(
-            command=gsrd_code,
-            arguments=['{input}'],
-            nodes={'input': prepared.result},
-            outputs=['results.npz'],
-        )
-        parsed = parse_output_task(stdout=simulation.stdout)
-        done = reached_plateau(variance=parsed.variance_V, target=0.012)
-        wg_loop.ctx.parameters = bump_n_steps_task(
-            parameters=wg_loop.ctx.parameters, increment=orm.Int(1000)
-        ).result
-        wg_loop.ctx.done = done.result
+wg_loop
+```
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show workflow execution log'
+:    code_prompt_hide: 'Hide workflow execution log'
 
 wg_loop.run()
-print(f'\nFinal state: {wg_loop.state}')
+```
+
+```{code-cell} ipython3
+print(f'Final state: {wg_loop.state}')
 ```
 
 :::{important}
 **Reassigning a Python variable inside a `While` body does *not* create a feedback edge.**
-Writing `prepared = prepare_input_task(...)` rebinds the *Python* name but does not tell WorkGraph that the next iteration's `parameters` should come from somewhere different.
+Writing `result = gray_scott_pipeline(...)` rebinds the *Python* name `result` but does not tell WorkGraph that the next iteration's `parameters` should come from somewhere different &mdash; the next iteration is *the same static sub-graph* re-executed, not a re-walking of the Python body.
 For state that has to flow from one iteration to the next, **write it into `wg.ctx`** and read it back from `wg.ctx` at the top of the body.
-That is what the two `wg_loop.ctx.<name>` assignments above are for: `parameters` carries the growing `n_steps` between iterations, and `done` carries the stopping signal.
+That is what the two `wg.ctx.<name>` assignments inside `extend_to_plateau` are for: `parameters` carries the growing `n_steps` between iterations, and `done` carries the stopping signal.
 :::
 
 The provenance shows one `ShellJob` (and the surrounding calcfunctions) per iteration:
@@ -266,9 +417,9 @@ for n, (_, n_steps, variance) in enumerate(iterations, start=1):
 The condition only references ctx values that the **current** iteration is responsible for setting (`done`).
 This is the cleanest shape for a `While` loop in WorkGraph: each iteration *only* writes the ctx keys it owns, and the condition reads keys whose value is fully determined by a single task in the current iteration.
 A loop whose condition compares "this iteration vs. last iteration" needs the previous value to *outlive* the current iteration's writes, which requires more care (you have to route the previous value through the comparing task explicitly so the engine sees the read-before-write dependency).
-::: 
+:::
 
-::::{dropdown} Why we don't loop over `dt` here
+::::{dropdown} Why we don't loop over&nbsp;`dt`&nbsp;here
 :icon: question
 
 A natural alternative is **time-step convergence**: halve `dt` and double `n_steps` (keeping the simulated time `dt * n_steps` constant) until `variance(V)` stops changing.
@@ -278,21 +429,18 @@ For the tutorial's parameter regime (`F = 0.04`, `dt = 1.0`, etc.) the integrato
 That makes for poor pedagogy: the loop reads as iterative but the data say it never had to be.
 We chose `n_steps` (i.e., simulated time) because it *does* drift across iterations at our parameters, so the loop does real work and exits on a real saturation condition.
 
-If your code has a tighter stability margin or your parameters live near the CFL limit, the same `While`+`ctx` skeleton applies to `dt` unchanged; the only thing that moves is what `bump_n_steps` becomes.
+If your code has a tighter stability margin or your parameters sit near the numerical-stability limit for the time step (the "CFL condition" for explicit schemes &mdash; roughly, halving `dt` is required whenever the diffusion is faster or the grid is finer), the same `While`+`ctx` skeleton applies to `dt` unchanged; the only thing that moves is what `bump_n_steps` becomes.
 ::::
 
-## Composing graphs of graphs
+## `If` inside `Map`: per-iteration variable shape
 
-Everything we have written so far is just a graph: `pipeline_with_optional_fft` is a graph; the `wg_loop` we just ran is a graph; Module 3's `gray_scott_pipeline` was a graph.
-A `@task.graph()` can be added as a single task inside any other graph, which is what keeps each level small and readable.
-
-The mechanic is the same one Module 3 used to put `gray_scott_pipeline` inside `gray_scott_sweep`'s `Map`: call the inner graph like a function from the outer graph's body, and AiiDA wires the inputs/outputs through.
-Here we reuse `pipeline_with_optional_fft` inside a `Map` zone so the `If`-gated FFT now decides itself, per iteration:
+Module 3's `gray_scott_sweep` ran the same three-step pipeline for every `F`: every iteration had the **same shape**.
+What happens if we put an `If`-gated pipeline inside the `Map`?
+Each iteration's internal shape is then decided **by that iteration's own data**: one run does the FFT, the next one does not, all from the same `param_sweep`.
+The outer graph builds the loop body once; the engine fans it out at runtime, and the shape of each fan-out branch is independent.
 
 ```{code-cell} ipython3
-:tags: ["hide-output"]
-
-from aiida_workgraph import Map, dynamic
+from aiida_workgraph import Map, dynamic, namespace
 
 from include.constants import F_VALUES
 
@@ -321,11 +469,18 @@ wg_cond = conditional_sweep.build(
     command=gsrd_code,
     variance_threshold=0.005,
 )
+```
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show workflow execution log'
+:    code_prompt_hide: 'Hide workflow execution log'
+
 wg_cond.run()
 ```
 
-The provenance now records the FFT only for the runs that earned it.
-We can see this by counting how many `fft_peak_wavelength` calcfunctions ran in total and comparing to the number of sweep points:
+Counting how many `fft_peak_wavelength` processes ran shows the fan-out's variable shape directly:
 
 ```{code-cell} ipython3
 fft_runs = sum(
@@ -336,7 +491,8 @@ print(f'FFT ran for {fft_runs} of {len(param_sweep)} sweep points '
       f'(threshold variance(V) > 0.005).')
 ```
 
-This is what `If` inside `Map` buys: the *shape* of each iteration is decided by that iteration's data, not by something we knew when we wrote the graph.
+`Map` plus a uniform sub-graph (Module 3) gives you `N` identical iterations.
+`Map` plus an `If`-gated sub-graph (this section) gives you `N` iterations whose shape is decided per-iteration, from data that did not exist when you wrote the graph.
 
 ## Putting it together: an adaptive sweep
 
@@ -352,32 +508,12 @@ The recipe has three parts:
 
 The trick that makes step 3 depend on step 2 is the `Map` source: it is a *socket* (`refined.result`), not a Python dict, so AiiDA only enumerates the iteration keys once the coarse sweep has finished.
 
-First, a tiny sub-graph that bundles the gsrd run plus its parser into one reusable step.
-We will use it twice below: once for the coarse sweep (variance only) and once for the refined sweep (variance plus FFT on the same simulation's `results.npz`).
+The coarse sweep needs only `variance_V`; the refined sweep needs both `variance_V` and `results_npz` (for the FFT). `gray_scott_pipeline` from `include/workflows.py` already exposes all three outputs, so we reuse it for both `Map` zones below.
 
 ```{code-cell} ipython3
-from aiida_workgraph import namespace
-
 from include.tasks import identify_transition_region
 
 fft_peak_wavelength_task = task(fft_peak_wavelength)
-
-
-@task.graph()
-def simulate(
-    parameters: orm.Dict,
-    command: orm.AbstractCode,
-) -> namespace(variance_V=float, results_npz=orm.SinglefileData):
-    """Run gsrd once and parse it. Exposes variance_V (scalar) and results_npz (file)."""
-    prepared = prepare_input_task(parameters=parameters)
-    sim = shelljob(
-        command=command,
-        arguments=['{input}'],
-        nodes={'input': prepared.result},
-        outputs=['results.npz'],
-    )
-    parsed = parse_output_task(stdout=sim.stdout)
-    return {'variance_V': parsed.variance_V, 'results_npz': sim.results_npz}
 ```
 
 Now the adaptive sweep itself.
@@ -398,7 +534,7 @@ def adaptive_sweep(
     """Coarse F-sweep -> locate transition -> refined sweep with FFT on each point."""
     # 1. Coarse sweep: only the variance is needed to locate the transition.
     with Map(coarse_sweep) as coarse:
-        run = simulate(parameters=coarse.item.value, command=command)
+        run = gray_scott_pipeline(parameters=coarse.item.value, command=command)
         coarse.gather({'variance_V': run.variance_V})
 
     # 2. Identify: build the refined sweep dict from the coarse variances.
@@ -410,7 +546,7 @@ def adaptive_sweep(
 
     # 3. Refined sweep: the Map source is the *socket* refined.result, not a static dict.
     with Map(refined.result) as fine:
-        fine_run = simulate(parameters=fine.item.value, command=command)
+        fine_run = gray_scott_pipeline(parameters=fine.item.value, command=command)
         wavelength = fft_peak_wavelength_task(results_npz=fine_run.results_npz)
         fine.gather({
             'variance_V': fine_run.variance_V,
@@ -425,8 +561,6 @@ def adaptive_sweep(
 ```
 
 ```{code-cell} ipython3
-:tags: ["hide-output"]
-
 # A slightly longer simulation than the M2/M3 default so the FFT analysis
 # has well-developed patterns to measure.
 adaptive_base = {**BASE_PARAMS, 'n_steps': 8000}
@@ -442,45 +576,48 @@ wg_adaptive = adaptive_sweep.build(
     command=gsrd_code,
     n_refined=orm.Int(5),
 )
+```
+
+The graph mirrors the three-step recipe one-to-one: two `map_zone` siblings (the coarse and refined sweeps) bridged by the `identify_transition_region` task. The refined `map_zone` reads its source socket from `identify_transition_region.result`, so the engine cannot begin the refined fan-out until the coarse `Map`'s `variance_V` gather has finished and `identify_transition_region` has produced the new parameter set.
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show interactive workflow graph'
+:    code_prompt_hide: 'Hide interactive workflow graph'
+
+wg_adaptive
+```
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show workflow execution log'
+:    code_prompt_hide: 'Hide workflow execution log'
+
 wg_adaptive.run()
 ```
 
 The refined sweep is clustered where the coarse sweep showed the steepest change in variance. Inspect both:
 
 ```{code-cell} ipython3
-:tags: ["hide-input"]
-:mystnb:
-:    code_prompt_show: 'Show plotting code: coarse + refined transition curves'
+from include.plotting import plot_adaptive_sweep
 
-import matplotlib.pyplot as plt
-
-
-def _key_to_f(key: str) -> float:
-    parts = key.split('_')
-    return float(f'{parts[1]}.{parts[2]}')
-
-
-coarse_var = {_key_to_f(k): float(v) for k, v in wg_adaptive.outputs.coarse_variances._value.items()}
-refined_var = {_key_to_f(k): float(v) for k, v in wg_adaptive.outputs.refined_variances._value.items()}
-
-fig, ax = plt.subplots(figsize=(6, 4))
-ax.plot(sorted(coarse_var), [coarse_var[f] for f in sorted(coarse_var)],
-        'o-', color='tab:blue', label='coarse sweep')
-ax.plot(sorted(refined_var), [refined_var[f] for f in sorted(refined_var)],
-        's-', color='tab:orange', label='refined sweep')
-ax.set_xlabel('Feed rate F')
-ax.set_ylabel('variance(V)')
-ax.set_yscale('log')
-ax.set_title('Adaptive Gray-Scott sweep')
-ax.legend()
-ax.grid(True, alpha=0.3)
-fig.tight_layout()
-plt.show()
+plot_adaptive_sweep(
+    coarse_variances=wg_adaptive.outputs.coarse_variances._value,
+    refined_variances=wg_adaptive.outputs.refined_variances._value,
+)
 ```
 
 The wavelength estimate from the FFT is in there too, one per refined point:
 
 ```{code-cell} ipython3
+def _key_to_f(key: str) -> float:
+    """Reverse the ``F_0_038`` key encoding back to a float."""
+    _, integer, fractional = key.split('_')
+    return float(f'{integer}.{fractional}')
+
+
 wavelengths = wg_adaptive.outputs.refined_wavelengths._value
 for key in sorted(wavelengths):
     print(f'  F = {_key_to_f(key):.4f}  ->  wavelength = {float(wavelengths[key]):.2f} cells')

@@ -29,11 +29,11 @@ import shutil
 import time
 
 from aiida import load_profile
-from aiida.brokers.zmq.broker import ZmqBroker
+from aiida.brokers import ZmqBroker
 from aiida.common.exceptions import NotExistent
-from aiida.engine.daemon.client import get_daemon_client
+from aiida.engine import get_daemon_client
+from aiida.manage import get_manager
 from aiida.manage.configuration import create_profile, get_config
-from aiida.manage.manager import get_manager
 from aiida.orm import Computer, InstalledCode, load_code, load_computer
 
 # Derive a short suffix from the mtimes of all setup scripts: stable across

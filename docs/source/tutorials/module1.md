@@ -258,8 +258,26 @@ print(f"mean(V)     = {mean_v:.4e}")
 That regex is the price of admission for a code that prints its headline scalars only to stdout.
 We did exactly the same thing manually in {ref}`Module 0 <tutorial:module0>`; the difference now is that the stdout text, the regex result, and the input that produced them all live as tracked nodes in the provenance graph. {ref}`Module 2 <tutorial:module2>` turns this hand-written extraction into a proper {func}`@calcfunction <aiida.engine.processes.functions.calcfunction>`, so it becomes a first-class step in the pipeline.
 
-<!-- TODO: Add `verdi shell` subsection: interactive exploration of the database
-     (load nodes, inspect attributes, follow links). From meeting notes. -->
+:::{tip} Interactive exploration with&nbsp;`verdi shell`
+:class: dropdown
+
+Notebooks are great for tutorials, but day-to-day debugging often happens in a shell.
+`verdi shell` drops you into an IPython session with your active profile already loaded, plus a handful of convenience symbols imported:
+
+```bash
+verdi shell
+```
+
+```pycon
+>>> node = load_node(<PK>)            # load any node by PK or UUID
+>>> node.outputs.stdout.get_content() # follow output links
+>>> node.inputs                       # inspect inputs
+>>> QueryBuilder().append(...).all()  # query the provenance graph
+```
+
+The shell pulls in `load_node`, `load_code`, `load_computer`, `Dict`, `Int`, `QueryBuilder`, `User`, etc., so you do not need `from aiida import ...` boilerplate.
+It is the same Python environment as `%load_ext aiida` gives you inside Jupyter; pick whichever feels right.
+:::
 
 ## Dumping calculation data
 

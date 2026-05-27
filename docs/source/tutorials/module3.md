@@ -10,7 +10,7 @@ kernelspec:
   language: python
   name: python3
 execution:
-  timeout: 120
+  timeout: 300
 ---
 
 (tutorial:module3)=
@@ -104,10 +104,15 @@ Before we write any code, it helps to have a mental picture of the four objects 
 - **Link**: a directed connection between an output socket of one task and an input socket of another. Links are created automatically when you pass one task's output socket as an argument to another task.
 
 :::{important}
-Inside a WorkGraph definition, **calling a task function does not execute it**.
-It creates a task node in the graph and returns a handle whose attributes are output sockets, references to future values.
-The actual execution only happens when you call `wg.run()` (or `wg.submit()`).
-This is the single most important mental shift when moving from plain Python loops to WorkGraph.
+**Building the graph and running the graph are two completely separate steps.**
+
+Inside a WorkGraph definition, calling a task function does not execute it.
+It creates a task node in the graph and returns a handle whose attributes are **output sockets** &mdash; placeholders for values that don't exist yet.
+You are not handling AiiDA `Float` / `Dict` / `SinglefileData` *values* yet; you are handling *sockets*, which the engine will fill in at execution time.
+
+Actual execution only happens later, when you call `wg.run()` (or `wg.submit()`).
+That separation is why a comparison like `parsed.variance_V > threshold` produces a new socket (a comparison task) rather than a Python `bool`, and why iterating a socket with a Python `for` or branching on it with a plain `if` does not work the way you might expect.
+It is the single most important mental shift when moving from plain Python loops to WorkGraph.
 :::
 
 ## Composing the pipeline as a workflow
@@ -125,7 +130,7 @@ from aiida import orm
 from aiida_workgraph import Map, WorkGraph, task, shelljob, dynamic, namespace
 
 from include.constants import BASE_PARAMS, F_VALUES
-from include.tasks import ParseOutputs, prepare_input, parse_output
+from include.tasks import prepare_input, parse_output
 ```
 
 We reuse the `prepare_input` and `parse_output` calcfunctions from {ref}`Module 2 <tutorial:module2>` ({download}`include/tasks.py`).
@@ -164,23 +169,18 @@ With the tasks wrapped, we can write the workflow itself: a Python function deco
 Its body reads like ordinary Python, but as the callouts above warned, the calls inside register tasks and links rather than executing right away.
 The function signature becomes the graph's inputs and the return statement its outputs.
 
-```{code-cell} ipython3
+The canonical definition lives in `include/workflows.py` so later modules (and other notebooks) can import the same pipeline rather than redefining it &mdash; each module's `.md` file runs in its own kernel and cannot reach names defined in other modules' cells.
+The file declares one extra output socket on top of what we strictly need here, `results_npz`, so Module 6 can read the V-field for follow-on analyses.
 
-@task.graph()
-def gray_scott_pipeline(
-    parameters: orm.Dict,
-    command: orm.AbstractCode,
-) -> ParseOutputs:
-    """Prepare input, run simulation, parse output."""
-    prepared = prepare_input_task(parameters=parameters)
-    simulation = shelljob(
-        command=command,
-        arguments=['{input}'],
-        nodes={'input': prepared.result},
-        outputs=['results.npz'],
-    )
-    parsed = parse_output_task(stdout=simulation.stdout)
-    return {'variance_V': parsed.variance_V, 'mean_V': parsed.mean_V}
+```{literalinclude} include/workflows.py
+:language: python
+:pyobject: gray_scott_pipeline
+```
+
+We bring it into the current namespace with a plain import:
+
+```{code-cell} ipython3
+from include.workflows import gray_scott_pipeline
 ```
 
 **Line by line**:
@@ -207,10 +207,15 @@ Adds the `parse_output` task.
 `simulation.stdout` is the ShellJob's auto-captured stdout socket; that is where `gsrd` prints the headline scalars our parser regexes out.
 
 ```python
-return {'variance_V': parsed.variance_V, 'mean_V': parsed.mean_V}
+return {
+    'variance_V': parsed.variance_V,
+    'mean_V': parsed.mean_V,
+    'results_npz': simulation.results_npz,
+}
 ```
 
-Wires the two named outputs of `parse_output` to the graph's own outputs (`parsed.variance_V` &rarr; the graph's `variance_V`, same for `mean_V`).
+Wires the named outputs to the graph's own outputs.
+`parsed.variance_V` and `parsed.mean_V` are the two scalar diagnostics parsed from stdout; `simulation.results_npz` is the file output declared on the `ShellJob` (`outputs=['results.npz']`), kept around so later modules can read the V and U fields directly.
 
 Before running anything, it helps to convince yourself that the function body above really is just a *specification*.
 `.build(...)` returns a `WorkGraph` object whose tasks and sockets we can inspect without running any simulation:
@@ -239,21 +244,41 @@ for t in wg_preview.tasks:
 
 Three things to notice:
 
-- The **return type annotation** `-> ParseOutputs` is what makes `variance_V` and `mean_V` appear as graph outputs. WorkGraph reads the TypedDict's keys and turns them into named output sockets.
+- The **return type annotation** `-> GrayScottOutputs` (a `TypedDict` defined alongside the function in `include/workflows.py`) is what makes `variance_V`, `mean_V`, and `results_npz` appear as graph outputs. WorkGraph reads the TypedDict's keys and turns them into named output sockets.
 - Task inputs accept **both plain Python values and sockets**. Above we passed `parameters` (an input socket), `command` (a real `InstalledCode` node), and `input` (a socket from `prepare_input_task`). WorkGraph treats them uniformly and creates links wherever a socket is passed.
 - The first three tasks (`graph_inputs`, `graph_outputs`, `graph_ctx`) are **built-ins** WorkGraph adds to every graph: the first two expose the graph's own I/O as pseudo-tasks so links into/out of the graph look like ordinary task-to-task links; `graph_ctx` is a shared key-value store (the WorkGraph analogue of the WorkChain `ctx`), reachable via `wg.ctx.foo = ...`/`wg.ctx.foo`.
+
+WorkGraph also exposes the same structure as an **interactive graph viewer**. Click around the nodes to see the sockets and links; the three built-ins sit on the left, then the linear chain `prepare_input → ShellJob → parse_output` carries `parameters` through to the output sockets.
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show interactive workflow graph'
+:    code_prompt_hide: 'Hide interactive workflow graph'
+
+wg_preview
+```
 
 `gray_scott_pipeline` is now a **factory**: call `.build(...)` to get a standalone `WorkGraph` you can `run()` or `submit()` directly, or call it inside a parent graph to embed it as a sub-task.
 For now, let's exercise the standalone form: build the workflow with a single set of parameters and run it.
 
 ```{code-cell} ipython3
-
 wg = gray_scott_pipeline.build(
     parameters=orm.Dict(BASE_PARAMS),
     command=gsrd_code,
 )
-wg.run()
+```
 
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show workflow execution log'
+:    code_prompt_hide: 'Hide workflow execution log'
+
+wg.run()
+```
+
+```{code-cell} ipython3
 print(f"WorkGraph PK: {wg.process.pk}")
 print(f"State: {wg.state}")
 ```
@@ -326,6 +351,17 @@ Conceptually, a `Map` zone does three things:
 2. Inside the zone, it exposes the current key/value via `map_zone.item.key` and `map_zone.item.value`. These are sockets, so you can wire them into tasks just like any other output.
 3. At the end of the zone, `map_zone.gather({...})` declares which per-iteration outputs to collect. The gathered outputs become accessible on `map_zone.outputs.<name>` as a namespace keyed by the original source keys.
 :::
+
+`Map` is imported alongside the rest of the WorkGraph helpers; its signature and docstring are visible via `help(Map)`:
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show `Map` signature and docstring'
+:    code_prompt_hide: 'Hide signature'
+
+help(Map)
+```
 
 To close the loop, we add a final **reduction step** to the workflow: a calcfunction `make_transition_plot` ({download}`include/tasks.py`) that takes the gathered `variance_V` `Float` nodes and renders a transition curve as a `SinglefileData` PNG.
 The workflow's primary output is then that single artifact: the per-iteration variances "fork out" via `Map`, and the plotting task "joins" them back together.
@@ -400,15 +436,34 @@ for key, val in param_sweep.items():
     print(f'  {key:<10}  ->  F = {val["F"]}')
 ```
 
-Now `.build(...)` with concrete inputs and `.run()` to actually launch the sweep:
+Now `.build(...)` with concrete inputs:
 
 ```{code-cell} ipython3
-:tags: ["hide-output"]
-
 wg_sweep = gray_scott_sweep.build(
     param_sweep=param_sweep,
     command=gsrd_code,
 )
+```
+
+The sweep graph contains the same `gray_scott_pipeline` sub-graph as before, now wrapped in a single `map_zone`. Even though we are about to run gsrd many times, the **build-time graph stays compact**: `Map` declares "this body runs once per item in `param_sweep`", and the actual fan-out happens at execution time.
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show interactive workflow graph'
+:    code_prompt_hide: 'Hide interactive workflow graph'
+
+wg_sweep
+```
+
+`.run()` to launch the sweep:
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show workflow execution log'
+:    code_prompt_hide: 'Hide workflow execution log'
+
 wg_sweep.run()
 ```
 
@@ -466,15 +521,12 @@ For a zoomable view, run `verdi node graph generate <PK>` from the command line.
 And finally, the workflow's *real* output: the transition curve PNG produced by the reduction step inside the workflow itself, recovered from the database the same way you would recover any other `SinglefileData`:
 
 ```{code-cell} ipython3
-# TODO: WorkGraph output-socket dereference for SinglefileData currently
-# returns None via `.value`. Disabled until the right access path is settled.
-#
-# from IPython.display import Image
-#
-# with wg_sweep.outputs.summary_plot.value.open(mode='rb') as fh:
-#     img_bytes = fh.read()
-#
-# Image(img_bytes)
+from IPython.display import Image
+
+with wg_sweep.outputs.summary_plot.value.open(mode='rb') as fh:
+    img_bytes = fh.read()
+
+Image(img_bytes)
 ```
 
 `verdi process show` works on the sweep workflow node too, but its per-node table is long, so it's hidden here:
@@ -484,6 +536,76 @@ And finally, the workflow's *real* output: the transition curve PNG produced by 
 
 %verdi process show {wg_sweep.process.pk}
 ```
+
+## A 2D scan: feed rate &times; kill rate
+
+So far the sweep has varied only `F`. The classic Gray-Scott phase diagram is two-dimensional, though: the pattern type depends on both the feed rate `F` and the kill rate `k`.
+The point of wrapping the sweep as a `@task.graph()` was that it is parameter-agnostic; we can scan a 2D grid by changing nothing but the contents of `param_sweep`.
+
+We use a 5&times;5 grid that straddles the **boundary** of the pattern-forming region.
+Inside the band, `variance(V)` is of order `1e-2`; outside it, the V field decays to a trivial steady state and `variance(V)` falls below `1e-30`.
+Both regimes are physically meaningful, so we let `gsrd` report whatever it computes and read the boundary off the heatmap.
+
+```{code-cell} ipython3
+F_GRID = [0.020, 0.030, 0.040, 0.050, 0.060]
+K_GRID = [0.045, 0.055, 0.060, 0.063, 0.066]
+
+param_sweep_2d = {}
+for f in F_GRID:
+    for k in K_GRID:
+        # Map keys must be valid identifiers (letters, digits, underscores
+        # only); encode both 'F = 0.040' and 'k = 0.060' as `F_0_040_k_0_060`.
+        f_key = f'F_{f:.3f}'.replace('.', '_')
+        k_key = f'k_{k:.3f}'.replace('.', '_')
+        key = f'{f_key}_{k_key}'
+        param_sweep_2d[key] = {**BASE_PARAMS, 'F': f, 'k': k}
+
+print(f'{len(param_sweep_2d)} parameter sets ({len(F_GRID)} F values x {len(K_GRID)} k values)')
+```
+
+The same `gray_scott_sweep` graph drives both the 1D and 2D scans; only the input dict changes.
+The `make_transition_plot` reduction still runs, but its 1D transition curve is not the figure we care about here, so we ignore that output and reshape the gathered `variance_V` into a 5&times;5 matrix instead.
+
+```{code-cell} ipython3
+wg_2d = gray_scott_sweep.build(
+    param_sweep=param_sweep_2d,
+    command=gsrd_code,
+)
+```
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show interactive workflow graph'
+:    code_prompt_hide: 'Hide interactive workflow graph'
+
+wg_2d
+```
+
+```{code-cell} ipython3
+:tags: [hide-output]
+:mystnb:
+:    code_prompt_show: 'Show workflow execution log'
+:    code_prompt_hide: 'Hide workflow execution log'
+
+wg_2d.run()
+```
+
+Render the gathered variances as a heatmap. The plotting helper lives in {download}`include/plotting.py`; it does the bookkeeping (map keys back to `(F, k)`, floor non-positive entries for the log-norm, build the figure) so the cell stays a one-liner:
+
+```{code-cell} ipython3
+from include.plotting import plot_2d_variance_heatmap
+
+plot_2d_variance_heatmap(
+    variances=wg_2d.outputs.variance_V._value,
+    param_sweep=param_sweep_2d,
+    f_grid=F_GRID,
+    k_grid=K_GRID,
+)
+```
+
+The bright diagonal band is the **pattern-forming region** of the classic Gray-Scott phase diagram: those `(F, k)` combinations develop the spots, stripes, and labyrinths the system is famous for. Above and below the band the V field decays to a trivial steady state and `variance(V)` is essentially zero (the log scale exaggerates the floor, but the colour difference is what matters).
+Twenty-five simulations, one workflow node, full provenance attached.
 
 ## Next steps
 
