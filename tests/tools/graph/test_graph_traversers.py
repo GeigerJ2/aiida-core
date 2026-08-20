@@ -11,6 +11,7 @@
 import pytest
 
 from aiida.common.links import LinkType
+from aiida.common.progress_reporter import ProgressReporterAbstract, set_progress_reporter
 from aiida.tools.graph.graph_traversers import get_nodes_delete, traverse_graph
 
 
@@ -414,3 +415,67 @@ class TestTraverseGraph:
 
         with pytest.raises(ValueError):
             _ = get_nodes_delete([nodes_dict['data_o'].pk], create_backward=False)
+
+
+@pytest.fixture
+def recorded_reporters():
+    """Install a progress reporter recording its instances, and yield the (initially empty) record."""
+    instances = []
+
+    class RecordingReporter(ProgressReporterAbstract):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.init_kwargs = kwargs
+            self.descriptions: list[str | None] = []
+            self.counts: list[int] = []
+            instances.append(self)
+
+        def set_description_str(self, text=None, refresh=True):
+            super().set_description_str(text, refresh)
+            self.descriptions.append(text)
+
+        def update(self, n=1):
+            super().update(n)
+            self.counts.append(self.n)
+
+    set_progress_reporter(RecordingReporter)
+    try:
+        yield instances
+    finally:
+        set_progress_reporter(None)
+
+
+class TestTraversalProgress:
+    """Tests for progress reporting during graph traversal."""
+
+    def test_progress_reported_per_iteration(self, recorded_reporters):
+        """Each traversal iteration must update the progress reporter, counting the nodes visited so far."""
+        nodes_dict = create_minimal_graph()
+
+        result = traverse_graph(
+            [nodes_dict['data_i'].pk],
+            links_forward=[LinkType.INPUT_CALC, LinkType.CREATE],
+        )
+
+        # Three iterations: data_i -> calc_0, calc_0 -> data_o, data_o -> nothing new
+        assert result['nodes'] == {nodes_dict['data_i'].pk, nodes_dict['calc_0'].pk, nodes_dict['data_o'].pk}
+        (reporter,) = recorded_reporters
+        # The unit is named so the counter cannot be misread as the iteration number next to it.
+        assert reporter.init_kwargs == {
+            'total': None,
+            'desc': 'Traversing provenance graph',
+            'unit': ' nodes',
+            'bar_format': None,
+        }
+        assert reporter.n == len(result['nodes'])
+        # The first description is the forced redraw that makes the seeded count visible.
+        assert reporter.descriptions == ['Traversing provenance graph'] + [
+            f'Traversing provenance graph (iteration {i})' for i in (1, 2, 3)
+        ]
+        # Seeded with the one starting node before any query runs, then one node per iteration.
+        assert reporter.counts == [1, 2, 3, 3]
+
+    def test_progress_skipped_for_empty_start(self, recorded_reporters):
+        """No progress reporter should be created when there is nothing to traverse."""
+        traverse_graph([], links_forward=[LinkType.CREATE])
+        assert recorded_reporters == []

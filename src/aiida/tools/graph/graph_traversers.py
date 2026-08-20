@@ -18,6 +18,7 @@ from typing_extensions import TypedDict
 from aiida import orm
 from aiida.common import exceptions
 from aiida.common.links import GraphTraversalRules, LinkType
+from aiida.common.progress_reporter import get_progress_reporter
 from aiida.tools.graph.age_entities import Basket
 from aiida.tools.graph.age_rules import RuleSaveWalkers, RuleSequence, RuleSetWalkers, UpdateRule
 
@@ -281,9 +282,27 @@ def traverse_graph(
         rule_incoming = UpdateRule(query_incoming, max_iterations=1, track_edges=get_links)
         rules += [rule_incoming]
 
-    rulesequence = RuleSequence(rules, max_iterations=max_iterations)
+    # The total is unknown upfront, so the bar is a plain counter of the nodes visited, updated
+    # after each traversal iteration. `bar_format=None` drops the project format, whose percentage
+    # would sit at 0.0% forever without a total. The unit is named, with a leading space since tqdm
+    # renders the count as `{n_fmt}{unit}`, because the default `it` reads as the iteration number.
+    description = 'Traversing provenance graph'
+    with get_progress_reporter()(total=None, desc=description, unit=' nodes', bar_format=None) as progress:
+        # The description write is here to force a redraw, not to change the text: `update()` is
+        # throttled, and the next tick is the long first query itself. The starting nodes already
+        # count as visited before any query runs, so showing them now is what keeps a wide graph
+        # from reading `0 nodes` for the whole wait.
+        progress.update(len(basket.nodes.keyset))
+        progress.set_description_str(description, refresh=True)
 
-    results = rulesequence.run(basket)
+        def update_progress(iterations_done: int, visits: Basket) -> None:
+            # refresh=False: the throttled update() below redraws anyway; an unconditional refresh
+            # per iteration would flood non-TTY output (e.g. CI logs) with one redraw per level.
+            progress.set_description_str(f'{description} (iteration {iterations_done})', refresh=False)
+            progress.update(len(visits.nodes.keyset) - progress.n)
+
+        rulesequence = RuleSequence(rules, max_iterations=max_iterations, iteration_callback=update_progress)
+        results = rulesequence.run(basket)
 
     return TraverseGraphOutput(
         nodes=results.nodes.keyset,

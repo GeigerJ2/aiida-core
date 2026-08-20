@@ -637,6 +637,24 @@ class TestAiidaGraphExplorer:
         result = uprule.run(basket.copy())['nodes'].keyset
         assert result == set()
 
+    def test_rules_from_generator(self):
+        """A generator of rules must survive validation: `run` iterates the rules once per iteration."""
+        nodes = self._create_basic_graph()
+        basket = Basket(nodes=[nodes['calc_0'].pk])
+
+        def make_rules():
+            queryb = orm.QueryBuilder()
+            queryb.append(orm.Node, tag='nodes_in_set')
+            queryb.append(orm.Node, with_incoming='nodes_in_set')
+            yield UpdateRule(queryb)
+
+        from_list = RuleSequence(list(make_rules()), max_iterations=np.inf)
+        from_generator = RuleSequence(make_rules(), max_iterations=np.inf)
+
+        expected = {nodes['calc_0'].pk, nodes['data_o'].pk}
+        assert from_list.run(basket.copy())['nodes'].keyset == expected
+        assert from_generator.run(basket.copy())['nodes'].keyset == expected
+
 
 class TestAiidaEntitySet:
     """Tests for AiidaEntitySets"""
