@@ -41,12 +41,33 @@ print(results['stdout'].get_content())
 ```
 
 The `core.shell` calculation job and parser entry points keep the names they had in `aiida-shell`, so existing nodes, archives and scripts that refer to them are unaffected.
-`launch_shell_job` is importable from `aiida.tools`, and the `PickledData` and `EntryPointData` data plugins from `aiida.orm`.
 
 Because the entry point names are the same, `aiida-shell` must be uninstalled before upgrading: with both installed, every one of the shared entry points resolves to two different values and raises `MultipleEntryPointError`.
 Replace `from aiida_shell import launch_shell_job` with `from aiida.tools import launch_shell_job`; see {ref}`how-to:run-shell-commands`.
 
 ### Behavior changes
+
+#### Checkpoints carry callables that no name can recover
+
+A checkpoint can now carry a lambda, a closure or a `functools.partial`, which are serialized in full, while anything importable keeps the name reference it had.
+Previously these were written as a reference to a name that resolves to something else, or to nothing at all.
+Nothing in `aiida-core` put a callable in a checkpoint, so that was a latent defect rather than a failure anyone could reach.
+
+A name is only kept when the daemon worker that reads the checkpoint back can resolve it.
+The worker imports from the `sys.path` the daemon froze when it started, so a directory added to a submitting shell afterwards is importable there and not in the worker.
+A callable from such a directory now travels inside the checkpoint, together with the modules it calls into, instead of leaving a reference the worker cannot follow.
+A name that would find a *different* file in the worker is treated the same way, since that reference would silently run other code.
+
+`aiida.common.callables.modules_missing_from` lists the loaded modules an interpreter could not import, and `dumps(value, carry=...)` writes them into the payload.
+That is what a calculation job needs to run a callable on a remote computer, where the user's own modules are not installed.
+Modules the reader already has stay references, so a payload never carries an installed dependency or pins the version of one.
+
+#### Processes defined where no name reaches them
+
+A process class defined in a Jupyter notebook or a script can now be submitted to the daemon.
+Its checkpoint records the class itself rather than a name, chosen by the same question as above: whether the worker resolves that name to the same object.
+Previously such a process was created and then excepted in the worker with `ImportError: object 'NotebookWorkChain' from identifier '__main__:NotebookWorkChain' could not be loaded`.
+A class that cannot be serialized, such as one defined inside a function that closes over a node, keeps the name it had and behaves as it did before.
 
 ### Fixes
 
